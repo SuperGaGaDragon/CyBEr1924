@@ -38,7 +38,7 @@ origins = [
     "http://localhost:5173",                # Local frontend development
     "http://localhost:5174",                # Local frontend development (alternate port)
     "https://cyber1924.com",                # Production domain
-    "https://*.pages.dev",                  # Cloudflare Pages preview/production
+    "https://cyber1924.pages.dev",          # Cloudflare Pages production
 ]
 
 app.add_middleware(
