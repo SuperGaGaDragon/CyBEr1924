@@ -66,6 +66,19 @@ function App() {
     showRegister: false,
   });
 
+  // Initialize token from localStorage on mount
+  useEffect(() => {
+    const savedToken = localStorage.getItem("cyber1924_token");
+    if (savedToken) {
+      setAccessToken(savedToken);
+      setAuth((prev) => ({
+        ...prev,
+        accessToken: savedToken,
+        isLoggedIn: true,
+      }));
+    }
+  }, []);
+
   useEffect(() => {
     if (!auth.isLoggedIn || !auth.accessToken) return;
 
@@ -121,6 +134,9 @@ function App() {
         throw new Error("No access token returned");
       }
 
+      // Save token to localStorage
+      localStorage.setItem("cyber1924_token", resp.access_token);
+
       setAccessToken(resp.access_token);
 
       setAuth((prev) => ({
@@ -133,6 +149,7 @@ function App() {
       const sessions = await listSessions();
       setState((prev) => ({ ...prev, sessions }));
     } catch (err: any) {
+      localStorage.removeItem("cyber1924_token");
       setAuth((prev) => ({
         ...prev,
         authError: err.message ?? "Login failed",
@@ -284,6 +301,28 @@ function App() {
         error: err.message ?? "Ask failed",
       }));
     }
+  }
+
+  function handleLogout() {
+    localStorage.removeItem("cyber1924_token");
+    setAccessToken(null);
+    setAuth({
+      email: "",
+      password: "",
+      verificationCode: "",
+      accessToken: null,
+      isLoggedIn: false,
+      authError: null,
+      showVerification: false,
+      showRegister: false,
+    });
+    setState({
+      sessions: [],
+      activeSessionId: null,
+      snapshot: null,
+      loading: false,
+      error: null,
+    });
   }
 
   const { sessions, snapshot, loading, error, activeSessionId } = state;
@@ -796,11 +835,16 @@ function App() {
           borderRight: "1px solid #ddd",
           padding: 12,
           boxSizing: "border-box",
+          display: "flex",
+          flexDirection: "column",
         }}
       >
-        <h3>Sessions</h3>
-        <div style={{ fontSize: 10, opacity: 0.6, marginBottom: 8 }}>v1.0 - Auto Deploy</div>
-        <button onClick={handleCreateSession}>＋ New Session</button>
+        <div>
+          <h3>Sessions</h3>
+          <div style={{ fontSize: 10, opacity: 0.6, marginBottom: 8 }}>v1.0 - Auto Deploy</div>
+          <button onClick={handleCreateSession} style={{ width: "100%", marginBottom: 8 }}>＋ New Session</button>
+          <button onClick={handleLogout} style={{ width: "100%", marginBottom: 12, background: "#f44", color: "white" }}>Logout</button>
+        </div>
         <ul style={{ listStyle: "none", padding: 0, marginTop: 12 }}>
           {sessions.map((session) => (
             <li

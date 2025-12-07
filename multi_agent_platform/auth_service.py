@@ -68,8 +68,8 @@ def generate_verification_code(length: int = 6) -> str:
     return "".join(secrets.choice(digits) for _ in range(length))
 
 
-def create_user(email: str, plain_password: str, ttl_minutes: int = 10) -> DbUser:
-    """注册新用户 + 生成验证码。"""
+def create_user(email: str, plain_password: str, ttl_minutes: int = 10) -> str:
+    """注册新用户 + 生成验证码，返回验证码。"""
     with SessionLocal() as db:
         # 检查邮箱是否已存在
         existing = db.query(DbUser).filter(DbUser.email == email).first()
@@ -93,7 +93,7 @@ def create_user(email: str, plain_password: str, ttl_minutes: int = 10) -> DbUse
         # 暂时先用日志/print 代替真正发邮件
         print(f"[DEV ONLY] Verification code for {email} is {code}")
 
-        return user
+        return code
 
 
 def get_user_by_email(email: str) -> Optional[DbUser]:

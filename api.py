@@ -7,9 +7,11 @@ Handles session creation, listing, snapshot retrieval, and command execution for
 
 from __future__ import annotations
 
+import os
 import json
 from datetime import datetime, timezone
 from typing import Dict, Any, Optional, List
+import resend
 
 from fastapi import Depends, FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
@@ -74,6 +76,16 @@ app.add_middleware(
 # Initialize database
 init_db()
 
+# Initialize Resend
+RESEND_API_KEY = os.getenv("RESEND_API_KEY")
+EMAIL_FROM = os.getenv("EMAIL_FROM")
+
+if not RESEND_API_KEY or not EMAIL_FROM:
+    # 这里不要直接 raise，让本地/测试还能跑；真正发邮件失败再报错
+    print("[WARN] RESEND_API_KEY or EMAIL_FROM not set; email sending will be disabled.")
+else:
+    resend.api_key = RESEND_API_KEY
+
 # Initialize orchestrator (singleton)
 artifact_store = ArtifactStore()
 message_bus = MessageBus(store=artifact_store)
@@ -103,6 +115,27 @@ def get_current_user(
         raise HTTPException(status_code=401, detail="User not found")
 
     return user
+
+
+def send_verification_email(email: str, code: str) -> None:
+    """
+    使用 Resend 发送邮箱验证码。
+    """
+    if not RESEND_API_KEY or not EMAIL_FROM:
+        # 没配置就只打日志，不中断注册流程（你也可以改成 raise）
+        print(f"[WARN] Email not sent, missing RESEND_API_KEY/EMAIL_FROM. Code for {email}: {code}")
+        return
+
+    params = {
+        "from": EMAIL_FROM,
+        "to": email,
+        "subject": "Your Cyber1924 verification code",
+        "html": (
+            f"<p>Your verification code is: <b>{code}</b></p>"
+            "<p>This code will expire in 10 minutes.</p>"
+        ),
+    }
+    resend.Emails.send(params)
 
 
 def _iso_datetime(ts: Optional[float]) -> Optional[datetime]:
@@ -239,13 +272,21 @@ def post_command(
 @app.post("/auth/register", response_model=AuthResponse)
 def register(payload: RegisterRequest):
     """
-    注册用户：创建用户 + 生成验证码（先打印在后台日志中）。
+    注册用户：创建用户 + 生成验证码并发邮件。
     """
     try:
-        create_user(payload.email, payload.password)
+        verification_code = create_user(payload.email, payload.password)
     except ValueError as e:
         # 比如 Email already registered
         raise HTTPException(status_code=400, detail=str(e))
+
+    # 发送邮件
+    try:
+        send_verification_email(payload.email, verification_code)
+    except Exception as e:
+        # 发邮件失败时你可以视情况处理：这里先打印日志但不阻止注册
+        print(f"[ERROR] Failed to send verification email to {payload.email}: {e}")
+        # 也可以改成 raise HTTPException(500, "Failed to send verification email")
 
     return AuthResponse(
         message="Registered successfully. Please check your email for the verification code."
