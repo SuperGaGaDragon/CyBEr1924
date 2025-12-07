@@ -1,0 +1,12 @@
+{
+  "plan_id": "plan-591a71e7",
+  "title": "简单测试：1+1",
+  "subtasks": [
+    {
+      "id": "t1",
+      "title": "[planner 模拟回复] You are a strict task planner. Based on the user's topic, generate a step-by-step plan. -> 你刚才说：请为下面的主题生成一个分步骤的计划，每个子任务一句话：\\n\\n主题：简单测试：1+1...",
+      "status": "pending",
+      "notes": ""
+    }
+  ]
+}
