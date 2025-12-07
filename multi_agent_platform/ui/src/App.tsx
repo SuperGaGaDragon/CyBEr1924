@@ -152,6 +152,7 @@ function App() {
         }}
       >
         <h3>Sessions</h3>
+        <div style={{ fontSize: 10, opacity: 0.6, marginBottom: 8 }}>v1.0 - Auto Deploy</div>
         <button onClick={handleCreateSession}>＋ New Session</button>
         <ul style={{ listStyle: "none", padding: 0, marginTop: 12 }}>
           {sessions.map((session) => (
