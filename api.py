@@ -35,6 +35,7 @@ from multi_agent_platform.auth_service import (
     get_user_by_email,
     verify_email_code,
     verify_password,
+    create_access_token,
 )
 
 
@@ -226,8 +227,13 @@ def login(payload: LoginRequest):
     if not user.is_verified:
         raise HTTPException(status_code=403, detail="Email not verified")
 
-    # 这里先不做真正 JWT，后面可以再加
-    return AuthResponse(message="Login successful.")
+    token = create_access_token(user.id)
+
+    return AuthResponse(
+        message="Login successful.",
+        access_token=token,
+        token_type="bearer",
+    )
 
 
 # ===== Run Server =====

@@ -67,4 +67,5 @@ class LoginRequest(BaseModel):
 
 class AuthResponse(BaseModel):
     message: str
-    # 以后可以加 token: str
+    access_token: str | None = None
+    token_type: str | None = "bearer"

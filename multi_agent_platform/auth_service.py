@@ -1,8 +1,11 @@
 # multi_agent_platform/auth_service.py
+import os
 import bcrypt
 import secrets
 from datetime import datetime, timedelta, timezone
 from typing import Optional
+
+import jwt
 
 from .db.db import SessionLocal, DbUser
 
@@ -15,6 +18,25 @@ def hash_password(plain_password: str) -> str:
 
 def verify_password(plain_password: str, password_hash: str) -> bool:
     return bcrypt.checkpw(plain_password.encode("utf-8"), password_hash.encode("utf-8"))
+
+
+# ===== JWT Token 相关 =====
+
+JWT_SECRET_KEY = os.getenv("JWT_SECRET_KEY", "dev-secret-key-change-me")
+JWT_ALGORITHM = "HS256"
+JWT_EXPIRE_MINUTES = 60 * 24  # 24 小时有效期
+
+
+def create_access_token(user_id: str, expires_minutes: int = JWT_EXPIRE_MINUTES) -> str:
+    now = datetime.now(timezone.utc)
+    payload = {
+        "sub": user_id,
+        "iat": int(now.timestamp()),
+        "exp": int((now + timedelta(minutes=expires_minutes)).timestamp()),
+    }
+    token = jwt.encode(payload, JWT_SECRET_KEY, algorithm=JWT_ALGORITHM)
+    # PyJWT v2 返回 str
+    return token
 
 
 # ===== 邮箱验证码相关 =====
