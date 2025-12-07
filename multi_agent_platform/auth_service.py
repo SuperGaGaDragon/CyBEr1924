@@ -1,7 +1,7 @@
 # multi_agent_platform/auth_service.py
 import bcrypt
 import secrets
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Optional
 
 from .db.db import SessionLocal, DbUser
@@ -41,7 +41,7 @@ def create_user(email: str, plain_password: str, ttl_minutes: int = 10) -> DbUse
         # 生成验证码
         code = generate_verification_code()
         user.verification_code = code
-        user.verification_expires_at = datetime.utcnow() + timedelta(minutes=ttl_minutes)
+        user.verification_expires_at = datetime.now(timezone.utc) + timedelta(minutes=ttl_minutes)
 
         db.add(user)
         db.commit()
@@ -69,7 +69,8 @@ def verify_email_code(email: str, code: str) -> bool:
         if not user.verification_code or user.verification_code != code:
             return False
 
-        if user.verification_expires_at and user.verification_expires_at < datetime.utcnow():
+        now = datetime.now(timezone.utc)
+        if user.verification_expires_at and user.verification_expires_at < now:
             return False
 
         # 验证成功，标记已验证，清空验证码
