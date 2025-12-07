@@ -58,26 +58,51 @@ export type SessionSnapshot = {
 // Use environment variable for API base URL, fallback to localhost for local development
 const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:8000";
 
+let accessToken: string | null = null;
+
+export function setAccessToken(token: string | null) {
+  accessToken = token;
+}
+
+async function request<T>(
+  path: string,
+  options: RequestInit = {}
+): Promise<T> {
+  const headers: HeadersInit = {
+    "Content-Type": "application/json",
+    ...(options.headers || {}),
+  };
+
+  if (accessToken) {
+    (headers as any)["Authorization"] = `Bearer ${accessToken}`;
+  }
+
+  const resp = await fetch(`${API_BASE}${path}`, {
+    ...options,
+    headers,
+  });
+
+  if (!resp.ok) {
+    const text = await resp.text().catch(() => "");
+    throw new Error(text || `Request failed with status ${resp.status}`);
+  }
+
+  return (await resp.json()) as T;
+}
+
 export async function listSessions(): Promise<SessionSummary[]> {
-  const res = await fetch(`${API_BASE}/sessions`);
-  if (!res.ok) throw new Error("Failed to load sessions");
-  return res.json();
+  return request<SessionSummary[]>("/sessions");
 }
 
 export async function createSession(topic: string): Promise<SessionSnapshot> {
-  const res = await fetch(`${API_BASE}/sessions`, {
+  return request<SessionSnapshot>("/sessions", {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ topic }),
   });
-  if (!res.ok) throw new Error("Failed to create session");
-  return res.json();
 }
 
 export async function getSession(id: string): Promise<SessionSnapshot> {
-  const res = await fetch(`${API_BASE}/sessions/${id}`);
-  if (!res.ok) throw new Error("Failed to load session");
-  return res.json();
+  return request<SessionSnapshot>(`/sessions/${id}`);
 }
 
 export async function sendCommand(
@@ -85,11 +110,35 @@ export async function sendCommand(
   command: Command,
   payload: Record<string, unknown> = {},
 ): Promise<SessionSnapshot> {
-  const res = await fetch(`${API_BASE}/sessions/${id}/command`, {
+  return request<SessionSnapshot>(`/sessions/${id}/command`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ command, payload }),
   });
-  if (!res.ok) throw new Error("Failed to send command");
-  return res.json();
+}
+
+export type AuthResponse = {
+  message: string;
+  access_token?: string | null;
+  token_type?: string | null;
+};
+
+export async function register(email: string, password: string): Promise<AuthResponse> {
+  return request<AuthResponse>("/auth/register", {
+    method: "POST",
+    body: JSON.stringify({ email, password }),
+  });
+}
+
+export async function verifyEmail(email: string, code: string): Promise<AuthResponse> {
+  return request<AuthResponse>("/auth/verify-email", {
+    method: "POST",
+    body: JSON.stringify({ email, code }),
+  });
+}
+
+export async function login(email: string, password: string): Promise<AuthResponse> {
+  return request<AuthResponse>("/auth/login", {
+    method: "POST",
+    body: JSON.stringify({ email, password }),
+  });
 }

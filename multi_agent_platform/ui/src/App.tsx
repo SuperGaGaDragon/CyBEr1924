@@ -5,6 +5,10 @@ import {
   createSession,
   getSession,
   sendCommand,
+  login,
+  register,
+  verifyEmail,
+  setAccessToken,
 } from "./api";
 import "./App.css";
 
@@ -24,6 +28,17 @@ type UIState = {
   error: string | null;
 };
 
+type AuthState = {
+  email: string;
+  password: string;
+  verificationCode: string;
+  accessToken: string | null;
+  isLoggedIn: boolean;
+  authError: string | null;
+  showVerification: boolean;
+  showRegister: boolean;
+};
+
 type PlanEditCommand =
   | "set_current_subtask"
   | "update_subtask"
@@ -40,13 +55,25 @@ function App() {
     error: null,
   });
 
+  const [auth, setAuth] = useState<AuthState>({
+    email: "",
+    password: "",
+    verificationCode: "",
+    accessToken: null,
+    isLoggedIn: false,
+    authError: null,
+    showVerification: false,
+    showRegister: false,
+  });
+
   useEffect(() => {
+    if (!auth.isLoggedIn || !auth.accessToken) return;
+
     (async () => {
       try {
         const sessions = await listSessions();
         setState((prev) => ({ ...prev, sessions }));
 
-        // 1. 先看 URL 里有没有 ?session=xxx
         const params = new URLSearchParams(window.location.search);
         const urlSessionId = params.get("session");
 
@@ -55,7 +82,6 @@ function App() {
         if (urlSessionId && sessions.some((s) => s.session_id === urlSessionId)) {
           targetId = urlSessionId;
         } else {
-          // 2. 没有 / 不合法，再看 localStorage
           const lastId = localStorage.getItem(LAST_SESSION_KEY);
           if (lastId && sessions.some((s) => s.session_id === lastId)) {
             targetId = lastId;
@@ -63,9 +89,6 @@ function App() {
         }
 
         if (targetId) {
-          // 复用已有逻辑：加载 snapshot + 更新 state
-          // 注意：这里不能直接调用 handleSelectSession，因为它会修改 URL
-          // 我们需要手动加载 snapshot
           try {
             const snapshot = await getSession(targetId);
             localStorage.setItem(LAST_SESSION_KEY, targetId);
@@ -76,7 +99,6 @@ function App() {
               snapshot,
             }));
           } catch (err) {
-            // 如果加载失败，清除记录
             localStorage.removeItem(LAST_SESSION_KEY);
           }
         }
@@ -87,7 +109,80 @@ function App() {
         }));
       }
     })();
-  }, []);
+  }, [auth.isLoggedIn, auth.accessToken]);
+
+  async function handleLogin(e: React.FormEvent) {
+    e.preventDefault();
+    setAuth((prev) => ({ ...prev, authError: null }));
+
+    try {
+      const resp = await login(auth.email, auth.password);
+      if (!resp.access_token) {
+        throw new Error("No access token returned");
+      }
+
+      setAccessToken(resp.access_token);
+
+      setAuth((prev) => ({
+        ...prev,
+        accessToken: resp.access_token || null,
+        isLoggedIn: true,
+        authError: null,
+      }));
+
+      const sessions = await listSessions();
+      setState((prev) => ({ ...prev, sessions }));
+    } catch (err: any) {
+      setAuth((prev) => ({
+        ...prev,
+        authError: err.message ?? "Login failed",
+        isLoggedIn: false,
+        accessToken: null,
+      }));
+      setAccessToken(null);
+    }
+  }
+
+  async function handleRegister(e: React.FormEvent) {
+    e.preventDefault();
+    setAuth((prev) => ({ ...prev, authError: null }));
+
+    try {
+      await register(auth.email, auth.password);
+      setAuth((prev) => ({
+        ...prev,
+        showVerification: true,
+        showRegister: false,
+        authError: null,
+      }));
+    } catch (err: any) {
+      setAuth((prev) => ({
+        ...prev,
+        authError: err.message ?? "Registration failed",
+      }));
+    }
+  }
+
+  async function handleVerify(e: React.FormEvent) {
+    e.preventDefault();
+    setAuth((prev) => ({ ...prev, authError: null }));
+
+    try {
+      await verifyEmail(auth.email, auth.verificationCode);
+      setAuth((prev) => ({
+        ...prev,
+        showVerification: false,
+        verificationCode: "",
+        authError: null,
+      }));
+      alert("Email verified! You can now log in.");
+    } catch (err: any) {
+      setAuth((prev) => ({
+        ...prev,
+        authError: err.message ?? "Verification failed",
+      }));
+    }
+  }
 
   async function handleCreateSession() {
     const topic = window.prompt("Topic / goal for this session?");
@@ -98,10 +193,7 @@ function App() {
       const sessions = await listSessions();
       const id = snapshot.session_id;
 
-      // ✅ 新建 session 后，也记住它
       localStorage.setItem(LAST_SESSION_KEY, id);
-
-      // 🔗 创建后也同步 URL
       updateSessionInUrl(id);
 
       setState((prev) => ({
@@ -125,10 +217,7 @@ function App() {
     try {
       const snapshot = await getSession(id);
 
-      // ✅ 记住最近打开的 session
       localStorage.setItem(LAST_SESSION_KEY, id);
-
-      // 🔗 同步地址栏 ?session=...
       updateSessionInUrl(id);
 
       setState((prev) => ({
@@ -198,6 +287,506 @@ function App() {
   }
 
   const { sessions, snapshot, loading, error, activeSessionId } = state;
+
+  // Login screen
+  if (!auth.isLoggedIn) {
+    if (auth.showVerification) {
+      return (
+        <div style={{
+          minHeight: "100vh",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          background: "linear-gradient(135deg, #000000 0%, #1a1a1a 100%)",
+          fontFamily: "system-ui, -apple-system, sans-serif",
+        }}>
+          <div style={{
+            width: "100%",
+            maxWidth: "420px",
+            padding: "48px 32px",
+            margin: "0 16px",
+            background: "#ffffff",
+            borderRadius: "24px",
+            boxShadow: "0 20px 60px rgba(0,0,0,0.3)",
+          }}>
+            <div style={{
+              textAlign: "center",
+              marginBottom: "32px",
+            }}>
+              <h1 style={{
+                fontSize: "42px",
+                fontWeight: "800",
+                margin: "0 0 8px 0",
+                letterSpacing: "-0.5px",
+              }}>
+                CyBEr<span style={{ fontWeight: "300" }}>1924</span>
+              </h1>
+              <p style={{
+                fontSize: "16px",
+                color: "#666",
+                margin: 0,
+              }}>Verify Your Email</p>
+            </div>
+
+            <form onSubmit={handleVerify} style={{
+              display: "flex",
+              flexDirection: "column",
+              gap: "20px",
+            }}>
+              <div>
+                <label style={{
+                  display: "block",
+                  fontSize: "14px",
+                  fontWeight: "600",
+                  marginBottom: "8px",
+                  color: "#333",
+                }}>
+                  Email
+                </label>
+                <input
+                  type="email"
+                  value={auth.email}
+                  disabled
+                  style={{
+                    width: "100%",
+                    padding: "14px 16px",
+                    fontSize: "15px",
+                    border: "2px solid #e0e0e0",
+                    borderRadius: "12px",
+                    boxSizing: "border-box",
+                    background: "#f5f5f5",
+                    color: "#666",
+                  }}
+                />
+              </div>
+
+              <div>
+                <label style={{
+                  display: "block",
+                  fontSize: "14px",
+                  fontWeight: "600",
+                  marginBottom: "8px",
+                  color: "#333",
+                }}>
+                  Verification Code
+                </label>
+                <input
+                  type="text"
+                  value={auth.verificationCode}
+                  onChange={(e) => setAuth((prev) => ({ ...prev, verificationCode: e.target.value }))}
+                  placeholder="Enter 6-digit code"
+                  required
+                  autoFocus
+                  style={{
+                    width: "100%",
+                    padding: "14px 16px",
+                    fontSize: "15px",
+                    border: "2px solid #e0e0e0",
+                    borderRadius: "12px",
+                    boxSizing: "border-box",
+                    transition: "all 0.2s",
+                    outline: "none",
+                  }}
+                  onFocus={(e) => e.target.style.borderColor = "#000"}
+                  onBlur={(e) => e.target.style.borderColor = "#e0e0e0"}
+                />
+              </div>
+
+              {auth.authError && (
+                <div style={{
+                  padding: "12px 16px",
+                  background: "#fee",
+                  border: "1px solid #fcc",
+                  borderRadius: "8px",
+                  color: "#c33",
+                  fontSize: "14px",
+                }}>
+                  {auth.authError}
+                </div>
+              )}
+
+              <button type="submit" style={{
+                width: "100%",
+                padding: "16px",
+                fontSize: "16px",
+                fontWeight: "700",
+                color: "#fff",
+                background: "#000",
+                border: "none",
+                borderRadius: "12px",
+                cursor: "pointer",
+                transition: "all 0.2s",
+                marginTop: "8px",
+              }}
+              onMouseOver={(e) => e.currentTarget.style.background = "#333"}
+              onMouseOut={(e) => e.currentTarget.style.background = "#000"}>
+                Verify Email
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setAuth((prev) => ({ ...prev, showVerification: false, authError: null }))}
+                style={{
+                  width: "100%",
+                  padding: "14px",
+                  fontSize: "14px",
+                  fontWeight: "600",
+                  color: "#666",
+                  background: "transparent",
+                  border: "none",
+                  cursor: "pointer",
+                }}
+              >
+                ← Back to Login
+              </button>
+            </form>
+          </div>
+        </div>
+      );
+    }
+
+    if (auth.showRegister) {
+      return (
+        <div style={{
+          minHeight: "100vh",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          background: "linear-gradient(135deg, #000000 0%, #1a1a1a 100%)",
+          fontFamily: "system-ui, -apple-system, sans-serif",
+        }}>
+          <div style={{
+            width: "100%",
+            maxWidth: "420px",
+            padding: "48px 32px",
+            margin: "0 16px",
+            background: "#ffffff",
+            borderRadius: "24px",
+            boxShadow: "0 20px 60px rgba(0,0,0,0.3)",
+          }}>
+            <div style={{
+              textAlign: "center",
+              marginBottom: "32px",
+            }}>
+              <h1 style={{
+                fontSize: "42px",
+                fontWeight: "800",
+                margin: "0 0 8px 0",
+                letterSpacing: "-0.5px",
+              }}>
+                CyBEr<span style={{ fontWeight: "300" }}>1924</span>
+              </h1>
+              <p style={{
+                fontSize: "16px",
+                color: "#666",
+                margin: 0,
+              }}>Create Your Account</p>
+            </div>
+
+            <form onSubmit={handleRegister} style={{
+              display: "flex",
+              flexDirection: "column",
+              gap: "20px",
+            }}>
+              <div>
+                <label style={{
+                  display: "block",
+                  fontSize: "14px",
+                  fontWeight: "600",
+                  marginBottom: "8px",
+                  color: "#333",
+                }}>
+                  Email
+                </label>
+                <input
+                  type="email"
+                  value={auth.email}
+                  onChange={(e) => setAuth((prev) => ({ ...prev, email: e.target.value }))}
+                  placeholder="you@example.com"
+                  required
+                  autoFocus
+                  style={{
+                    width: "100%",
+                    padding: "14px 16px",
+                    fontSize: "15px",
+                    border: "2px solid #e0e0e0",
+                    borderRadius: "12px",
+                    boxSizing: "border-box",
+                    transition: "all 0.2s",
+                    outline: "none",
+                  }}
+                  onFocus={(e) => e.target.style.borderColor = "#000"}
+                  onBlur={(e) => e.target.style.borderColor = "#e0e0e0"}
+                />
+              </div>
+
+              <div>
+                <label style={{
+                  display: "block",
+                  fontSize: "14px",
+                  fontWeight: "600",
+                  marginBottom: "8px",
+                  color: "#333",
+                }}>
+                  Password
+                </label>
+                <input
+                  type="password"
+                  value={auth.password}
+                  onChange={(e) => setAuth((prev) => ({ ...prev, password: e.target.value }))}
+                  placeholder="••••••••"
+                  required
+                  style={{
+                    width: "100%",
+                    padding: "14px 16px",
+                    fontSize: "15px",
+                    border: "2px solid #e0e0e0",
+                    borderRadius: "12px",
+                    boxSizing: "border-box",
+                    transition: "all 0.2s",
+                    outline: "none",
+                  }}
+                  onFocus={(e) => e.target.style.borderColor = "#000"}
+                  onBlur={(e) => e.target.style.borderColor = "#e0e0e0"}
+                />
+              </div>
+
+              {auth.authError && (
+                <div style={{
+                  padding: "12px 16px",
+                  background: "#fee",
+                  border: "1px solid #fcc",
+                  borderRadius: "8px",
+                  color: "#c33",
+                  fontSize: "14px",
+                }}>
+                  {auth.authError}
+                </div>
+              )}
+
+              <button type="submit" style={{
+                width: "100%",
+                padding: "16px",
+                fontSize: "16px",
+                fontWeight: "700",
+                color: "#fff",
+                background: "#000",
+                border: "none",
+                borderRadius: "12px",
+                cursor: "pointer",
+                transition: "all 0.2s",
+                marginTop: "8px",
+              }}
+              onMouseOver={(e) => e.currentTarget.style.background = "#333"}
+              onMouseOut={(e) => e.currentTarget.style.background = "#000"}>
+                Sign Up
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setAuth((prev) => ({ ...prev, showRegister: false, authError: null }))}
+                style={{
+                  width: "100%",
+                  padding: "14px",
+                  fontSize: "14px",
+                  fontWeight: "600",
+                  color: "#666",
+                  background: "transparent",
+                  border: "none",
+                  cursor: "pointer",
+                }}
+              >
+                ← Back to Login
+              </button>
+            </form>
+
+            <p style={{
+              marginTop: "24px",
+              fontSize: "12px",
+              color: "#999",
+              textAlign: "center",
+              lineHeight: "1.6",
+            }}>
+              You'll receive a verification code after registration.
+            </p>
+          </div>
+        </div>
+      );
+    }
+
+    return (
+      <div style={{
+        minHeight: "100vh",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        background: "linear-gradient(135deg, #000000 0%, #1a1a1a 100%)",
+        fontFamily: "system-ui, -apple-system, sans-serif",
+      }}>
+        <div style={{
+          width: "100%",
+          maxWidth: "420px",
+          padding: "48px 32px",
+          margin: "0 16px",
+          background: "#ffffff",
+          borderRadius: "24px",
+          boxShadow: "0 20px 60px rgba(0,0,0,0.3)",
+        }}>
+          <div style={{
+            textAlign: "center",
+            marginBottom: "40px",
+          }}>
+            <h1 style={{
+              fontSize: "48px",
+              fontWeight: "800",
+              margin: "0 0 12px 0",
+              letterSpacing: "-0.5px",
+            }}>
+              CyBEr<span style={{ fontWeight: "300" }}>1924</span>
+            </h1>
+            <p style={{
+              fontSize: "16px",
+              color: "#666",
+              margin: 0,
+            }}>Multi-Agent Platform</p>
+          </div>
+
+          <form onSubmit={handleLogin} style={{
+            display: "flex",
+            flexDirection: "column",
+            gap: "20px",
+          }}>
+            <div>
+              <label style={{
+                display: "block",
+                fontSize: "14px",
+                fontWeight: "600",
+                marginBottom: "8px",
+                color: "#333",
+              }}>
+                Email
+              </label>
+              <input
+                type="email"
+                value={auth.email}
+                onChange={(e) => setAuth((prev) => ({ ...prev, email: e.target.value }))}
+                placeholder="you@example.com"
+                required
+                autoFocus
+                style={{
+                  width: "100%",
+                  padding: "14px 16px",
+                  fontSize: "15px",
+                  border: "2px solid #e0e0e0",
+                  borderRadius: "12px",
+                  boxSizing: "border-box",
+                  transition: "all 0.2s",
+                  outline: "none",
+                }}
+                onFocus={(e) => e.target.style.borderColor = "#000"}
+                onBlur={(e) => e.target.style.borderColor = "#e0e0e0"}
+              />
+            </div>
+
+            <div>
+              <label style={{
+                display: "block",
+                fontSize: "14px",
+                fontWeight: "600",
+                marginBottom: "8px",
+                color: "#333",
+              }}>
+                Password
+              </label>
+              <input
+                type="password"
+                value={auth.password}
+                onChange={(e) => setAuth((prev) => ({ ...prev, password: e.target.value }))}
+                placeholder="••••••••"
+                required
+                style={{
+                  width: "100%",
+                  padding: "14px 16px",
+                  fontSize: "15px",
+                  border: "2px solid #e0e0e0",
+                  borderRadius: "12px",
+                  boxSizing: "border-box",
+                  transition: "all 0.2s",
+                  outline: "none",
+                }}
+                onFocus={(e) => e.target.style.borderColor = "#000"}
+                onBlur={(e) => e.target.style.borderColor = "#e0e0e0"}
+              />
+            </div>
+
+            {auth.authError && (
+              <div style={{
+                padding: "12px 16px",
+                background: "#fee",
+                border: "1px solid #fcc",
+                borderRadius: "8px",
+                color: "#c33",
+                fontSize: "14px",
+              }}>
+                {auth.authError}
+              </div>
+            )}
+
+            <button type="submit" style={{
+              width: "100%",
+              padding: "16px",
+              fontSize: "16px",
+              fontWeight: "700",
+              color: "#fff",
+              background: "#000",
+              border: "none",
+              borderRadius: "12px",
+              cursor: "pointer",
+              transition: "all 0.2s",
+              marginTop: "8px",
+            }}
+            onMouseOver={(e) => e.currentTarget.style.background = "#333"}
+            onMouseOut={(e) => e.currentTarget.style.background = "#000"}>
+              Log In
+            </button>
+
+            <div style={{
+              textAlign: "center",
+              marginTop: "8px",
+            }}>
+              <button
+                type="button"
+                onClick={() => setAuth((prev) => ({ ...prev, showRegister: true, authError: null }))}
+                style={{
+                  fontSize: "14px",
+                  fontWeight: "600",
+                  color: "#666",
+                  background: "transparent",
+                  border: "none",
+                  cursor: "pointer",
+                  textDecoration: "underline",
+                }}
+              >
+                Don't have an account? Sign up
+              </button>
+            </div>
+          </form>
+
+          <div style={{
+            marginTop: "32px",
+            padding: "16px",
+            background: "#f8f8f8",
+            borderRadius: "12px",
+            fontSize: "12px",
+            color: "#666",
+            lineHeight: "1.6",
+          }}>
+            <strong>Internal Beta:</strong> After signing up, check your server logs for the verification code, then verify your email before logging in.
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div style={{ display: "flex", height: "100vh", fontFamily: "system-ui" }}>
