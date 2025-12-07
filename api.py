@@ -19,6 +19,10 @@ from multi_agent_platform.api_models import (
     CreateSessionRequest,
     SessionSnapshotModel,
     SessionSummaryModel,
+    RegisterRequest,
+    VerifyEmailRequest,
+    LoginRequest,
+    AuthResponse,
 )
 from multi_agent_platform.message_bus import MessageBus
 from multi_agent_platform.run_flow import Orchestrator
@@ -26,6 +30,12 @@ from multi_agent_platform.session_state import build_session_snapshot
 from multi_agent_platform.session_store import ArtifactStore
 from multi_agent_platform.db.db import init_db
 from multi_agent_platform.db.db_session_store import save_snapshot
+from multi_agent_platform.auth_service import (
+    create_user,
+    get_user_by_email,
+    verify_email_code,
+    verify_password,
+)
 
 
 # Initialize FastAPI
@@ -172,6 +182,52 @@ def post_command(session_id: str, request: CommandRequest) -> SessionSnapshotMod
         raise HTTPException(status_code=404, detail=f"Session {session_id} not found")
     except Exception as exc:
         raise HTTPException(status_code=500, detail=str(exc))
+
+
+# ===== Authentication Endpoints =====
+
+@app.post("/auth/register", response_model=AuthResponse)
+def register(payload: RegisterRequest):
+    """
+    注册用户：创建用户 + 生成验证码（先打印在后台日志中）。
+    """
+    try:
+        create_user(payload.email, payload.password)
+    except ValueError as e:
+        # 比如 Email already registered
+        raise HTTPException(status_code=400, detail=str(e))
+
+    return AuthResponse(
+        message="Registered successfully. Please check your email for the verification code."
+    )
+
+
+@app.post("/auth/verify-email", response_model=AuthResponse)
+def verify_email(payload: VerifyEmailRequest):
+    """
+    校验邮箱验证码，成功后将用户标记为 is_verified=True。
+    """
+    ok = verify_email_code(payload.email, payload.code)
+    if not ok:
+        raise HTTPException(status_code=400, detail="Invalid or expired verification code")
+
+    return AuthResponse(message="Email verified successfully.")
+
+
+@app.post("/auth/login", response_model=AuthResponse)
+def login(payload: LoginRequest):
+    user = get_user_by_email(payload.email)
+    if not user:
+        raise HTTPException(status_code=400, detail="Invalid email or password")
+
+    if not verify_password(payload.password, user.password_hash):
+        raise HTTPException(status_code=400, detail="Invalid email or password")
+
+    if not user.is_verified:
+        raise HTTPException(status_code=403, detail="Email not verified")
+
+    # 这里先不做真正 JWT，后面可以再加
+    return AuthResponse(message="Login successful.")
 
 
 # ===== Run Server =====

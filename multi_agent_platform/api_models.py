@@ -48,3 +48,23 @@ class SessionSnapshotModel(BaseModel):
     mode: Optional[str] = None
     context: Optional[Dict[str, Any]] = None
     state: Dict[str, Any]
+
+
+class RegisterRequest(BaseModel):
+    email: str
+    password: str
+
+
+class VerifyEmailRequest(BaseModel):
+    email: str
+    code: str
+
+
+class LoginRequest(BaseModel):
+    email: str
+    password: str
+
+
+class AuthResponse(BaseModel):
+    message: str
+    # 以后可以加 token: str
