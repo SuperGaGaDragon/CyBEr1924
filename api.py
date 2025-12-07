@@ -24,6 +24,8 @@ from multi_agent_platform.message_bus import MessageBus
 from multi_agent_platform.run_flow import Orchestrator
 from multi_agent_platform.session_state import build_session_snapshot
 from multi_agent_platform.session_store import ArtifactStore
+from multi_agent_platform.db.db import init_db
+from multi_agent_platform.db.db_session_store import save_snapshot
 
 
 # Initialize FastAPI
@@ -48,6 +50,9 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Initialize database
+init_db()
 
 # Initialize orchestrator (singleton)
 artifact_store = ArtifactStore()
@@ -105,7 +110,9 @@ def create_session(request: CreateSessionRequest) -> SessionSnapshotModel:
         snapshot = build_session_snapshot(artifact_store, state, message_bus)
         snapshot.command = "plan"
         snapshot.message = "Session created"
-        return SessionSnapshotModel(**snapshot.to_dict())
+        snapshot_model = SessionSnapshotModel(**snapshot.to_dict())
+        save_snapshot(session_id, snapshot_model)
+        return snapshot_model
     except Exception as exc:
         raise HTTPException(status_code=500, detail=str(exc))
 
@@ -158,7 +165,9 @@ def post_command(session_id: str, request: CommandRequest) -> SessionSnapshotMod
             request.command,
             payload=request.payload,
         )
-        return SessionSnapshotModel(**snapshot)
+        snapshot_model = SessionSnapshotModel(**snapshot)
+        save_snapshot(session_id, snapshot_model)
+        return snapshot_model
     except FileNotFoundError:
         raise HTTPException(status_code=404, detail=f"Session {session_id} not found")
     except Exception as exc:

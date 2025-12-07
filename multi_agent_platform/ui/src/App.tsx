@@ -8,6 +8,14 @@ import {
 } from "./api";
 import "./App.css";
 
+const LAST_SESSION_KEY = "cyber1924:lastSessionId";
+
+function updateSessionInUrl(sessionId: string) {
+  const url = new URL(window.location.href);
+  url.searchParams.set("session", sessionId);
+  window.history.replaceState({}, "", url.toString());
+}
+
 type UIState = {
   sessions: SessionSummary[];
   activeSessionId: string | null;
@@ -37,6 +45,41 @@ function App() {
       try {
         const sessions = await listSessions();
         setState((prev) => ({ ...prev, sessions }));
+
+        // 1. 先看 URL 里有没有 ?session=xxx
+        const params = new URLSearchParams(window.location.search);
+        const urlSessionId = params.get("session");
+
+        let targetId: string | null = null;
+
+        if (urlSessionId && sessions.some((s) => s.session_id === urlSessionId)) {
+          targetId = urlSessionId;
+        } else {
+          // 2. 没有 / 不合法，再看 localStorage
+          const lastId = localStorage.getItem(LAST_SESSION_KEY);
+          if (lastId && sessions.some((s) => s.session_id === lastId)) {
+            targetId = lastId;
+          }
+        }
+
+        if (targetId) {
+          // 复用已有逻辑：加载 snapshot + 更新 state
+          // 注意：这里不能直接调用 handleSelectSession，因为它会修改 URL
+          // 我们需要手动加载 snapshot
+          try {
+            const snapshot = await getSession(targetId);
+            localStorage.setItem(LAST_SESSION_KEY, targetId);
+            updateSessionInUrl(targetId);
+            setState((prev) => ({
+              ...prev,
+              activeSessionId: targetId,
+              snapshot,
+            }));
+          } catch (err) {
+            // 如果加载失败，清除记录
+            localStorage.removeItem(LAST_SESSION_KEY);
+          }
+        }
       } catch (err: any) {
         setState((prev) => ({
           ...prev,
@@ -53,11 +96,19 @@ function App() {
     try {
       const snapshot = await createSession(topic);
       const sessions = await listSessions();
+      const id = snapshot.session_id;
+
+      // ✅ 新建 session 后，也记住它
+      localStorage.setItem(LAST_SESSION_KEY, id);
+
+      // 🔗 创建后也同步 URL
+      updateSessionInUrl(id);
+
       setState((prev) => ({
         ...prev,
         loading: false,
         sessions,
-        activeSessionId: snapshot.session_id,
+        activeSessionId: id,
         snapshot,
       }));
     } catch (err: any) {
@@ -73,6 +124,13 @@ function App() {
     setState((prev) => ({ ...prev, loading: true, error: null }));
     try {
       const snapshot = await getSession(id);
+
+      // ✅ 记住最近打开的 session
+      localStorage.setItem(LAST_SESSION_KEY, id);
+
+      // 🔗 同步地址栏 ?session=...
+      updateSessionInUrl(id);
+
       setState((prev) => ({
         ...prev,
         loading: false,
@@ -274,11 +332,11 @@ function PlannerColumn({ snapshot, onPlanCommand }: PlannerColumnProps) {
               marginBottom: 8,
             }}
           >
-            <div style={{ fontWeight: 600 }}>{snapshot.plan.title}</div>
+            <div style={{ fontWeight: 600 }}>{snapshot.plan?.title || snapshot.topic}</div>
             <button onClick={handleAppend}>Append subtask</button>
           </div>
           <ol style={{ paddingLeft: 18 }}>
-            {snapshot.plan.subtasks.map((subtask) => {
+            {snapshot.subtasks.map((subtask) => {
               const isCurrent = snapshot.current_subtask_id === subtask.id;
               const handleSetCurrent = () => {
                 void onPlanCommand("set_current_subtask", {

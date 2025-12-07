@@ -40,14 +40,19 @@ export type ChatMessage = {
 export type SessionSnapshot = {
   session_id: string;
   topic: string;
-  plan: {
-    title: string;
-    subtasks: Subtask[];
-  };
+  plan: Record<string, any>;
+  subtasks: Subtask[];
   current_subtask_id: string | null;
+  orchestrator_state: Record<string, any>;
   worker_outputs: WorkerOutput[];
+  coord_decisions: Record<string, any>[];
   chat_history: ChatMessage[];
-  message?: string;
+  message: string;
+  ok: boolean;
+  command?: string | null;
+  mode?: string | null;
+  context?: Record<string, any> | null;
+  state: Record<string, any>;
 };
 
 // Use environment variable for API base URL, fallback to localhost for local development

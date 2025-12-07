@@ -2,45 +2,291 @@
 要做的是一个多智能体协作写作/任务平台，核心构成仍然是 Planner/Worker/Coordinator 三个角色（左中右三栏 UI），
 支持可执行计划、子任务执行与协调审核、用户随时提问/修改，最终能承载长文/复杂项目。
 
-## 当前项目结构
+## 当前项目结构（2025-12-07 更新）
 ```
-multi_agent_platform/
-  ├─ run_flow.py             可复用的 Orchestrator（init_session/run_next/run_all/answer_user_question ）
-  ├─ plan_model.py           Plan/Subtask dataclass + Plan.from_outline/to_json/to_brief_text
-  ├─ session_store.py        ArtifactStore + ArtifactRef + logs/sessions + session_index
-  ├─ message_bus.py          统一构造 protocol.Envelope + ProtocolValidator + log_user_command
-  ├─ agent_runner.py         OpenAI Agent + mock fallback (planner/worker echo, coordinator ACCEPT)
-  ├─ interactive_session*.py 多种 CLI 入口，调用 Orch.run_next/run_all/answer_user_question，记录 user_command
-  ├─ session_state.py        OrchestratorState + helpers for persistence
-  ├─ interactive_coordinator.py、execute_command 等：后续 FastAPI/API 集成用
-  ├─ run_example.py          旧入口，构造 store+bus，运行 run_all 演示完整流程
-docs/、QUICK_START.md、SESSION_RECOVERY_README.md 等文档给出操作步骤和恢复说明
-src/protocol.py             JSON Schema + Envelope/ProtocolValidator/BUILD helpers
-tests like test_unified_flow.py、test_recovery.py、validate_mvp.py、test_long_form_writing.py cover state/API expectations
+ai_environment/
+  ├─ api.py                         FastAPI 主应用入口，定义所有 API 端点
+  │                                 - POST /sessions: 创建新 session（自动保存到数据库）
+  │                                 - GET /sessions: 列出所有 session
+  │                                 - GET /sessions/{id}: 获取 session snapshot
+  │                                 - POST /sessions/{id}/command: 执行命令（自动保存到数据库）
+  │
+  ├─ multi_agent_platform/
+  │  ├─ __init__.py                 包初始化文件
+  │  ├─ run_flow.py                 可复用的 Orchestrator（init_session/run_next/run_all/answer_user_question）
+  │  ├─ plan_model.py               Plan/Subtask dataclass + Plan.from_outline/to_json/to_brief_text
+  │  ├─ session_store.py            ArtifactStore + ArtifactRef + logs/sessions + session_index
+  │  ├─ message_bus.py              统一构造 protocol.Envelope + ProtocolValidator + log_user_command
+  │  ├─ agent_runner.py             OpenAI Agent + mock fallback (planner/worker echo, coordinator ACCEPT)
+  │  ├─ api_models.py               Pydantic 模型定义（SessionSnapshotModel, CommandRequest 等）
+  │  ├─ session_state.py            OrchestratorState + helpers for persistence
+  │  ├─ prompt_registry.py          提示词注册管理
+  │  │
+  │  ├─ db/                         **数据库模块（新增）**
+  │  │  ├─ __init__.py              数据库包初始化
+  │  │  ├─ db.py                    数据库核心配置
+  │  │  │                           - SQLAlchemy engine/session 配置
+  │  │  │                           - DbSession 表定义（sessions 表）
+  │  │  │                           - init_db() 自动建表函数
+  │  │  │                           - 支持 PostgreSQL（JSONB）和 SQLite（JSON）
+  │  │  └─ db_session_store.py      Session 持久化函数
+  │  │                               - save_snapshot(): 保存/更新 session 到数据库
+  │  │                               - load_snapshot(): 从数据库加载 session
+  │  │
+  │  ├─ interactive_coordinator.py  Interactive coordinator 交互逻辑
+  │  ├─ interactive_session.py      CLI 交互入口（基础版）
+  │  ├─ interactive_session_unified.py  CLI 交互入口（统一版）
+  │  ├─ interactive_session_v2.py   CLI 交互入口（V2 版）
+  │  ├─ run_example.py              旧入口，演示完整流程
+  │  ├─ requirements.txt            Python 依赖列表
+  │  │
+  │  ├─ sessions/                   Session 数据存储目录
+  │  │  ├─ session_index.json       Session 索引文件
+  │  │  └─ sess-*/                  各个 session 的数据
+  │  │     ├─ state.json            Session 状态
+  │  │     ├─ orchestrator_state.json  Orchestrator 状态
+  │  │     ├─ artifacts/            工作产物存储
+  │  │     └─ logs/                 日志文件
+  │  │        └─ envelopes.jsonl    事件日志
+  │  │
+  │  └─ ui/                         前端界面（React + Vite）
+  │     ├─ package.json             前端依赖配置
+  │     ├─ package-lock.json        依赖锁定文件
+  │     ├─ tsconfig*.json           TypeScript 配置
+  │     ├─ src/                     前端源代码
+  │     ├─ public/                  静态资源
+  │     └─ dist/                    构建输出
+  │
+  ├─ src/
+  │  └─ protocol.py                 JSON Schema + Envelope/ProtocolValidator/BUILD helpers
+  │
+  ├─ prompts/                       提示词模板
+  │  ├─ planner_prompt.txt          Planner 提示词
+  │  ├─ worker_prompt.txt           Worker 提示词
+  │  ├─ coordinator_prompt.txt      Coordinator 提示词
+  │  └─ coordinator_chat_prompt.txt Coordinator 聊天提示词
+  │
+  ├─ docs/                          文档目录
+  │  ├─ multi-agent-collaboration-platform.md  平台架构文档
+  │  └─ prompt_personas.md          角色提示词说明
+  │
+  ├─ 测试脚本
+  │  ├─ test_unified_flow.py        统一流程测试
+  │  ├─ test_recovery.py            恢复功能测试
+  │  ├─ test_long_form_writing.py   长文写作测试
+  │  ├─ validate_mvp.py             MVP 验证
+  │  ├─ verify_fastapi_ready.py     FastAPI 就绪验证
+  │  └─ verify_prompts_ready.py     提示词验证
+  │
+  └─ 文档文件
+     ├─ API_README.md               API 使用说明
+     ├─ ARCHITECTURE_V2.md          架构设计文档 V2
+     ├─ FASTAPI_READY_SUMMARY.md    FastAPI 就绪总结
+     ├─ IMPLEMENTATION_SUMMARY.md   实现总结
+     ├─ QUICK_START.md              快速开始指南
+     ├─ QUICK_START_V3.md           快速开始指南 V3
+     ├─ SESSION_RECOVERY_README.md  Session 恢复说明
+     ├─ V2_TO_V3_MERGE_SUMMARY.md   V2 到 V3 合并总结
+     └─ chanpinshuoming.txt         本文件（产品说明）
+```
+
+## 数据库架构（新增功能）
+
+### 数据库表结构
+```sql
+sessions 表:
+  - id (String, PRIMARY KEY): session_id
+  - snapshot (JSON/JSONB): 完整的 session snapshot
+  - created_at (DateTime): 创建时间（自动）
+  - updated_at (DateTime): 更新时间（自动）
+```
+
+### 数据库特性
+1. **多数据库支持**：
+   - 本地开发：使用 SQLite（`local_dev.db`）
+   - 生产环境：使用 PostgreSQL（通过 `DATABASE_URL` 环境变量）
+   - 自动检测并使用正确的 JSON 类型（SQLite=JSON, PostgreSQL=JSONB）
+
+2. **自动初始化**：
+   - API 服务器启动时自动调用 `init_db()`
+   - 自动创建表结构（如果不存在）
+
+3. **持久化集成**：
+   - 创建 session 时自动保存到数据库
+   - 执行命令后自动更新数据库
+   - 文件存储继续保留作为备份/调试用途
+
+### 数据流
+```
+用户请求 → API 端点 → Orchestrator 处理 → 生成 snapshot →
+  ├─ 保存到数据库（save_snapshot）
+  └─ 保存到文件系统（ArtifactStore）
 ```
 
 ## 功能细节（按文件）
-- `multi_agent_platform/run_flow.py`：
-  * 配置化 Orchestrator（可替换模型），负责 planner 生成计划、worker 执行、coordinator 决策，循环直到所有 subtask 完成；
-  * `init_session` 创建 artifact/session，保存 orchestrator_state.json；
-  * `run_next_pending_subtask` 支持 interactive 模式 `user_feedback` 和 `answer_user_question` 供右侧 coordinator QA；
-  * `run_all` 简化一键跑完逻辑，结果包含 plan/outline/state。
-- `multi_agent_platform/plan_model.py`：从 outline 解析出有序 `Subtask` 列表，使用 `Plan.to_json()`/`to_brief_text()` 支持序列化和 coordinator 上下文。
-- `multi_agent_platform/session_store.py`：统一管理 `sessions/<id>/artifacts` + logs + `session_index.json`，`ArtifactStore.save_artifact` 返回可插入协议的 `ArtifactRef`。
-- `multi_agent_platform/message_bus.py`：调用 `src.protocol.build_envelope` + `ProtocolValidator`，并提供 `send`/`build_envelope`/`append_envelope`/`log_user_command`，生成 `logs/envelopes.jsonl`。
-- `multi_agent_platform/agent_runner.py`：封装 OpenAI 交互（系统+用户消息），`OPENAI_API_KEY` 为空时按 planner/worker/coordinator 简要逻辑返回可控模拟内容。
-- `multi_agent_platform/interactive_session*.py`：交互式 CLI（两个版本/统一版本）支持 `/plan` `/next` `/all` `自然语言`，所有用户输入写入 `user_command` envelope；`interactive_session_unified.py` 还调用 `execute_command`/`OrchestratorState` 和 coordinator 对话结合。
-- `multi_agent_platform/session_state.py`：`OrchestratorState` dataclass，读写 `orchestrator_state.json`，被 CLI、API、测试共享。
-- `multi_agent_platform/interactive_coordinator.py` + `execute_command`：为 FastAPI 提供 `/command` 类型的统一处理，利用 `Orchestrator.execute_command` 反向驱动 `run_next_pending_subtask`。
-- `multi_agent_platform/run_example.py`：维持旧入口，构造 `ArtifactStore` + `MessageBus`，通过 `Orchestrator.run_all(topic)` 跑一次 demo；打印 `plan`/`outline` artifact 路径。
-- `multi_agent_platform/interactive_session.py` / `_unified.py` / `_v2.py`：可恢复/恢复模式、`message_bus.log_user_command` + CLI loops、`execute_command` 结果应用（plan+state update）、`answer_user_question` 用 plan 生成上下文并调用 coordinator。
-- `src/protocol.py`：定义众多 `PayloadType`（`plan_created`/`subtask_result`/`coord_decision`/`user_command` 等），`Envelope` + `ProtocolValidator` + `build_envelope`，`PAYLOAD_SCHEMAS` 明确每种 envelope 的 schema。
-- top-level docs（ARCHITECTURE_V2/IMPLEMENTATION_SUMMARY/QUICK_START/SESSION_RECOVERY_README）定级系统目标，指导开发与恢复。
-- tests/scripts (`validate_mvp.py`, `test_recovery.py`, `test_unified_flow.py`, `test_long_form_writing.py`) 确保状态持久化、execute_command、session index、answer_user_question 上下文、新 payload 方案、long-form writing 指南。
 
-## 当前可交付结果（对 ChatGPT 汇报）
-1. `python3 -m multi_agent_platform.run_example` 演示 Planner→ Worker→ Coordinator 完整流程（在没有 API key 时使用内置 mock，生成 sessions/artifacts/logs）。
-2. `python3 -m multi_agent_platform.interactive_session[_unified|_v2]` 提供命令式 CLI，支持 `/plan` `/next` `/all` 直到 plan 完成，并把自然语言交给 coordinator 解释。
-3. 所有 `MessageBus` 事件都写入 `multi_agent_platform/sessions/<id>/logs/envelopes.jsonl` 以便后续 UI 回放，`user_command` 也记录。
-4. Plan/State/Logs 均持久化，下次可恢复（`SessionStore` + `OrchestratorState` + `session_index`），并可通过 `validate_mvp.py`/`test_recovery.py` 验证。
-5. FastAPI skeleton (`api.py`) + `interactive_coordinator`/`execute_command` 已具备 session 创建、命令执行、状态查询基础，可接 Web UI。
+### 核心业务逻辑
+- **api.py**：
+  * FastAPI 应用主入口，提供 RESTful API
+  * 在启动时调用 `init_db()` 初始化数据库
+  * 每个 session 创建/更新时自动调用 `save_snapshot()` 持久化到数据库
+  * CORS 配置支持前端跨域访问
+  * 端点：/, /sessions, /sessions/{id}, /sessions/{id}/command
+
+- **multi_agent_platform/run_flow.py**：
+  * 配置化 Orchestrator（可替换模型），负责 planner 生成计划、worker 执行、coordinator 决策
+  * `init_session` 创建 artifact/session，保存 orchestrator_state.json
+  * `run_next_pending_subtask` 支持 interactive 模式 `user_feedback` 和 `answer_user_question`
+  * `run_all` 简化一键跑完逻辑，结果包含 plan/outline/state
+
+- **multi_agent_platform/plan_model.py**：
+  * 从 outline 解析出有序 `Subtask` 列表
+  * 使用 `Plan.to_json()`/`to_brief_text()` 支持序列化和 coordinator 上下文
+
+- **multi_agent_platform/session_store.py**：
+  * 统一管理 `sessions/<id>/artifacts` + logs + `session_index.json`
+  * `ArtifactStore.save_artifact` 返回可插入协议的 `ArtifactRef`
+
+- **multi_agent_platform/message_bus.py**：
+  * 调用 `src.protocol.build_envelope` + `ProtocolValidator`
+  * 提供 `send`/`build_envelope`/`append_envelope`/`log_user_command`
+  * 生成 `logs/envelopes.jsonl`
+
+- **multi_agent_platform/agent_runner.py**：
+  * 封装 OpenAI 交互（系统+用户消息）
+  * `OPENAI_API_KEY` 为空时按 planner/worker/coordinator 简要逻辑返回可控模拟内容
+
+- **multi_agent_platform/api_models.py**：
+  * 定义所有 API 的 Pydantic 模型
+  * `SessionSnapshotModel`: 完整的 session 快照
+  * `CommandRequest`: 命令请求
+  * `CreateSessionRequest`: 创建 session 请求
+  * `SessionSummaryModel`: session 摘要信息
+
+### 数据库模块（新增）
+- **multi_agent_platform/db/db.py**：
+  * SQLAlchemy 引擎和会话配置
+  * `DbSession` ORM 模型定义 sessions 表结构
+  * `init_db()` 函数：自动创建所有表
+  * 智能 JSON 类型选择：PostgreSQL 用 JSONB，SQLite 用 JSON
+  * 环境变量支持：`DATABASE_URL` 配置数据库连接
+
+- **multi_agent_platform/db/db_session_store.py**：
+  * `save_snapshot()`: 保存或更新 session 到数据库
+  * `load_snapshot()`: 从数据库加载 session（支持恢复）
+  * 使用 SQLAlchemy session 确保事务安全
+
+### 交互式界面
+- **multi_agent_platform/interactive_session*.py**：
+  * 交互式 CLI（多个版本）支持 `/plan` `/next` `/all` `自然语言`
+  * 所有用户输入写入 `user_command` envelope
+  * `interactive_session_unified.py` 调用 `execute_command` 和 coordinator 对话
+
+- **multi_agent_platform/session_state.py**：
+  * `OrchestratorState` dataclass，读写 `orchestrator_state.json`
+  * 被 CLI、API、测试共享
+
+- **multi_agent_platform/interactive_coordinator.py**：
+  * 为 FastAPI 提供 `/command` 类型的统一处理
+  * 利用 `Orchestrator.execute_command` 驱动 `run_next_pending_subtask`
+
+### 协议与工具
+- **src/protocol.py**：
+  * 定义所有 `PayloadType`（`plan_created`/`subtask_result`/`coord_decision`/`user_command` 等）
+  * `Envelope` + `ProtocolValidator` + `build_envelope`
+  * `PAYLOAD_SCHEMAS` 明确每种 envelope 的 schema
+
+- **tests/scripts**：
+  * `validate_mvp.py`: MVP 验证
+  * `test_recovery.py`: 状态恢复测试
+  * `test_unified_flow.py`: 统一流程测试
+  * `test_long_form_writing.py`: 长文写作指南验证
+
+## 当前可交付结果
+
+1. **完整的 API 服务**：
+   - `python3 api.py` 或 `uvicorn api:app --reload` 启动 FastAPI 服务器
+   - 支持创建 session、执行命令、查询状态
+   - 自动保存所有 session 到数据库（PostgreSQL/SQLite）
+   - CORS 配置完成，支持前端跨域访问
+
+2. **数据库持久化**：
+   - 所有 session 数据自动保存到数据库
+   - 支持本地 SQLite 和生产 PostgreSQL
+   - 自动建表，无需手动初始化
+   - 双重存储：数据库 + 文件系统（备份）
+
+3. **CLI 演示**：
+   - `python3 -m multi_agent_platform.run_example` 演示完整流程
+   - `python3 -m multi_agent_platform.interactive_session_unified` 提供交互式 CLI
+   - 支持 `/plan` `/next` `/all` 命令
+
+4. **事件日志**：
+   - 所有 `MessageBus` 事件写入 `envelopes.jsonl`
+   - `user_command` 完整记录
+   - 支持 UI 回放
+
+5. **状态恢复**：
+   - Plan/State/Logs 均持久化
+   - 可通过 session_id 恢复会话
+   - 数据库和文件系统双重保障
+
+6. **前端集成就绪**：
+   - API 端点完整定义
+   - Pydantic 模型验证所有数据
+   - CORS 配置支持前端开发
+   - 实时 session 更新和查询
+
+## 环境变量配置
+
+```bash
+# 数据库配置（可选，默认使用 SQLite）
+DATABASE_URL=postgresql://user:pass@host:port/dbname
+
+# OpenAI API（可选，无 key 时使用 mock）
+OPENAI_API_KEY=sk-...
+```
+
+## 启动方式
+
+```bash
+# 启动 API 服务器（开发模式）
+uvicorn api:app --reload --host 0.0.0.0 --port 8000
+
+# 启动 API 服务器（生产模式）
+python3 api.py
+
+# CLI 交互模式
+python3 -m multi_agent_platform.interactive_session_unified
+
+# 演示模式
+python3 -m multi_agent_platform.run_example
+```
+
+## 技术栈
+
+- **后端**: Python 3.12+, FastAPI, SQLAlchemy, Pydantic
+- **数据库**: PostgreSQL (生产) / SQLite (开发)
+- **AI**: OpenAI API (可选，支持 mock)
+- **前端**: React + TypeScript + Vite
+- **协议**: JSON Schema, JSONL 事件日志
+
+## 最新更新（2025-12-07）
+
+✅ 数据库模块重构完成
+  - 创建 `multi_agent_platform/db/` 目录
+  - 移动并修复所有 import 路径
+  - 支持 PostgreSQL 和 SQLite 双数据库
+  - 自动建表机制完成
+
+✅ API 持久化集成完成
+  - 在 `api.py` 中集成 `save_snapshot()`
+  - 创建 session 时自动保存
+  - 执行命令后自动更新
+  - 服务器启动时自动初始化数据库
+
+✅ 测试验证通过
+  - 数据库连接测试通过
+  - save/load 功能测试通过
+  - API 服务器启动测试通过
+  - Uvicorn 运行测试通过

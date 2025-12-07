@@ -1,11 +1,11 @@
 # multi_agent_platform/db.py
 import os
-from sqlalchemy import create_engine, Column, String, DateTime, func
+from sqlalchemy import create_engine, Column, String, DateTime, func, JSON
 from sqlalchemy.orm import sessionmaker, declarative_base
 from sqlalchemy.dialects.postgresql import JSONB
 from datetime import datetime
 
-from .session_state import SessionSnapshotModel  # 你已有的 Pydantic 模型
+from ..api_models import SessionSnapshotModel  # Pydantic 模型
 
 # 1) 读取环境变量中的 DATABASE_URL（线上 Railway 会提供）
 DATABASE_URL = os.getenv("DATABASE_URL", "")
@@ -27,13 +27,16 @@ SessionLocal = sessionmaker(
 # 3) 声明基类
 Base = declarative_base()
 
+# 4) 确定使用的 JSON 类型 (PostgreSQL 用 JSONB，SQLite 用 JSON)
+JSONType = JSONB if "postgresql" in DATABASE_URL else JSON
 
-# 4) 定义数据库中的 sessions 表
+
+# 5) 定义数据库中的 sessions 表
 class DbSession(Base):
     __tablename__ = "sessions"
 
     id = Column(String, primary_key=True, index=True)  # 直接用你的 session_id
-    snapshot = Column(JSONB, nullable=False)          # 整个 SessionSnapshot 存成 JSONB
+    snapshot = Column(JSONType, nullable=False)       # 整个 SessionSnapshot 存成 JSON/JSONB
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
