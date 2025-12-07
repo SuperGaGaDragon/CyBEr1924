@@ -12,12 +12,23 @@ import {
 } from "./api";
 import "./App.css";
 
-const LAST_SESSION_KEY = "cyber1924:lastSessionId";
+const SESSION_TOKEN_KEY = "cyber1924_last_session_id";
 
-function updateSessionInUrl(sessionId: string) {
+// From /c/<id> -> <id>
+function getSessionIdFromLocation(): string | null {
+  const parts = window.location.pathname.split("/").filter(Boolean);
+  if (parts.length >= 2 && parts[0] === "c") {
+    return parts[1];
+  }
+  return null;
+}
+
+// Push /c/<id> into the URL and remember it locally
+function navigateToSession(sessionId: string) {
   const url = new URL(window.location.href);
-  url.searchParams.set("session", sessionId);
-  window.history.replaceState({}, "", url.toString());
+  url.pathname = `/c/${sessionId}`;
+  window.history.pushState(null, "", url.toString());
+  localStorage.setItem(SESSION_TOKEN_KEY, sessionId);
 }
 
 type UIState = {
@@ -87,33 +98,25 @@ function App() {
         const sessions = await listSessions();
         setState((prev) => ({ ...prev, sessions }));
 
-        const params = new URLSearchParams(window.location.search);
-        const urlSessionId = params.get("session");
+        const urlSessionId = getSessionIdFromLocation();
+        const fallbackId = urlSessionId || localStorage.getItem(SESSION_TOKEN_KEY);
 
-        let targetId: string | null = null;
+        if (!fallbackId) return;
 
-        if (urlSessionId && sessions.some((s) => s.session_id === urlSessionId)) {
-          targetId = urlSessionId;
-        } else {
-          const lastId = localStorage.getItem(LAST_SESSION_KEY);
-          if (lastId && sessions.some((s) => s.session_id === lastId)) {
-            targetId = lastId;
+        try {
+          const snapshot = await getSession(fallbackId);
+          if (!urlSessionId) {
+            navigateToSession(fallbackId);
+          } else {
+            localStorage.setItem(SESSION_TOKEN_KEY, fallbackId);
           }
-        }
-
-        if (targetId) {
-          try {
-            const snapshot = await getSession(targetId);
-            localStorage.setItem(LAST_SESSION_KEY, targetId);
-            updateSessionInUrl(targetId);
-            setState((prev) => ({
-              ...prev,
-              activeSessionId: targetId,
-              snapshot,
-            }));
-          } catch (err) {
-            localStorage.removeItem(LAST_SESSION_KEY);
-          }
+          setState((prev) => ({
+            ...prev,
+            activeSessionId: fallbackId,
+            snapshot,
+          }));
+        } catch {
+          localStorage.removeItem(SESSION_TOKEN_KEY);
         }
       } catch (err: any) {
         setState((prev) => ({
@@ -210,8 +213,8 @@ function App() {
       const sessions = await listSessions();
       const id = snapshot.session_id;
 
-      localStorage.setItem(LAST_SESSION_KEY, id);
-      updateSessionInUrl(id);
+      localStorage.setItem(SESSION_TOKEN_KEY, id);
+      navigateToSession(id);
 
       setState((prev) => ({
         ...prev,
@@ -229,13 +232,15 @@ function App() {
     }
   }
 
-  async function handleSelectSession(id: string) {
+  async function handleSelectSession(id: string, shouldNavigate = true) {
     setState((prev) => ({ ...prev, loading: true, error: null }));
     try {
       const snapshot = await getSession(id);
 
-      localStorage.setItem(LAST_SESSION_KEY, id);
-      updateSessionInUrl(id);
+      localStorage.setItem(SESSION_TOKEN_KEY, id);
+      if (shouldNavigate) {
+        navigateToSession(id);
+      }
 
       setState((prev) => ({
         ...prev,
@@ -305,6 +310,7 @@ function App() {
 
   function handleLogout() {
     localStorage.removeItem("cyber1924_token");
+    localStorage.removeItem(SESSION_TOKEN_KEY);
     setAccessToken(null);
     setAuth({
       email: "",
@@ -323,7 +329,31 @@ function App() {
       loading: false,
       error: null,
     });
+
+    const url = new URL(window.location.href);
+    url.pathname = "/";
+    url.search = "";
+    window.history.replaceState(null, "", url.toString());
   }
+
+  useEffect(() => {
+    function handlePopState() {
+      if (!auth.isLoggedIn || !auth.accessToken) return;
+      const id = getSessionIdFromLocation();
+      if (!id) {
+        setState((prev) => ({
+          ...prev,
+          activeSessionId: null,
+          snapshot: null,
+        }));
+        return;
+      }
+      handleSelectSession(id, false);
+    }
+
+    window.addEventListener("popstate", handlePopState);
+    return () => window.removeEventListener("popstate", handlePopState);
+  }, [auth.isLoggedIn, auth.accessToken]);
 
   const { sessions, snapshot, loading, error, activeSessionId } = state;
 
