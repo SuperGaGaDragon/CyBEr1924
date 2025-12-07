@@ -11,8 +11,9 @@ import json
 from datetime import datetime, timezone
 from typing import Dict, Any, Optional, List
 
-from fastapi import FastAPI, HTTPException
+from fastapi import Depends, FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 from multi_agent_platform.api_models import (
     CommandRequest,
@@ -29,13 +30,21 @@ from multi_agent_platform.run_flow import Orchestrator
 from multi_agent_platform.session_state import build_session_snapshot
 from multi_agent_platform.session_store import ArtifactStore
 from multi_agent_platform.db.db import init_db
-from multi_agent_platform.db.db_session_store import save_snapshot
+from multi_agent_platform.db.db_session_store import (
+    save_snapshot,
+    load_snapshot,
+    link_user_session,
+    user_owns_session,
+    list_session_ids_for_user,
+)
 from multi_agent_platform.auth_service import (
     create_user,
     get_user_by_email,
     verify_email_code,
     verify_password,
     create_access_token,
+    decode_access_token,
+    get_user_by_id,
 )
 
 
@@ -69,6 +78,31 @@ init_db()
 artifact_store = ArtifactStore()
 message_bus = MessageBus(store=artifact_store)
 orch = Orchestrator(artifact_store=artifact_store, message_bus=message_bus)
+
+# Security scheme for JWT authentication
+security = HTTPBearer(auto_error=False)
+
+
+def get_current_user(
+    credentials: HTTPAuthorizationCredentials = Depends(security),
+):
+    """
+    从 Authorization: Bearer <token> 中解析当前用户。
+    如果没有 token 或无效，返回 401。
+    """
+    if credentials is None:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+
+    token = credentials.credentials
+    user_id = decode_access_token(token)
+    if not user_id:
+        raise HTTPException(status_code=401, detail="Invalid or expired token")
+
+    user = get_user_by_id(user_id)
+    if not user:
+        raise HTTPException(status_code=401, detail="User not found")
+
+    return user
 
 
 def _iso_datetime(ts: Optional[float]) -> Optional[datetime]:
@@ -115,7 +149,10 @@ def read_root() -> Dict[str, str]:
 
 
 @app.post("/sessions", response_model=SessionSnapshotModel)
-def create_session(request: CreateSessionRequest) -> SessionSnapshotModel:
+def create_session(
+    request: CreateSessionRequest,
+    current_user = Depends(get_current_user),
+) -> SessionSnapshotModel:
     try:
         session_id, plan, state = orch.init_session(request.topic)
         snapshot = build_session_snapshot(artifact_store, state, message_bus)
@@ -123,47 +160,59 @@ def create_session(request: CreateSessionRequest) -> SessionSnapshotModel:
         snapshot.message = "Session created"
         snapshot_model = SessionSnapshotModel(**snapshot.to_dict())
         save_snapshot(session_id, snapshot_model)
+        link_user_session(current_user.id, session_id)
         return snapshot_model
     except Exception as exc:
         raise HTTPException(status_code=500, detail=str(exc))
 
 
 @app.get("/sessions", response_model=List[SessionSummaryModel])
-def list_sessions() -> List[SessionSummaryModel]:
-    index = artifact_store.get_session_index()
-    history = index.get("history", [])
-    seen: set[str] = set()
+def list_sessions(current_user = Depends(get_current_user)) -> List[SessionSummaryModel]:
+    session_ids = list_session_ids_for_user(current_user.id)
+
     summaries: List[SessionSummaryModel] = []
-    for session_id in reversed(history):
-        if session_id in seen:
+    for session_id in session_ids:
+        snapshot = load_snapshot(session_id)
+        if snapshot is None:
             continue
-        created_ts, updated_ts = _session_timestamps(session_id)
-        topic = _load_plan_title(session_id)
         summaries.append(
             SessionSummaryModel(
                 session_id=session_id,
-                topic=topic,
-                created_at=_iso_datetime(created_ts),
-                last_updated=_iso_datetime(updated_ts),
+                topic=snapshot.topic,
+                created_at=snapshot.created_at if hasattr(snapshot, 'created_at') else None,
+                last_updated=snapshot.last_updated if hasattr(snapshot, 'last_updated') else None,
             )
         )
-        seen.add(session_id)
+
     return summaries
 
 
 @app.get("/sessions/{session_id}", response_model=SessionSnapshotModel)
-def get_session_snapshot(session_id: str) -> SessionSnapshotModel:
+def get_session_snapshot(
+    session_id: str,
+    current_user = Depends(get_current_user),
+) -> SessionSnapshotModel:
+    if not user_owns_session(current_user.id, session_id):
+        raise HTTPException(status_code=404, detail="Session not found")
+
     try:
         state = orch.load_orchestrator_state(session_id)
     except FileNotFoundError:
-        raise HTTPException(status_code=404, detail=f"Session {session_id} not found")
+        raise HTTPException(status_code=404, detail="Session not found")
     snapshot = build_session_snapshot(artifact_store, state, message_bus)
     snapshot.message = "Session snapshot loaded"
     return SessionSnapshotModel(**snapshot.to_dict())
 
 
 @app.post("/sessions/{session_id}/command", response_model=SessionSnapshotModel)
-def post_command(session_id: str, request: CommandRequest) -> SessionSnapshotModel:
+def post_command(
+    session_id: str,
+    request: CommandRequest,
+    current_user = Depends(get_current_user),
+) -> SessionSnapshotModel:
+    if not user_owns_session(current_user.id, session_id):
+        raise HTTPException(status_code=404, detail="Session not found")
+
     try:
         message_bus.log_user_command(
             session_id,
@@ -180,7 +229,7 @@ def post_command(session_id: str, request: CommandRequest) -> SessionSnapshotMod
         save_snapshot(session_id, snapshot_model)
         return snapshot_model
     except FileNotFoundError:
-        raise HTTPException(status_code=404, detail=f"Session {session_id} not found")
+        raise HTTPException(status_code=404, detail="Session not found")
     except Exception as exc:
         raise HTTPException(status_code=500, detail=str(exc))
 

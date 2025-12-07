@@ -39,6 +39,27 @@ def create_access_token(user_id: str, expires_minutes: int = JWT_EXPIRE_MINUTES)
     return token
 
 
+def decode_access_token(token: str) -> Optional[str]:
+    """
+    解析 access token，返回 user_id（sub），失败时返回 None。
+    """
+    try:
+        payload = jwt.decode(token, JWT_SECRET_KEY, algorithms=[JWT_ALGORITHM])
+        sub = payload.get("sub")
+        if not isinstance(sub, str):
+            return None
+        return sub
+    except jwt.ExpiredSignatureError:
+        return None
+    except jwt.InvalidTokenError:
+        return None
+
+
+def get_user_by_id(user_id: str) -> Optional[DbUser]:
+    with SessionLocal() as db:
+        return db.query(DbUser).filter(DbUser.id == user_id).first()
+
+
 # ===== 邮箱验证码相关 =====
 
 def generate_verification_code(length: int = 6) -> str:
