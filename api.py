@@ -33,10 +33,16 @@ app = FastAPI(
     version="1.0.0",
 )
 
-# CORS middleware
+# CORS middleware - configure allowed origins
+origins = [
+    "http://localhost:5173",                # Local frontend development
+    "https://cyber1924.com",                # Production domain
+    "https://*.pages.dev",                  # Cloudflare Pages preview/production
+]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Configure this properly in production
+    allow_origins=origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
