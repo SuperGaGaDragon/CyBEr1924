@@ -9,6 +9,7 @@ export type Command =
   | "plan"
   | "next"
   | "all"
+  | "confirm_plan"
   | "ask"
   | "set_current_subtask"
   | "update_subtask"

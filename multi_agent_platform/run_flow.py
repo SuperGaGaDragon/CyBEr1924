@@ -500,6 +500,18 @@ class Orchestrator:
 
         return reply
 
+    def handle_planning_turn(
+        self,
+        session_id: str,
+        plan: Plan,
+        state: OrchestratorState,
+        user_text: str,
+    ) -> str:
+        """
+        Entry point for planning-phase user messages. Currently delegates to existing answer logic.
+        """
+        return self.answer_user_question(session_id, plan, user_text)
+
     def save_state(self, session_id: str, plan: Plan) -> Path:
         """
         保存当前会话状态到 state.json，用于断点续跑。
@@ -698,6 +710,21 @@ class Orchestrator:
 
         if bare_cmd == "plan":
             message = "当前计划"
+            self._persist_plan_state(session_id, plan, state)
+            return self._render_session_snapshot(
+                session_id, normalized, plan, state, message=message
+            )
+
+        if bare_cmd == "confirm_plan":
+            if state.plan_locked:
+                message = "Plan already locked."
+            else:
+                state.plan_locked = True
+                state.add_orchestrator_message(
+                    role="orchestrator",
+                    content="Plan has been locked; execution phase can begin.",
+                )
+                message = "Plan locked."
             self._persist_plan_state(session_id, plan, state)
             return self._render_session_snapshot(
                 session_id, normalized, plan, state, message=message
@@ -956,7 +983,10 @@ class Orchestrator:
                 )
             state.add_orchestrator_message(role="user", content=question)
             run_orchestrator_turn(state, question)
-            answer = self.answer_user_question(session_id, plan, question)
+            if not state.plan_locked:
+                answer = self.handle_planning_turn(session_id, plan, state, question)
+            else:
+                answer = self.answer_user_question(session_id, plan, question)
             self._persist_plan_state(session_id, plan, state)
             return self._render_session_snapshot(
                 session_id,

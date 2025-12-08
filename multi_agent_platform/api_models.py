@@ -15,6 +15,7 @@ class CommandRequest(BaseModel):
         "plan",
         "next",
         "all",
+        "confirm_plan",
         "ask",
         "set_current_subtask",
         "update_subtask",
