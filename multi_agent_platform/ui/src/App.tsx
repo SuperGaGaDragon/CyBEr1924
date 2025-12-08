@@ -2782,6 +2782,12 @@ function WorkerColumn({ snapshot, progress, progressSeenCount = 0 }: { snapshot:
     const diff = new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime();
     return descending ? -diff : diff;
   });
+  useEffect(() => {
+    const hasProgress = (snapshot?.progress_events?.length ?? 0) > 0;
+    if (hasProgress && outputs.length === 0) {
+      console.warn("Worker outputs are empty while progress events exist; check backend SUBTASK_RESULT writes or artifact access.");
+    }
+  }, [snapshot?.progress_events, outputs.length]);
 
   const subtaskMap = new Map((snapshot?.subtasks ?? []).map((s) => [s.id, s.title]));
   const subtaskOrder = new Map((snapshot?.subtasks ?? []).map((s, i) => [s.id, i + 1]));
@@ -2850,7 +2856,7 @@ function WorkerColumn({ snapshot, progress, progressSeenCount = 0 }: { snapshot:
             background: "#ffffff",
             border: "1px dashed #d1d5db",
           }}>
-            No worker output yet.
+            No worker output yet. If tasks are running, verify backend SUBTASK_RESULT logs and artifact access.
           </div>
         )}
         {outputs.map((out, idx) => {
