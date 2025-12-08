@@ -62,6 +62,7 @@ origins = [
     "http://localhost:5173",                # Local frontend development
     "http://localhost:5174",                # Local frontend development (alternate port)
     "https://cyber1924.com",                # Production domain
+    "https://cyber1924-production.up.railway.app",  # Railway-hosted API domain
     "https://cyber1924.pages.dev",          # Cloudflare Pages production
 ]
 
