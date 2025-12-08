@@ -567,7 +567,10 @@ function App() {
     startY: number;
     startW: number;
     startH: number;
-  }>({ resizing: false, startX: 0, startY: 0, startW: 360, startH: 420 });
+    startLeft: number;
+    startTop: number;
+    dir: "nw" | "ne" | "sw" | "se";
+  }>({ resizing: false, startX: 0, startY: 0, startW: 360, startH: 420, startLeft: 0, startTop: 0, dir: "se" });
   const orchDragOffset = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
   const [deleteConfirm, setDeleteConfirm] = useState<{
     show: boolean;
@@ -709,12 +712,42 @@ function App() {
       }
 
       if (orchResize.current.resizing) {
-        const { startX, startY, startW, startH } = orchResize.current;
+        const { startX, startY, startW, startH, startLeft, startTop, dir } = orchResize.current;
         const deltaX = e.clientX - startX;
         const deltaY = e.clientY - startY;
-        const nextW = Math.max(320, startW + deltaX);
-        const nextH = Math.max(320, startH + deltaY);
+        let nextW = startW;
+        let nextH = startH;
+        let nextLeft = startLeft;
+        let nextTop = startTop;
+        const MIN = 320;
+
+        if (dir === "se") {
+          nextW = Math.max(MIN, startW + deltaX);
+          nextH = Math.max(MIN, startH + deltaY);
+        } else if (dir === "sw") {
+          nextW = Math.max(MIN, startW - deltaX);
+          nextLeft = startLeft + deltaX;
+          nextH = Math.max(MIN, startH + deltaY);
+        } else if (dir === "ne") {
+          nextW = Math.max(MIN, startW + deltaX);
+          nextH = Math.max(MIN, startH - deltaY);
+          nextTop = startTop + deltaY;
+        } else if (dir === "nw") {
+          nextW = Math.max(MIN, startW - deltaX);
+          nextLeft = startLeft + deltaX;
+          nextH = Math.max(MIN, startH - deltaY);
+          nextTop = startTop + deltaY;
+        }
+
+        const vw = window.innerWidth;
+        const vh = window.innerHeight;
+        const maxLeft = Math.max(8, vw - nextW - 8);
+        const maxTop = Math.max(8, vh - nextH - 8);
+        nextLeft = Math.min(Math.max(8, nextLeft), maxLeft);
+        nextTop = Math.min(Math.max(8, nextTop), maxTop);
+
         setOrchSize({ width: nextW, height: nextH });
+        setOrchPos({ x: nextLeft, y: nextTop });
         return;
       }
     };
@@ -2134,31 +2167,51 @@ function App() {
                     <ExecutionView session={snapshot} onSendExecutionMessage={sendExecutionMessage} />
                   </div>
                 </div>
-                <div
-                  onMouseDown={(e) => {
-                    orchResize.current = {
-                      resizing: true,
-                      startX: e.clientX,
-                      startY: e.clientY,
-                      startW: orchSize.width,
-                      startH: orchSize.height,
-                    };
-                    document.body.style.cursor = 'nwse-resize';
-                    document.body.style.userSelect = 'none';
-                  }}
-                  style={{
-                    position: "absolute",
-                    right: "6px",
-                    bottom: "6px",
-                    width: "16px",
-                    height: "16px",
-                    borderRadius: "4px",
-                    background: "#f3f4f6",
-                    border: "1px solid #d1d5db",
-                    cursor: "nwse-resize",
-                    boxShadow: "inset 0 1px 0 rgba(255,255,255,0.6)",
-                  }}
-                />
+                {(["nw", "ne", "sw", "se"] as const).map((dir) => {
+                  const cursor =
+                    dir === "nw" || dir === "se" ? "nwse-resize" : "nesw-resize";
+                  const positionStyle: Record<string, string> = {};
+                  if (dir.includes("n")) positionStyle.top = "6px";
+                  if (dir.includes("s")) positionStyle.bottom = "6px";
+                  if (dir.includes("w")) positionStyle.left = "6px";
+                  if (dir.includes("e")) positionStyle.right = "6px";
+                  return (
+                    <div
+                      key={dir}
+                      onMouseDown={(e) => {
+                        if (!orchPos) {
+                          const pad = 24;
+                          const fallbackX = Math.max(pad, window.innerWidth - orchSize.width - pad);
+                          const fallbackY = Math.max(pad, window.innerHeight - orchSize.height - 90);
+                          setOrchPos({ x: fallbackX, y: fallbackY });
+                        }
+                        orchResize.current = {
+                          resizing: true,
+                          startX: e.clientX,
+                          startY: e.clientY,
+                          startW: orchSize.width,
+                          startH: orchSize.height,
+                          startLeft: orchPos?.x ?? Math.max(24, window.innerWidth - orchSize.width - 24),
+                          startTop: orchPos?.y ?? Math.max(24, window.innerHeight - orchSize.height - 90),
+                          dir,
+                        };
+                        document.body.style.cursor = cursor;
+                        document.body.style.userSelect = 'none';
+                      }}
+                      style={{
+                        position: "absolute",
+                        width: "14px",
+                        height: "14px",
+                        borderRadius: "4px",
+                        background: "#f3f4f6",
+                        border: "1px solid #d1d5db",
+                        cursor,
+                        boxShadow: "inset 0 1px 0 rgba(255,255,255,0.6)",
+                        ...positionStyle,
+                      }}
+                    />
+                  );
+                })}
               </div>
             )}
           </section>
@@ -2621,17 +2674,7 @@ function CoordinatorColumn({ snapshot, width }: ColumnProps) {
                 </span>
               )}
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "10px" }}>
-                <div style={{ display: "flex", alignItems: "center", gap: "10px", color: "#111827", fontWeight: 700, fontSize: "13px" }}>
-                  <span style={{
-                    padding: "6px 12px",
-                    borderRadius: "999px",
-                    background: "#f4f4f5",
-                    border: "1px solid #e4e4e7",
-                    letterSpacing: "0.02em",
-                    color: "#111827",
-                  }}>
-                    Task {subtaskId}
-                  </span>
+                <div style={{ display: "flex", alignItems: "center", gap: "10px", color: "#111827", fontWeight: 700, fontSize: "13px", minHeight: "28px" }}>
                   <span style={{
                     padding: "6px 12px",
                     borderRadius: "999px",
