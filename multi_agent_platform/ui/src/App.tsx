@@ -2292,6 +2292,7 @@ function WorkerColumn({ snapshot }: { snapshot: SessionSnapshot | null }) {
   });
 
   const subtaskMap = new Map((snapshot?.subtasks ?? []).map((s) => [s.id, s.title]));
+  const subtaskOrder = new Map((snapshot?.subtasks ?? []).map((s, i) => [s.id, i + 1]));
   return (
     <div style={{
       borderRight: "1px solid #e5e7eb",
@@ -2325,6 +2326,7 @@ function WorkerColumn({ snapshot }: { snapshot: SessionSnapshot | null }) {
         {outputs.map((out, idx) => {
           const title = subtaskMap.get(out.subtask_id) ?? `Task ${out.subtask_id}`;
           const content = out.preview || out.content || "No content.";
+          const order = subtaskOrder.get(out.subtask_id);
           return (
             <div key={idx} style={{
               background: "#ffffff",
@@ -2335,7 +2337,29 @@ function WorkerColumn({ snapshot }: { snapshot: SessionSnapshot | null }) {
               display: "flex",
               flexDirection: "column",
               gap: "8px",
+              position: "relative",
             }}>
+              {order && (
+                <span style={{
+                  position: "absolute",
+                  top: "10px",
+                  left: "10px",
+                  width: "26px",
+                  height: "26px",
+                  borderRadius: "50%",
+                  background: "#111827",
+                  color: "#ffffff",
+                  fontSize: "11px",
+                  fontWeight: 700,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  boxShadow: "0 6px 14px rgba(0,0,0,0.18)",
+                  textTransform: "uppercase",
+                }}>
+                  T{order}
+                </span>
+              )}
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "8px" }}>
                 <div style={{ fontWeight: 700, color: "#111827", fontSize: "13px" }}>{title}</div>
                 <span style={{ fontSize: "11px", color: "#6b7280" }}>
