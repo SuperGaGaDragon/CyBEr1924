@@ -20,3 +20,10 @@
 ## Protocol & Prompts
 - Shared protocol definitions: `src/protocol.py` (envelope/payload schemas used by MessageBus and agents).
 - Prompt templates: `prompts/` (planner/worker/coordinator); additional product/docs in `docs/` and `chanpinshuoming.txt`.
+
+## AI Agent Capabilities
+- Planner: drafts plan/subtasks; produces structured `plan` and `subtasks`, setting `current_subtask_id`.
+- Worker: executes current subtask, emits structured outputs stored in `worker_outputs` and artifacts in `sessions/<id>/artifacts/`.
+- Coordinator: answers user questions (`/ask`), routes next steps (`/next`, `/all`), and logs decisions in `coord_decisions` and chat history.
+- Orchestrator loop: Planner → Worker → Coordinator; supports `/plan`, `/next`, `/all`, `/ask`, plan edit commands (set/update/insert/append/skip subtask).
+- Message logging: all agent/user commands logged as envelopes to `sessions/<id>/logs/envelopes.jsonl` via `MessageBus`.

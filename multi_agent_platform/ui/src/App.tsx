@@ -1,4 +1,4 @@
-import { type FormEvent, useEffect, useState } from "react";
+import { type FormEvent, useEffect, useState, useRef } from "react";
 import type { SessionSummary, SessionSnapshot } from "./api";
 import {
   listSessions,
@@ -937,92 +937,297 @@ function App() {
     );
   }
 
+  const [sidebarWidth, setSidebarWidth] = useState(280);
+  const [plannerWidth, setPlannerWidth] = useState(33.33);
+  const [workerWidth, setWorkerWidth] = useState(33.33);
+
+  const isDraggingSidebar = useRef(false);
+  const isDraggingPlanner = useRef(false);
+  const isDraggingWorker = useRef(false);
+
+  useEffect(() => {
+    const handleMouseMove = (e: MouseEvent) => {
+      if (isDraggingSidebar.current) {
+        const newWidth = Math.max(200, Math.min(500, e.clientX));
+        setSidebarWidth(newWidth);
+      }
+      if (isDraggingPlanner.current || isDraggingWorker.current) {
+        const mainContent = document.getElementById('main-content');
+        if (!mainContent) return;
+        const rect = mainContent.getBoundingClientRect();
+        const relativeX = e.clientX - rect.left;
+        const percentage = (relativeX / rect.width) * 100;
+
+        if (isDraggingPlanner.current) {
+          const newPlannerWidth = Math.max(15, Math.min(70, percentage));
+          setPlannerWidth(newPlannerWidth);
+        } else if (isDraggingWorker.current) {
+          const newWorkerWidth = Math.max(15, Math.min(70, percentage - plannerWidth));
+          setWorkerWidth(newWorkerWidth);
+        }
+      }
+    };
+
+    const handleMouseUp = () => {
+      isDraggingSidebar.current = false;
+      isDraggingPlanner.current = false;
+      isDraggingWorker.current = false;
+      document.body.style.cursor = 'default';
+      document.body.style.userSelect = 'auto';
+    };
+
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseup', handleMouseUp);
+    return () => {
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, [plannerWidth]);
+
+  const coordinatorWidth = 100 - plannerWidth - workerWidth;
+
   return (
-    <div style={{ display: "flex", height: "100vh", fontFamily: "system-ui" }}>
+    <div style={{ display: "flex", height: "100vh", fontFamily: "system-ui, -apple-system, sans-serif", background: "#ffffff" }}>
       <aside
         style={{
-          width: 260,
-          borderRight: "1px solid #ddd",
-          padding: 12,
+          width: sidebarWidth,
+          background: "#fafafa",
+          padding: "20px",
           boxSizing: "border-box",
           display: "flex",
           flexDirection: "column",
+          position: "relative",
         }}
       >
         <div>
-          <h3>Sessions</h3>
-          <div style={{ fontSize: 10, opacity: 0.6, marginBottom: 8 }}>v1.0 - Auto Deploy</div>
-          <button onClick={handleCreateSession} style={{ width: "100%", marginBottom: 8 }}>＋ New Session</button>
-          <button onClick={handleLogout} style={{ width: "100%", marginBottom: 12, background: "#f44", color: "white" }}>Logout</button>
+          <h3 style={{
+            margin: "0 0 4px 0",
+            fontSize: "18px",
+            fontWeight: "600",
+            color: "#000000"
+          }}>Sessions</h3>
+          <div style={{
+            fontSize: "11px",
+            color: "#666666",
+            marginBottom: "20px",
+            fontWeight: "500"
+          }}>v1.0 - Auto Deploy</div>
+          <button
+            onClick={handleCreateSession}
+            style={{
+              width: "100%",
+              marginBottom: "8px",
+              padding: "12px",
+              background: "#000000",
+              color: "#ffffff",
+              border: "none",
+              borderRadius: "8px",
+              fontSize: "14px",
+              fontWeight: "600",
+              cursor: "pointer",
+              transition: "all 0.2s ease",
+            }}
+            onMouseOver={(e) => e.currentTarget.style.background = "#333333"}
+            onMouseOut={(e) => e.currentTarget.style.background = "#000000"}
+          >＋ New Session</button>
+          <button
+            onClick={handleLogout}
+            style={{
+              width: "100%",
+              marginBottom: "20px",
+              padding: "12px",
+              background: "#ffffff",
+              color: "#000000",
+              border: "1px solid #e0e0e0",
+              borderRadius: "8px",
+              fontSize: "14px",
+              fontWeight: "600",
+              cursor: "pointer",
+              transition: "all 0.2s ease",
+            }}
+            onMouseOver={(e) => {
+              e.currentTarget.style.background = "#000000";
+              e.currentTarget.style.color = "#ffffff";
+            }}
+            onMouseOut={(e) => {
+              e.currentTarget.style.background = "#ffffff";
+              e.currentTarget.style.color = "#000000";
+            }}
+          >Logout</button>
         </div>
-        <ul style={{ listStyle: "none", padding: 0, marginTop: 12 }}>
+        <ul style={{ listStyle: "none", padding: 0, margin: 0, flex: 1, overflowY: "auto" }}>
           {sessions.map((session) => (
             <li
               key={session.session_id}
               onClick={() => handleSelectSession(session.session_id)}
               style={{
-                padding: "6px 8px",
-                marginBottom: 4,
+                padding: "12px 14px",
+                marginBottom: "6px",
                 cursor: "pointer",
-                borderRadius: 4,
-                background:
-                  activeSessionId === session.session_id ? "#eee" : "transparent",
+                borderRadius: "8px",
+                background: activeSessionId === session.session_id ? "#000000" : "#ffffff",
+                color: activeSessionId === session.session_id ? "#ffffff" : "#000000",
+                border: "1px solid #e0e0e0",
+                transition: "all 0.2s ease",
+              }}
+              onMouseOver={(e) => {
+                if (activeSessionId !== session.session_id) {
+                  e.currentTarget.style.background = "#f5f5f5";
+                }
+              }}
+              onMouseOut={(e) => {
+                if (activeSessionId !== session.session_id) {
+                  e.currentTarget.style.background = "#ffffff";
+                }
               }}
             >
-              <div style={{ fontWeight: 600 }}>{session.topic ?? "Untitled"}</div>
-              <div style={{ fontSize: 12, opacity: 0.7 }}>
+              <div style={{ fontWeight: 600, fontSize: "14px", marginBottom: "4px" }}>{session.topic ?? "Untitled"}</div>
+              <div style={{ fontSize: 11, opacity: 0.6 }}>
                 {session.last_updated}
               </div>
             </li>
           ))}
         </ul>
+        <div
+          onMouseDown={() => {
+            isDraggingSidebar.current = true;
+            document.body.style.cursor = 'col-resize';
+            document.body.style.userSelect = 'none';
+          }}
+          style={{
+            position: "absolute",
+            right: 0,
+            top: 0,
+            bottom: 0,
+            width: "4px",
+            cursor: "col-resize",
+            background: "transparent",
+            transition: "background 0.2s ease",
+          }}
+          onMouseOver={(e) => e.currentTarget.style.background = "#e0e0e0"}
+          onMouseOut={(e) => e.currentTarget.style.background = "transparent"}
+        />
       </aside>
 
-      <main style={{ flex: 1, display: "flex", flexDirection: "column" }}>
+      <main style={{ flex: 1, display: "flex", flexDirection: "column", background: "#ffffff" }}>
         <header
           style={{
-            padding: "8px 12px",
-            borderBottom: "1px solid #ddd",
+            padding: "16px 24px",
+            background: "#ffffff",
+            borderBottom: "1px solid #e0e0e0",
             display: "flex",
             alignItems: "center",
             justifyContent: "space-between",
           }}
         >
           <div>
-            <div style={{ fontWeight: 600 }}>
+            <div style={{ fontWeight: 600, fontSize: "16px", color: "#000000" }}>
               {snapshot ? snapshot.topic : "No session selected"}
             </div>
-            {loading && <span style={{ fontSize: 12 }}>Thinking…</span>}
+            {loading && <span style={{ fontSize: 13, color: "#666666", marginTop: "4px", display: "block" }}>Thinking…</span>}
             {error && (
-              <span style={{ fontSize: 12, color: "red", marginLeft: 8 }}>
-                {error}
+              <span style={{ fontSize: 13, color: "#000000", marginTop: "4px", display: "block" }}>
+                ⚠ {error}
               </span>
             )}
           </div>
           {snapshot && (
-            <div>
-              <button onClick={() => handleCommand("next")} style={{ marginRight: 8 }}>
+            <div style={{ display: "flex", gap: "8px" }}>
+              <button
+                onClick={() => handleCommand("next")}
+                style={{
+                  padding: "10px 20px",
+                  background: "#ffffff",
+                  color: "#000000",
+                  border: "1px solid #e0e0e0",
+                  borderRadius: "8px",
+                  fontSize: "14px",
+                  fontWeight: "600",
+                  cursor: "pointer",
+                  transition: "all 0.2s ease",
+                }}
+                onMouseOver={(e) => {
+                  e.currentTarget.style.background = "#000000";
+                  e.currentTarget.style.color = "#ffffff";
+                }}
+                onMouseOut={(e) => {
+                  e.currentTarget.style.background = "#ffffff";
+                  e.currentTarget.style.color = "#000000";
+                }}
+              >
                 Next Step
               </button>
-              <button onClick={() => handleCommand("all")}>Run All</button>
+              <button
+                onClick={() => handleCommand("all")}
+                style={{
+                  padding: "10px 20px",
+                  background: "#000000",
+                  color: "#ffffff",
+                  border: "none",
+                  borderRadius: "8px",
+                  fontSize: "14px",
+                  fontWeight: "600",
+                  cursor: "pointer",
+                  transition: "all 0.2s ease",
+                }}
+                onMouseOver={(e) => e.currentTarget.style.background = "#333333"}
+                onMouseOut={(e) => e.currentTarget.style.background = "#000000"}
+              >
+                Run All
+              </button>
             </div>
           )}
         </header>
 
-          <section style={{ flex: 1, display: "flex", overflow: "hidden" }}>
-            <PlannerColumn
-              snapshot={snapshot}
-              onPlanCommand={handlePlanCommand}
-            />
-            <WorkerColumn snapshot={snapshot} />
-            <CoordinatorColumn snapshot={snapshot} onAsk={handleAsk} />
-          </section>
+        <section id="main-content" style={{ flex: 1, display: "flex", overflow: "hidden", position: "relative" }}>
+          <PlannerColumn
+            snapshot={snapshot}
+            onPlanCommand={handlePlanCommand}
+            width={plannerWidth}
+          />
+          <div
+            onMouseDown={() => {
+              isDraggingPlanner.current = true;
+              document.body.style.cursor = 'col-resize';
+              document.body.style.userSelect = 'none';
+            }}
+            style={{
+              width: "4px",
+              cursor: "col-resize",
+              background: "transparent",
+              position: "relative",
+              transition: "background 0.2s ease",
+              flexShrink: 0,
+            }}
+            onMouseOver={(e) => e.currentTarget.style.background = "#e0e0e0"}
+            onMouseOut={(e) => e.currentTarget.style.background = "transparent"}
+          />
+          <WorkerColumn snapshot={snapshot} width={workerWidth} />
+          <div
+            onMouseDown={() => {
+              isDraggingWorker.current = true;
+              document.body.style.cursor = 'col-resize';
+              document.body.style.userSelect = 'none';
+            }}
+            style={{
+              width: "4px",
+              cursor: "col-resize",
+              background: "transparent",
+              position: "relative",
+              transition: "background 0.2s ease",
+              flexShrink: 0,
+            }}
+            onMouseOver={(e) => e.currentTarget.style.background = "#e0e0e0"}
+            onMouseOut={(e) => e.currentTarget.style.background = "transparent"}
+          />
+          <CoordinatorColumn snapshot={snapshot} onAsk={handleAsk} width={coordinatorWidth} />
+        </section>
       </main>
     </div>
   );
 }
 
-type ColumnProps = { snapshot: SessionSnapshot | null };
+type ColumnProps = { snapshot: SessionSnapshot | null; width: number };
 
 type PlannerColumnProps = ColumnProps & {
   onPlanCommand: (
@@ -1031,7 +1236,7 @@ type PlannerColumnProps = ColumnProps & {
   ) => Promise<void>;
 };
 
-function PlannerColumn({ snapshot, onPlanCommand }: PlannerColumnProps) {
+function PlannerColumn({ snapshot, onPlanCommand, width }: PlannerColumnProps) {
   const promptForSubtask = (
     defaultTitle = "",
     defaultNotes = "",
@@ -1057,14 +1262,21 @@ function PlannerColumn({ snapshot, onPlanCommand }: PlannerColumnProps) {
   return (
     <div
       style={{
-        flex: 1,
-        borderRight: "1px solid #eee",
-        padding: 12,
+        width: `${width}%`,
+        padding: "20px",
         overflowY: "auto",
+        background: "#ffffff",
       }}
     >
-      <h4>Planner</h4>
-      {!snapshot && <div>Choose or create a session.</div>}
+      <h4 style={{
+        margin: "0 0 20px 0",
+        fontSize: "15px",
+        fontWeight: "600",
+        color: "#000000",
+        textTransform: "uppercase",
+        letterSpacing: "0.5px"
+      }}>Planner</h4>
+      {!snapshot && <div style={{ color: "#666666", fontSize: "14px" }}>Choose or create a session.</div>}
       {snapshot && (
         <>
           <div
@@ -1072,13 +1284,32 @@ function PlannerColumn({ snapshot, onPlanCommand }: PlannerColumnProps) {
               display: "flex",
               alignItems: "center",
               justifyContent: "space-between",
-              marginBottom: 8,
+              marginBottom: "16px",
+              gap: "12px",
             }}
           >
-            <div style={{ fontWeight: 600 }}>{snapshot.plan?.title || snapshot.topic}</div>
-            <button onClick={handleAppend}>Append subtask</button>
+            <div style={{ fontWeight: 600, fontSize: "14px", color: "#000000", flex: 1 }}>
+              {snapshot.plan?.title || snapshot.topic}
+            </div>
+            <button
+              onClick={handleAppend}
+              style={{
+                padding: "8px 14px",
+                background: "#000000",
+                color: "#ffffff",
+                border: "none",
+                borderRadius: "6px",
+                fontSize: "12px",
+                fontWeight: "600",
+                cursor: "pointer",
+                transition: "all 0.2s ease",
+                whiteSpace: "nowrap",
+              }}
+              onMouseOver={(e) => e.currentTarget.style.background = "#333333"}
+              onMouseOut={(e) => e.currentTarget.style.background = "#000000"}
+            >＋ Add</button>
           </div>
-          <ol style={{ paddingLeft: 18 }}>
+          <ol style={{ paddingLeft: 0, margin: 0, listStyle: "none" }}>
             {snapshot.subtasks.map((subtask) => {
               const isCurrent = snapshot.current_subtask_id === subtask.id;
               const handleSetCurrent = () => {
@@ -1134,57 +1365,194 @@ function PlannerColumn({ snapshot, onPlanCommand }: PlannerColumnProps) {
                 <li
                   key={subtask.id}
                   style={{
-                    margin: "6px 0",
-                    padding: 10,
-                    borderRadius: 8,
+                    marginBottom: "10px",
+                    padding: "14px",
+                    borderRadius: "10px",
                     border: isCurrent
-                      ? "1px solid #4a90e2"
-                      : "1px solid #f0f0f0",
-                    background: isCurrent ? "#eef7ff" : "#fff",
-                    listStyle: "none",
+                      ? "2px solid #000000"
+                      : "1px solid #e0e0e0",
+                    background: isCurrent ? "#fafafa" : "#ffffff",
+                    position: "relative",
+                    transition: "all 0.2s ease",
                   }}
                 >
+                  {isCurrent && (
+                    <div style={{
+                      position: "absolute",
+                      top: 0,
+                      left: 0,
+                      width: "3px",
+                      height: "100%",
+                      background: "#000000",
+                      borderRadius: "10px 0 0 10px",
+                    }} />
+                  )}
                   <div
                     style={{
                       display: "flex",
                       alignItems: "baseline",
                       justifyContent: "space-between",
                       flexWrap: "wrap",
-                      gap: 8,
+                      gap: "8px",
+                      marginBottom: "10px",
                     }}
                   >
                     <span
                       style={{
                         fontWeight: subtask.status === "in_progress" ? 600 : 500,
-                        textDecoration:
-                          subtask.status === "done" ? "line-through" : "none",
+                        textDecoration: subtask.status === "done" ? "line-through" : "none",
+                        color: subtask.status === "done" ? "#999999" : "#000000",
+                        fontSize: "13px",
+                        flex: 1,
                       }}
                     >
-                      [{subtask.status}] {subtask.title}
+                      {subtask.title}
                     </span>
-                    <span style={{ fontSize: 12, opacity: 0.7 }}>
+                    <span style={{
+                      fontSize: "11px",
+                      color: "#999999",
+                      background: "#f5f5f5",
+                      padding: "2px 8px",
+                      borderRadius: "6px",
+                      fontWeight: "600",
+                    }}>
                       #{subtask.index + 1}
                     </span>
                   </div>
+                  <div style={{
+                    fontSize: "10px",
+                    color: "#666666",
+                    marginBottom: "10px",
+                    textTransform: "uppercase",
+                    letterSpacing: "0.5px",
+                    fontWeight: "600",
+                  }}>
+                    {subtask.status}
+                  </div>
                   <div
                     style={{
-                      marginTop: 8,
                       display: "flex",
                       flexWrap: "wrap",
-                      gap: 6,
+                      gap: "6px",
                     }}
                   >
-                    <button onClick={handleSetCurrent}>Set current</button>
-                    <button onClick={handleUpdate}>Update</button>
-                    <button onClick={handleInsertBelow}>Insert below</button>
-                    <button onClick={handleSkip}>Skip</button>
+                    <button
+                      onClick={handleSetCurrent}
+                      style={{
+                        padding: "6px 12px",
+                        background: "#ffffff",
+                        color: "#000000",
+                        border: "1px solid #e0e0e0",
+                        borderRadius: "6px",
+                        fontSize: "11px",
+                        fontWeight: "600",
+                        cursor: "pointer",
+                        transition: "all 0.2s ease",
+                      }}
+                      onMouseOver={(e) => {
+                        e.currentTarget.style.background = "#000000";
+                        e.currentTarget.style.color = "#ffffff";
+                      }}
+                      onMouseOut={(e) => {
+                        e.currentTarget.style.background = "#ffffff";
+                        e.currentTarget.style.color = "#000000";
+                      }}
+                    >Set current</button>
+                    <button
+                      onClick={handleUpdate}
+                      style={{
+                        padding: "6px 12px",
+                        background: "#ffffff",
+                        color: "#000000",
+                        border: "1px solid #e0e0e0",
+                        borderRadius: "6px",
+                        fontSize: "11px",
+                        fontWeight: "600",
+                        cursor: "pointer",
+                        transition: "all 0.2s ease",
+                      }}
+                      onMouseOver={(e) => {
+                        e.currentTarget.style.background = "#000000";
+                        e.currentTarget.style.color = "#ffffff";
+                      }}
+                      onMouseOut={(e) => {
+                        e.currentTarget.style.background = "#ffffff";
+                        e.currentTarget.style.color = "#000000";
+                      }}
+                    >Update</button>
+                    <button
+                      onClick={handleInsertBelow}
+                      style={{
+                        padding: "6px 12px",
+                        background: "#ffffff",
+                        color: "#000000",
+                        border: "1px solid #e0e0e0",
+                        borderRadius: "6px",
+                        fontSize: "11px",
+                        fontWeight: "600",
+                        cursor: "pointer",
+                        transition: "all 0.2s ease",
+                      }}
+                      onMouseOver={(e) => {
+                        e.currentTarget.style.background = "#000000";
+                        e.currentTarget.style.color = "#ffffff";
+                      }}
+                      onMouseOut={(e) => {
+                        e.currentTarget.style.background = "#ffffff";
+                        e.currentTarget.style.color = "#000000";
+                      }}
+                    >Insert below</button>
+                    <button
+                      onClick={handleSkip}
+                      style={{
+                        padding: "6px 12px",
+                        background: "#ffffff",
+                        color: "#000000",
+                        border: "1px solid #e0e0e0",
+                        borderRadius: "6px",
+                        fontSize: "11px",
+                        fontWeight: "600",
+                        cursor: "pointer",
+                        transition: "all 0.2s ease",
+                      }}
+                      onMouseOver={(e) => {
+                        e.currentTarget.style.background = "#000000";
+                        e.currentTarget.style.color = "#ffffff";
+                      }}
+                      onMouseOut={(e) => {
+                        e.currentTarget.style.background = "#ffffff";
+                        e.currentTarget.style.color = "#000000";
+                      }}
+                    >Skip</button>
                   </div>
                 </li>
               );
             })}
           </ol>
-          <div style={{ marginTop: 10 }}>
-            <button onClick={handleAppend}>Append subtask</button>
+          <div style={{ marginTop: "16px" }}>
+            <button
+              onClick={handleAppend}
+              style={{
+                padding: "10px 16px",
+                background: "#ffffff",
+                color: "#000000",
+                border: "1px solid #e0e0e0",
+                borderRadius: "8px",
+                fontSize: "13px",
+                fontWeight: "600",
+                cursor: "pointer",
+                transition: "all 0.2s ease",
+                width: "100%",
+              }}
+              onMouseOver={(e) => {
+                e.currentTarget.style.background = "#000000";
+                e.currentTarget.style.color = "#ffffff";
+              }}
+              onMouseOut={(e) => {
+                e.currentTarget.style.background = "#ffffff";
+                e.currentTarget.style.color = "#000000";
+              }}
+            >＋ Append subtask</button>
           </div>
         </>
       )}
@@ -1192,36 +1560,73 @@ function PlannerColumn({ snapshot, onPlanCommand }: PlannerColumnProps) {
   );
 }
 
-function WorkerColumn({ snapshot }: ColumnProps) {
+function WorkerColumn({ snapshot, width }: ColumnProps) {
   return (
     <div
       style={{
-        flex: 1,
-        borderRight: "1px solid #eee",
-        padding: 12,
+        width: `${width}%`,
+        padding: "20px",
         overflowY: "auto",
+        background: "#ffffff",
       }}
     >
-      <h4>Worker</h4>
-      {!snapshot && <div>Worker outputs will appear here.</div>}
+      <h4 style={{
+        margin: "0 0 20px 0",
+        fontSize: "15px",
+        fontWeight: "600",
+        color: "#000000",
+        textTransform: "uppercase",
+        letterSpacing: "0.5px"
+      }}>Worker</h4>
+      {!snapshot && <div style={{ color: "#666666", fontSize: "14px" }}>Worker outputs will appear here.</div>}
       {snapshot &&
         (snapshot.worker_outputs.length === 0 ? (
-          <div>No worker outputs yet.</div>
+          <div style={{ color: "#666666", fontSize: "14px" }}>No worker outputs yet.</div>
         ) : (
           snapshot.worker_outputs.map((output) => (
             <div
               key={output.subtask_id + output.timestamp}
               style={{
-                marginBottom: 12,
-                padding: 8,
-                border: "1px solid #ddd",
-                borderRadius: 4,
+                marginBottom: "14px",
+                padding: "14px",
+                border: "1px solid #e0e0e0",
+                borderRadius: "10px",
+                background: "#fafafa",
+                transition: "all 0.2s ease",
               }}
             >
-              <div style={{ fontSize: 12, opacity: 0.7 }}>
-                Subtask: {output.subtask_id} @ {output.timestamp}
+              <div style={{
+                fontSize: "11px",
+                color: "#666666",
+                marginBottom: "10px",
+                fontWeight: "600",
+                display: "flex",
+                gap: "8px",
+                alignItems: "center",
+              }}>
+                <span style={{
+                  background: "#000000",
+                  color: "#ffffff",
+                  padding: "3px 8px",
+                  borderRadius: "6px",
+                  fontSize: "10px",
+                }}>
+                  {output.subtask_id}
+                </span>
+                <span>{output.timestamp}</span>
               </div>
-              <pre style={{ whiteSpace: "pre-wrap", margin: 0 }}>
+              <pre style={{
+                whiteSpace: "pre-wrap",
+                margin: 0,
+                fontFamily: "ui-monospace, 'SF Mono', Monaco, monospace",
+                fontSize: "12px",
+                lineHeight: "1.6",
+                color: "#000000",
+                background: "#ffffff",
+                padding: "12px",
+                borderRadius: "8px",
+                border: "1px solid #e0e0e0",
+              }}>
                 {output.preview ?? output.content}
               </pre>
             </div>
@@ -1234,6 +1639,7 @@ function WorkerColumn({ snapshot }: ColumnProps) {
 function CoordinatorColumn({
   snapshot,
   onAsk,
+  width,
 }: ColumnProps & { onAsk: (question: string) => void }) {
   const [input, setInput] = useState("");
 
@@ -1247,18 +1653,34 @@ function CoordinatorColumn({
 
   return (
     <div
-      style={{ flex: 1.2, padding: 12, display: "flex", flexDirection: "column" }}
+      style={{
+        width: `${width}%`,
+        padding: "20px",
+        display: "flex",
+        flexDirection: "column",
+        background: "#ffffff",
+      }}
     >
-      <h4>Coordinator</h4>
+      <h4 style={{
+        margin: "0 0 20px 0",
+        fontSize: "15px",
+        fontWeight: "600",
+        color: "#000000",
+        textTransform: "uppercase",
+        letterSpacing: "0.5px"
+      }}>Coordinator</h4>
       <div
         style={{
           flex: 1,
           overflowY: "auto",
-          border: "1px solid #eee",
-          padding: 8,
+          background: "#fafafa",
+          padding: "16px",
+          borderRadius: "10px",
+          border: "1px solid #e0e0e0",
+          marginBottom: "16px",
         }}
       >
-        {!snapshot && <div>Chat with the Coordinator here.</div>}
+        {!snapshot && <div style={{ color: "#666666", fontSize: "14px" }}>Chat with the Coordinator here.</div>}
         {snapshot &&
           snapshot.chat_history.map((message, index) => {
             const response =
@@ -1274,26 +1696,79 @@ function CoordinatorColumn({
                 ? JSON.stringify(message.payload)
                 : String(message.payload ?? "");
             const content = response ?? text ?? fallback;
+            const isUser = message.role === "user";
             return (
-              <div key={index} style={{ marginBottom: 8 }}>
-                <div style={{ fontSize: 12, opacity: 0.7 }}>{message.role}</div>
-                <div>{content}</div>
+              <div key={index} style={{ marginBottom: "16px" }}>
+                <div style={{
+                  fontSize: "10px",
+                  color: "#666666",
+                  marginBottom: "6px",
+                  textTransform: "uppercase",
+                  letterSpacing: "0.5px",
+                  fontWeight: "600",
+                }}>
+                  {message.role}
+                </div>
+                <div style={{
+                  background: isUser ? "#000000" : "#ffffff",
+                  color: isUser ? "#ffffff" : "#000000",
+                  padding: "12px 14px",
+                  borderRadius: "10px",
+                  fontSize: "13px",
+                  lineHeight: "1.6",
+                  border: isUser ? "none" : "1px solid #e0e0e0",
+                  whiteSpace: "pre-wrap",
+                }}>
+                  {content}
+                </div>
               </div>
             );
           })}
       </div>
       <form
         onSubmit={handleSubmit}
-        style={{ marginTop: 8, display: "flex", gap: 8 }}
+        style={{ display: "flex", gap: "8px" }}
       >
         <input
           type="text"
           placeholder="Ask the coordinator…"
           value={input}
           onChange={(event) => setInput(event.target.value)}
-          style={{ flex: 1, padding: 6 }}
+          style={{
+            flex: 1,
+            padding: "12px 16px",
+            fontSize: "14px",
+            border: "1px solid #e0e0e0",
+            borderRadius: "8px",
+            outline: "none",
+            transition: "all 0.2s ease",
+            background: "#ffffff",
+            color: "#000000",
+          }}
+          onFocus={(e) => e.currentTarget.style.borderColor = "#000000"}
+          onBlur={(e) => e.currentTarget.style.borderColor = "#e0e0e0"}
         />
-        <button type="submit" disabled={!snapshot}>
+        <button
+          type="submit"
+          disabled={!snapshot}
+          style={{
+            padding: "12px 24px",
+            background: snapshot ? "#000000" : "#e0e0e0",
+            color: snapshot ? "#ffffff" : "#999999",
+            border: "none",
+            borderRadius: "8px",
+            fontSize: "14px",
+            fontWeight: "600",
+            cursor: snapshot ? "pointer" : "not-allowed",
+            transition: "all 0.2s ease",
+          }}
+          onMouseOver={(e) => {
+            if (snapshot) e.currentTarget.style.background = "#333333";
+          }}
+          onMouseOut={(e) => {
+            if (snapshot) e.currentTarget.style.background = "#000000";
+          }}
+        >
           Ask
         </button>
       </form>
