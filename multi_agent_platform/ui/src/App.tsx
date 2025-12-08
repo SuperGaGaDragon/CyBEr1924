@@ -1917,7 +1917,7 @@ function App() {
   return (
     <>
       {aboutButton}
-      <div style={{ display: "flex", height: "100vh", fontFamily: "system-ui, -apple-system, sans-serif", background: "#ffffff", overflow: "hidden" }}>
+      <div style={{ display: "flex", height: "100vh", fontFamily: "system-ui, -apple-system, sans-serif", background: "#ffffff", overflowY: "auto", overflowX: "hidden" }}>
       <aside
         style={{
           width: sidebarWidth,
@@ -2818,7 +2818,8 @@ function WorkerColumn({ snapshot, progress, progressSeenCount = 0 }: { snapshot:
       padding: "20px",
       minHeight: 0,
       height: "100%",
-      overflow: "hidden",
+      overflowX: "hidden",
+      overflowY: "auto",
     }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "12px" }}>
         <h4 style={{
@@ -2845,6 +2846,7 @@ function WorkerColumn({ snapshot, progress, progressSeenCount = 0 }: { snapshot:
             alignItems: "center",
             justifyContent: "center",
             transition: "all 0.2s ease",
+            zIndex: 5,
           }}
           onMouseOver={(e) => {
             e.currentTarget.style.borderColor = "#0f172a";
@@ -2863,7 +2865,7 @@ function WorkerColumn({ snapshot, progress, progressSeenCount = 0 }: { snapshot:
         </button>
       </div>
       <ProgressStrip items={progress} label="Worker" sourceCount={progressSeenCount} />
-      <div style={{ overflowY: "auto", flex: 1, paddingRight: "6px", display: "flex", flexDirection: "column", gap: "10px" }}>
+      <div style={{ flex: 1, paddingRight: "6px", display: "flex", flexDirection: "column", gap: "10px" }}>
         {outputs.length === 0 && (
           <div style={{
             color: "#4b5563",
