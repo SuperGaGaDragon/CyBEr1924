@@ -85,6 +85,16 @@ function App() {
     showRegister: false,
   });
 
+  const [sidebarWidth, setSidebarWidth] = useState(280);
+  const [plannerWidth, setPlannerWidth] = useState(33.33);
+  const [workerWidth, setWorkerWidth] = useState(33.33);
+
+  const isDraggingSidebar = useRef(false);
+  const isDraggingPlanner = useRef(false);
+  const isDraggingWorker = useRef(false);
+
+  const coordinatorWidth = 100 - plannerWidth - workerWidth;
+
   // Initialize token from localStorage on mount
   useEffect(() => {
     const savedToken = localStorage.getItem("cyber1924_token");
@@ -97,6 +107,46 @@ function App() {
       }));
     }
   }, []);
+
+  // Handle mouse events for resizing panels
+  useEffect(() => {
+    const handleMouseMove = (e: MouseEvent) => {
+      if (isDraggingSidebar.current) {
+        const newWidth = Math.max(200, Math.min(500, e.clientX));
+        setSidebarWidth(newWidth);
+      }
+      if (isDraggingPlanner.current || isDraggingWorker.current) {
+        const mainContent = document.getElementById('main-content');
+        if (!mainContent) return;
+        const rect = mainContent.getBoundingClientRect();
+        const relativeX = e.clientX - rect.left;
+        const percentage = (relativeX / rect.width) * 100;
+
+        if (isDraggingPlanner.current) {
+          const newPlannerWidth = Math.max(15, Math.min(70, percentage));
+          setPlannerWidth(newPlannerWidth);
+        } else if (isDraggingWorker.current) {
+          const newWorkerWidth = Math.max(15, Math.min(70, percentage - plannerWidth));
+          setWorkerWidth(newWorkerWidth);
+        }
+      }
+    };
+
+    const handleMouseUp = () => {
+      isDraggingSidebar.current = false;
+      isDraggingPlanner.current = false;
+      isDraggingWorker.current = false;
+      document.body.style.cursor = 'default';
+      document.body.style.userSelect = 'auto';
+    };
+
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseup', handleMouseUp);
+    return () => {
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, [plannerWidth]);
 
   useEffect(() => {
     if (!auth.isLoggedIn || !auth.accessToken) return;
@@ -936,55 +986,6 @@ function App() {
       </div>
     );
   }
-
-  const [sidebarWidth, setSidebarWidth] = useState(280);
-  const [plannerWidth, setPlannerWidth] = useState(33.33);
-  const [workerWidth, setWorkerWidth] = useState(33.33);
-
-  const isDraggingSidebar = useRef(false);
-  const isDraggingPlanner = useRef(false);
-  const isDraggingWorker = useRef(false);
-
-  useEffect(() => {
-    const handleMouseMove = (e: MouseEvent) => {
-      if (isDraggingSidebar.current) {
-        const newWidth = Math.max(200, Math.min(500, e.clientX));
-        setSidebarWidth(newWidth);
-      }
-      if (isDraggingPlanner.current || isDraggingWorker.current) {
-        const mainContent = document.getElementById('main-content');
-        if (!mainContent) return;
-        const rect = mainContent.getBoundingClientRect();
-        const relativeX = e.clientX - rect.left;
-        const percentage = (relativeX / rect.width) * 100;
-
-        if (isDraggingPlanner.current) {
-          const newPlannerWidth = Math.max(15, Math.min(70, percentage));
-          setPlannerWidth(newPlannerWidth);
-        } else if (isDraggingWorker.current) {
-          const newWorkerWidth = Math.max(15, Math.min(70, percentage - plannerWidth));
-          setWorkerWidth(newWorkerWidth);
-        }
-      }
-    };
-
-    const handleMouseUp = () => {
-      isDraggingSidebar.current = false;
-      isDraggingPlanner.current = false;
-      isDraggingWorker.current = false;
-      document.body.style.cursor = 'default';
-      document.body.style.userSelect = 'auto';
-    };
-
-    document.addEventListener('mousemove', handleMouseMove);
-    document.addEventListener('mouseup', handleMouseUp);
-    return () => {
-      document.removeEventListener('mousemove', handleMouseMove);
-      document.removeEventListener('mouseup', handleMouseUp);
-    };
-  }, [plannerWidth]);
-
-  const coordinatorWidth = 100 - plannerWidth - workerWidth;
 
   return (
     <div style={{ display: "flex", height: "100vh", fontFamily: "system-ui, -apple-system, sans-serif", background: "#ffffff" }}>
