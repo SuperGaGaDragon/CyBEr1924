@@ -23,6 +23,9 @@ export type Subtask = {
   status: "pending" | "in_progress" | "done" | "skipped";
   notes?: string;
   index: number;
+  needs_redo?: boolean;
+  output?: string;
+  description?: string;
 };
 
 export type WorkerOutput = {

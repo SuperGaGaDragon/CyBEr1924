@@ -112,7 +112,7 @@ stage3
 ###工作进程透明化
 
 目标：
-- worker和reviewer，每开始一个subtask，就显示一个subtask。
+- worker和reviewer，每开始一个subtask，就显示一个subtask的方格。每做完个subtask就显示一个subtask。不要等到全部做完才显示。
 
 stage 1
 

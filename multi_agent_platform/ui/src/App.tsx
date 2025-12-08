@@ -2652,36 +2652,38 @@ function WorkerColumn({ snapshot }: { snapshot: SessionSnapshot | null }) {
 }
 
 function CoordinatorColumn({ snapshot, width }: ColumnProps) {
-  const decisions = snapshot?.coord_decisions ?? [];
+  const baseDecisions: any[] = snapshot?.coord_decisions ?? [];
   const subtaskOrder = new Map((snapshot?.subtasks ?? []).map((s, i) => [String(s.id), i + 1]));
 
   // Derive reviewer-like statuses from subtasks when no explicit decision exists.
   const existingIds = new Set(
-    decisions
+    baseDecisions
       .map((d) => {
         const sid =
-          typeof d.subtask_id === "string" || typeof d.subtask_id === "number"
+          typeof d?.subtask_id === "string" || typeof d?.subtask_id === "number"
             ? d.subtask_id
-            : (d as any).id;
+            : (d as any)?.id;
         return sid == null ? null : String(sid);
       })
       .filter(Boolean) as string[]
   );
 
-  const derivedDecisions =
-    snapshot?.subtasks?.map((sub) => {
-      if (!sub || (sub.id != null && existingIds.has(String(sub.id)))) return null;
-      const status = sub.needs_redo ? "redo" : sub.status === "done" ? "accept" : "pending";
-      return {
-        subtask_id: sub.id,
-        decision: status,
-        reason: sub.notes || "",
-        timestamp: (sub as any).updated_at || (sub as any).ts || null,
-        source: "orchestrator",
-      };
-    }).filter(Boolean) ?? [];
+  const derivedDecisions: any[] =
+    snapshot?.subtasks
+      ?.map((sub) => {
+        if (!sub || (sub.id != null && existingIds.has(String(sub.id)))) return null;
+        const status = sub.needs_redo ? "redo" : sub.status === "done" ? "accept" : "pending";
+        return {
+          subtask_id: sub.id,
+          decision: status,
+          reason: sub.notes || "",
+          timestamp: (sub as any)?.updated_at || (sub as any)?.ts || null,
+          source: "orchestrator",
+        };
+      })
+      .filter(Boolean) as any[] ?? [];
 
-  const allDecisions = [...decisions, ...derivedDecisions];
+  const decisions = [...baseDecisions, ...derivedDecisions];
 
   return (
     <div
@@ -2719,7 +2721,7 @@ function CoordinatorColumn({ snapshot, width }: ColumnProps) {
             Reviewer decisions will appear here.
           </div>
         )}
-        {snapshot && allDecisions.length === 0 && (
+        {snapshot && decisions.length === 0 && (
           <div style={{
             color: "#4b5563",
             fontSize: "14px",
@@ -2732,22 +2734,22 @@ function CoordinatorColumn({ snapshot, width }: ColumnProps) {
             No reviewer decisions yet.
           </div>
         )}
-        {allDecisions.map((decision, index) => {
-          const statusRaw = typeof decision.decision === "string" ? decision.decision : "";
+        {decisions.map((decision, index) => {
+          const statusRaw = typeof decision?.decision === "string" ? decision.decision : "";
           const status = statusRaw ? statusRaw.toLowerCase() : "pending";
           const subtaskId =
-            typeof decision.subtask_id === "string" || typeof decision.subtask_id === "number"
+            typeof decision?.subtask_id === "string" || typeof decision?.subtask_id === "number"
               ? decision.subtask_id
-              : typeof (decision as any).id === "string" || typeof (decision as any).id === "number"
+              : typeof (decision as any)?.id === "string" || typeof (decision as any)?.id === "number"
                 ? (decision as any).id
                 : "—";
           const reason =
-            typeof decision.reason === "string"
+            typeof decision?.reason === "string"
               ? decision.reason
-              : typeof (decision as any).comment === "string"
+              : typeof (decision as any)?.comment === "string"
                 ? (decision as any).comment
                 : "";
-          const ts = (decision as any).timestamp ?? (decision as any).ts ?? null;
+          const ts = (decision as any)?.timestamp ?? (decision as any)?.ts ?? null;
           const palette: Record<string, { bg: string; fg: string; shadow: string }> = {
             accept: { bg: "rgba(16, 185, 129, 0.12)", fg: "#0f766e", shadow: "0 10px 24px rgba(16,185,129,0.18)" },
             redo: { bg: "rgba(248, 113, 113, 0.12)", fg: "#b91c1c", shadow: "0 10px 24px rgba(248,113,113,0.18)" },
