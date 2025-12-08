@@ -428,6 +428,21 @@ def build_session_snapshot(
 
     chat_history.sort(key=lambda entry: entry.get("timestamp", ""))
 
+    # Fallback: if subtask outputs exist on plan but no subtask_result logs were written,
+    # synthesize worker_outputs so UI can render content (e.g., TRIGGER_REDO path without artifact writes).
+    for subtask in plan.subtasks:
+        if getattr(subtask, "output", "") and subtask.id not in worker_outputs:
+            text = str(getattr(subtask, "output", "") or "")
+            worker_outputs[subtask.id] = {
+                "subtask_id": subtask.id,
+                "subtask_title": subtask_map.get(subtask.id, subtask.title),
+                "artifact_path": None,
+                "content": text,
+                "preview": text[:400],
+                "timestamp": None,
+                "source": "state_fallback",
+            }
+
     worker_list = [
         worker_outputs[sub_id]
         for sub_id in subtask_map.keys()
