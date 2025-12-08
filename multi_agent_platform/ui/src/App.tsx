@@ -2127,20 +2127,92 @@ function CoordinatorColumn({
         {!snapshot && <div style={{ color: "#666666", fontSize: "14px" }}>Chat with the Reviewer here.</div>}
         {snapshot &&
           snapshot.chat_history.map((message, index) => {
+            const payload: any = message.payload ?? {};
+            const payloadType = (message as any).payload_type as string | undefined;
+            const decisionRaw = typeof payload.decision === "string" ? payload.decision : undefined;
+            const decision = decisionRaw ? decisionRaw.toLowerCase() : undefined;
+            const subtaskId =
+              typeof payload.subtask_id === "string"
+                ? payload.subtask_id
+                : typeof payload.id === "string"
+                  ? payload.id
+                  : undefined;
+            const reason =
+              typeof payload.reason === "string"
+                ? payload.reason
+                : typeof payload.comment === "string"
+                  ? payload.comment
+                  : undefined;
+            const isReview = Boolean(decision || reason || subtaskId || payloadType === "COORD_DECISION");
+            const isUser = message.role === "user";
+
+            if (isReview) {
+              const status = decision ?? "pending";
+              const statusColor =
+                status === "accept"
+                  ? "#16a34a"
+                  : status === "redo"
+                    ? "#dc2626"
+                    : "#6b7280";
+              const statusBg =
+                status === "accept"
+                  ? "rgba(22,163,74,0.12)"
+                  : status === "redo"
+                    ? "rgba(220,38,38,0.12)"
+                    : "rgba(107,114,128,0.12)";
+
+              return (
+                <div
+                  key={index}
+                  style={{
+                    marginBottom: "12px",
+                    padding: "12px 14px",
+                    borderRadius: "12px",
+                    border: "1px solid #e0e0e0",
+                    background: "#ffffff",
+                    boxShadow: "0 6px 18px rgba(0,0,0,0.04)",
+                  }}
+                >
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "6px" }}>
+                    <div style={{ fontSize: "12px", fontWeight: 700, color: "#111827" }}>
+                      Task {subtaskId ?? "—"}
+                    </div>
+                    <div
+                      style={{
+                        padding: "4px 10px",
+                        borderRadius: "999px",
+                        background: statusBg,
+                        color: statusColor,
+                        fontSize: "11px",
+                        fontWeight: 700,
+                        letterSpacing: "0.03em",
+                        textTransform: "uppercase",
+                      }}
+                    >
+                      {status}
+                    </div>
+                  </div>
+                  <div style={{ fontSize: "12px", color: "#374151", lineHeight: "1.5", whiteSpace: "pre-wrap" }}>
+                    {reason ?? JSON.stringify(payload, null, 2)}
+                  </div>
+                </div>
+              );
+            }
+
             const response =
-              typeof message.payload?.response === "string"
-                ? message.payload.response
+              typeof payload.response === "string"
+                ? payload.response
                 : null;
             const text =
-              typeof message.payload?.text === "string"
-                ? message.payload.text
+              typeof payload.text === "string"
+                ? payload.text
                 : null;
             const fallback =
               typeof message.payload === "object"
                 ? JSON.stringify(message.payload)
                 : String(message.payload ?? "");
             const content = response ?? text ?? fallback;
-            const isUser = message.role === "user";
+
             return (
               <div key={index} style={{ marginBottom: "16px" }}>
                 <div style={{
@@ -2151,7 +2223,7 @@ function CoordinatorColumn({
                   letterSpacing: "0.5px",
                   fontWeight: "600",
                 }}>
-                  {message.role}
+                  {message.role ?? payloadType ?? "message"}
                 </div>
                 <div style={{
                   background: isUser ? "#000000" : "#ffffff",
