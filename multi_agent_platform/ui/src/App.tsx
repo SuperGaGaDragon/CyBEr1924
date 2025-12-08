@@ -71,7 +71,7 @@ function PlanningView({ session, onSendPlanningMessage, onConfirmPlan }: Plannin
       }}>
         {session.planner_chat.length === 0 ? (
           <div style={{ color: "#6b7280", fontSize: "14px" }}>
-            No planning messages yet. Describe what you want to write!
+            No planning messages yet. Share all requirements and context with the Planner here.
           </div>
         ) : (
           session.planner_chat.map((msg, idx) => (
@@ -100,7 +100,7 @@ function PlanningView({ session, onSendPlanningMessage, onConfirmPlan }: Plannin
       <form onSubmit={handleSubmit} style={{ display: "flex", gap: "10px" }}>
         <input
           type="text"
-          placeholder="Describe the project or adjust the plan..."
+          placeholder="Describe requirements for the Planner to shape the plan..."
           value={input}
           onChange={(e) => setInput(e.target.value)}
           style={{
@@ -799,7 +799,7 @@ function App() {
   }
 
   async function handleCreateSession() {
-    const topic = window.prompt("Topic / goal for this session?");
+    const topic = window.prompt("Project name (requirements go to Planner chat)");
     if (!topic) return;
     setState((prev) => ({ ...prev, loading: true, error: null }));
     try {
