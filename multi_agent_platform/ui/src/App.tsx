@@ -86,7 +86,7 @@ function App() {
     showRegister: false,
   });
 
-  const [sidebarWidth, setSidebarWidth] = useState(280);
+  const [sidebarWidth, setSidebarWidth] = useState(320);
   const [plannerWidth, setPlannerWidth] = useState(33.33);
   const [workerWidth, setWorkerWidth] = useState(33.33);
 
@@ -119,7 +119,7 @@ function App() {
   useEffect(() => {
     const handleMouseMove = (e: MouseEvent) => {
       if (isDraggingSidebar.current) {
-        const newWidth = Math.max(200, Math.min(500, e.clientX));
+        const newWidth = Math.max(260, Math.min(520, e.clientX));
         setSidebarWidth(newWidth);
       }
       if (isDraggingPlanner.current || isDraggingWorker.current) {
@@ -413,24 +413,39 @@ function App() {
 
     setState((prev) => ({ ...prev, loading: true, error: null }));
     try {
-      await deleteSession(deleteConfirm.sessionId);
+      const deletedId = deleteConfirm.sessionId;
+      await deleteSession(deletedId);
 
       // Refresh sessions list
       const sessions = await listSessions();
 
-      // If we deleted the active session, clear it
+      // If we deleted the active session, clear it or move to the next available one
       let newActiveSessionId = state.activeSessionId;
       let newSnapshot = state.snapshot;
+      const deletedActive = state.activeSessionId === deletedId;
 
-      if (state.activeSessionId === deleteConfirm.sessionId) {
+      if (deletedActive) {
         newActiveSessionId = null;
         newSnapshot = null;
         localStorage.removeItem(SESSION_TOKEN_KEY);
 
-        // Update URL
-        const url = new URL(window.location.href);
-        url.pathname = "/";
-        window.history.pushState(null, "", url.toString());
+        if (sessions.length > 0) {
+          const fallbackId = sessions[0].session_id;
+          try {
+            const fallbackSnapshot = await getSession(fallbackId);
+            navigateToSession(fallbackId);
+            localStorage.setItem(SESSION_TOKEN_KEY, fallbackId);
+            newActiveSessionId = fallbackId;
+            newSnapshot = fallbackSnapshot;
+          } catch (fallbackError) {
+            console.error("Failed to load fallback session after delete", fallbackError);
+          }
+        } else {
+          // No sessions left
+          const url = new URL(window.location.href);
+          url.pathname = "/";
+          window.history.pushState(null, "", url.toString());
+        }
       }
 
       setState((prev) => ({
@@ -1055,12 +1070,16 @@ function App() {
       <aside
         style={{
           width: sidebarWidth,
-          background: "#fafafa",
-          padding: "20px",
+          minWidth: 260,
+          maxWidth: 520,
+          background: "linear-gradient(180deg, #ffffff 0%, #f6f7fb 100%)",
+          padding: "24px 20px",
           boxSizing: "border-box",
           display: "flex",
           flexDirection: "column",
           position: "relative",
+          borderRight: "1px solid #e5e7eb",
+          boxShadow: "8px 0 30px rgba(0, 0, 0, 0.04)",
         }}
       >
         <div>
@@ -1124,12 +1143,15 @@ function App() {
             <li
               key={session.session_id}
               style={{
-                padding: "12px 14px",
-                marginBottom: "6px",
-                borderRadius: "8px",
-                background: activeSessionId === session.session_id ? "#000000" : "#ffffff",
-                color: activeSessionId === session.session_id ? "#ffffff" : "#000000",
-                border: "1px solid #e0e0e0",
+                padding: "14px 14px",
+                marginBottom: "10px",
+                borderRadius: "12px",
+                background: activeSessionId === session.session_id ? "#0f1115" : "#f5f7fb",
+                color: activeSessionId === session.session_id ? "#ffffff" : "#0f172a",
+                border: activeSessionId === session.session_id ? "1px solid #0f1115" : "1px solid #e5e7eb",
+                boxShadow: activeSessionId === session.session_id
+                  ? "0 12px 30px rgba(0, 0, 0, 0.18)"
+                  : "0 6px 16px rgba(0, 0, 0, 0.06)",
                 transition: "all 0.2s ease",
                 position: "relative",
                 display: "flex",
@@ -1138,12 +1160,12 @@ function App() {
               }}
               onMouseOver={(e) => {
                 if (activeSessionId !== session.session_id) {
-                  e.currentTarget.style.background = "#f5f5f5";
+                  e.currentTarget.style.background = "#eef2f8";
                 }
               }}
               onMouseOut={(e) => {
                 if (activeSessionId !== session.session_id) {
-                  e.currentTarget.style.background = "#ffffff";
+                  e.currentTarget.style.background = "#f5f7fb";
                 }
               }}
             >
@@ -1204,16 +1226,23 @@ function App() {
           }}
           style={{
             position: "absolute",
-            right: 0,
+            right: -2,
             top: 0,
             bottom: 0,
-            width: "4px",
+            width: "10px",
             cursor: "col-resize",
-            background: "transparent",
-            transition: "background 0.2s ease",
+            background: "linear-gradient(90deg, transparent 0%, #d7dbe4 50%, transparent 100%)",
+            transition: "background 0.2s ease, opacity 0.2s ease",
+            opacity: 0.7,
           }}
-          onMouseOver={(e) => e.currentTarget.style.background = "#e0e0e0"}
-          onMouseOut={(e) => e.currentTarget.style.background = "transparent"}
+          onMouseOver={(e) => {
+            e.currentTarget.style.background = "#d0d6e4";
+            e.currentTarget.style.opacity = "1";
+          }}
+          onMouseOut={(e) => {
+            e.currentTarget.style.background = "linear-gradient(90deg, transparent 0%, #d7dbe4 50%, transparent 100%)";
+            e.currentTarget.style.opacity = "0.7";
+          }}
         />
       </aside>
 

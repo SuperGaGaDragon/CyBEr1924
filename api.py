@@ -31,7 +31,7 @@ from multi_agent_platform.message_bus import MessageBus
 from multi_agent_platform.run_flow import Orchestrator
 from multi_agent_platform.session_state import build_session_snapshot
 from multi_agent_platform.session_store import ArtifactStore
-from multi_agent_platform.db.db import init_db
+from multi_agent_platform.db.db import init_db, SessionLocal, DbSession, DbUserSession
 from multi_agent_platform.db.db_session_store import (
     save_snapshot,
     load_snapshot,
@@ -301,19 +301,11 @@ def delete_session(
         if session_dir.exists():
             shutil.rmtree(session_dir)
 
-        # Delete session from database
-        from multi_agent_platform.db.db import get_db_connection
-        conn = get_db_connection()
-        cursor = conn.cursor()
-
-        # Delete from user_sessions first (foreign key)
-        cursor.execute("DELETE FROM user_sessions WHERE session_id = ?", (session_id,))
-
-        # Delete from sessions
-        cursor.execute("DELETE FROM sessions WHERE session_id = ?", (session_id,))
-
-        conn.commit()
-        conn.close()
+        # Delete session from database (both ownership link and snapshot)
+        with SessionLocal() as db:
+            db.query(DbUserSession).filter(DbUserSession.session_id == session_id).delete()
+            db.query(DbSession).filter(DbSession.id == session_id).delete()
+            db.commit()
 
         return {"message": f"Session {session_id} deleted successfully"}
     except Exception as exc:
