@@ -12,7 +12,7 @@ from pathlib import Path
 from typing import Optional, Dict, Any, List, Literal
 from datetime import datetime
 import json
-from pydantic import BaseModel
+from pydantic import BaseModel, Field, root_validator
 
 from .message_bus import MessageBus
 from .plan_model import Plan
@@ -32,6 +32,31 @@ class OrchestratorEvent(BaseModel):
     kind: str  # "REQUEST_REDO", "REQUEST_PLAN_UPDATE", ...
     payload: Dict[str, Any] = {}
     ts: datetime
+
+
+class SubtaskProgressEvent(BaseModel):
+    agent: Literal["worker", "reviewer"]
+    subtask_id: str
+    stage: Literal["start", "finish"] = "start"
+    status: Literal["in_progress", "completed"] = "in_progress"
+    ts: datetime
+    payload: Dict[str, Any] = Field(default_factory=dict)
+
+    @root_validator(pre=True)
+    def _default_status_from_stage(cls, values: Dict[str, Any]) -> Dict[str, Any]:
+        stage = values.get("stage") or values.get("event") or "start"
+        values["stage"] = stage
+        if not values.get("status"):
+            values["status"] = PROGRESS_STAGE_STATUS_MAP.get(stage, "in_progress")
+        if "payload" not in values or values.get("payload") is None:
+            values["payload"] = {}
+        return values
+
+
+PROGRESS_STAGE_STATUS_MAP: Dict[str, str] = {
+    "start": "in_progress",
+    "finish": "completed",
+}
 
 
 class PlannerChatMessage(BaseModel):
@@ -56,6 +81,7 @@ class OrchestratorState:
     plan_locked: bool = False
     orchestrator_messages: List[OrchestratorMessage] = field(default_factory=list)
     orch_events: List[OrchestratorEvent] = field(default_factory=list)
+    progress_events: List[SubtaskProgressEvent] = field(default_factory=list)
     planner_chat: List[PlannerChatMessage] = field(default_factory=list)
 
     @property
@@ -91,6 +117,21 @@ class OrchestratorState:
             }
             for event in self.orch_events
         ]
+        d["progress_events"] = []
+        for event in self.progress_events:
+            base = event.dict() if isinstance(event, SubtaskProgressEvent) else dict(event)
+            stage = base.get("stage") or "start"
+            status = base.get("status") or PROGRESS_STAGE_STATUS_MAP.get(stage, "in_progress")
+            ts_val = getattr(event, "ts", None) if hasattr(event, "ts") else base.get("ts")
+            d["progress_events"].append(
+                {
+                    **base,
+                    "stage": stage,
+                    "status": status,
+                    "payload": base.get("payload") or {},
+                    "ts": _ser_ts(ts_val),
+                }
+            )
         d["planner_chat"] = [
             {
                 **(msg.dict() if isinstance(msg, PlannerChatMessage) else msg),
@@ -124,6 +165,7 @@ class OrchestratorState:
         """Create from dictionary."""
         orchestrator_messages_data = data.get("orchestrator_messages") or []
         orch_events_data = data.get("orch_events") or []
+        progress_events_data = data.get("progress_events") or []
         planner_chat_data = data.get("planner_chat") or []
 
         def _load_items(items: List[Any], model_cls: type[BaseModel]) -> List[BaseModel]:
@@ -150,6 +192,7 @@ class OrchestratorState:
                 orchestrator_messages_data, OrchestratorMessage
             ),
             orch_events=_load_items(orch_events_data, OrchestratorEvent),
+            progress_events=_load_items(progress_events_data, SubtaskProgressEvent),
             planner_chat=_load_items(planner_chat_data, PlannerChatMessage),
         )
 
@@ -219,6 +262,7 @@ class SessionSnapshot:
     chat_history: List[Dict[str, Any]]
     plan_locked: bool = False
     session_mode: str = "planning"
+    progress_events: List[Dict[str, Any]] = field(default_factory=list)
     orchestrator_messages: List[Dict[str, Any]] = field(default_factory=list)
     orch_events: List[Dict[str, Any]] = field(default_factory=list)
     planner_chat: List[Dict[str, Any]] = field(default_factory=list)
@@ -243,6 +287,7 @@ class SessionSnapshot:
             "chat_history": self.chat_history,
             "plan_locked": self.plan_locked,
             "session_mode": self.session_mode,
+            "progress_events": self.progress_events,
             "orchestrator_messages": self.orchestrator_messages,
             "orch_events": self.orch_events,
             "planner_chat": self.planner_chat,
@@ -381,6 +426,28 @@ def build_session_snapshot(
     # Use serialized versions from state_dict to avoid datetime leakage
     orchestrator_messages = state_dict.get("orchestrator_messages", [])
     raw_events = state_dict.get("orch_events", [])
+    progress_events_raw = state_dict.get("progress_events", [])
+    progress_events: List[Dict[str, Any]] = []
+    for ev in progress_events_raw:
+        if not isinstance(ev, dict):
+            continue
+        agent = ev.get("agent")
+        subtask_id = ev.get("subtask_id")
+        if not agent or not subtask_id:
+            continue
+        stage = ev.get("stage") or "start"
+        status = ev.get("status") or PROGRESS_STAGE_STATUS_MAP.get(stage, "in_progress")
+        progress_events.append(
+            {
+                **ev,
+                "agent": agent,
+                "subtask_id": subtask_id,
+                "stage": stage,
+                "status": status,
+                "ts": ev.get("ts"),
+                "payload": ev.get("payload") or {},
+            }
+        )
     # Filter out malformed orch_events to avoid downstream validation errors
     orch_events = []
     for ev in raw_events:
@@ -406,6 +473,7 @@ def build_session_snapshot(
         session_mode=orchestrator_state.session_mode,
         orchestrator_messages=orchestrator_messages,
         orch_events=orch_events,
+        progress_events=progress_events,
         planner_chat=planner_chat,
         state=state_dict,
     )

@@ -47,6 +47,15 @@ class OrchestratorEventModel(BaseModel):
     ts: datetime
 
 
+class SubtaskProgressEventModel(BaseModel):
+    agent: Literal["worker", "reviewer"]
+    subtask_id: str
+    stage: Literal["start", "finish"] = "start"
+    status: Literal["in_progress", "completed"] = "in_progress"
+    payload: Dict[str, Any] = Field(default_factory=dict)
+    ts: datetime
+
+
 class PlannerChatMessageModel(BaseModel):
     role: Literal["user", "planner"]
     content: str
@@ -65,6 +74,7 @@ class SessionSnapshotModel(BaseModel):
     chat_history: List[Dict[str, Any]]
     plan_locked: bool = False
     session_mode: Literal["planning", "execution"] = "planning"
+    progress_events: List[SubtaskProgressEventModel] = Field(default_factory=list)
     orchestrator_messages: List[OrchestratorMessageModel] = Field(default_factory=list)
     orch_events: List[OrchestratorEventModel] = Field(default_factory=list)
     planner_chat: List[PlannerChatMessageModel] = Field(default_factory=list)

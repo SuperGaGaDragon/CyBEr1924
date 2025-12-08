@@ -55,6 +55,15 @@ export type OrchestratorEvent = {
   ts: string;
 };
 
+export type SubtaskProgressEvent = {
+  agent: "worker" | "reviewer";
+  subtask_id: string;
+  stage: "start" | "finish";
+  status: "in_progress" | "completed";
+  payload?: Record<string, any>;
+  ts: string;
+};
+
 export type PlannerChatMessage = {
   role: "user" | "planner";
   content: string;
@@ -73,6 +82,7 @@ export type SessionSnapshot = {
   chat_history: ChatMessage[];
   plan_locked: boolean;
   session_mode: "planning" | "execution";
+  progress_events: SubtaskProgressEvent[];
   orchestrator_messages: OrchestratorMessage[];
   orch_events: OrchestratorEvent[];
   planner_chat: PlannerChatMessage[];

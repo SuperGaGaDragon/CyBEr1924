@@ -115,12 +115,25 @@ stage3
 - worker和reviewer，每开始一个subtask，就显示一个subtask的方格。每做完个subtask就显示一个subtask。不要等到全部做完才显示。
 
 stage 1
+- [x] 明确“subtask 方格”触发信号：定义 worker/reviewer 的 start/finish 事件结构（含 subtask_id、agent、timestamp、状态），补充缺省状态映射（生成中/完成）。
 
 stage 2
+- [ ] 后端落地事件流：worker/reviewer 在开始执行时立刻写 start 事件，完成时写 finish 事件；确保 orchestrator/plan redo 时也能按 subtask 划分事件。
 
 stage 3 
+- [ ] 前端状态建模：引入 per-agent subtask list state，start 事件立即生成方格占位，finish 事件更新状态/时间/序号；支持 session 恢复时的初始化。
 
+stage 4
+- [ ] UI 呈现：为 worker/reviewer 区域添加方格列表（进行中/已完成样式区分），进行中的展示 spinner/“In progress”，完成的展示摘要/时间戳；禁止等待全量完成才渲染。
 
+stage 5
+- [ ] 验证：手动跑多子任务（含 redo）确认方格按开始顺序出现、完成后状态更新不中断；自动测试覆盖 start/finish 事件驱动的渲染逻辑。
+
+stage 6
+- [ ] 收尾与稳态：补日志/监控（事件漏写/顺序异常预警）、兜底提示（无事件时提示“等待任务开始”），清理临时 debug 文案与样式。
+
+stage 7
+- [ ] 审查，确保不会出现404，500等bug
 -----
 
 ### 小说专用模式设计
