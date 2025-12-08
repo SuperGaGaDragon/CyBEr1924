@@ -48,6 +48,8 @@ from multi_agent_platform.auth_service import (
     decode_access_token,
     get_user_by_id,
 )
+from multi_agent_platform.session_state import OrchestratorState
+from multi_agent_platform.plan_model import Plan
 
 
 # Initialize FastAPI
@@ -281,7 +283,42 @@ def post_command(
         save_snapshot(session_id, snapshot_model)
         return snapshot_model
     except FileNotFoundError:
-        raise HTTPException(status_code=404, detail="Session not found")
+        # Attempt to restore missing state from DB snapshot, then retry once.
+        snapshot_from_db = load_snapshot(session_id)
+        if snapshot_from_db is None:
+            raise HTTPException(status_code=404, detail="Session not found")
+
+        # Rehydrate plan state.json
+        plan_dict = snapshot_from_db.plan or {}
+        plan_obj = Plan.from_dict(plan_dict) if plan_dict else Plan(plan_id=session_id, title=session_id)
+        state_path = artifact_store.session_dir(session_id) / "state.json"
+        state_path.parent.mkdir(parents=True, exist_ok=True)
+        state_path.write_text(json.dumps({"session_id": session_id, "plan": plan_obj.to_dict()}, ensure_ascii=False, indent=2), encoding="utf-8")
+
+        # Rehydrate orchestrator_state
+        orch_state_data = snapshot_from_db.orchestrator_state or {}
+        if not orch_state_data:
+            orch_state_data = {
+                "session_id": session_id,
+                "plan_id": plan_obj.plan_id,
+                "status": "idle",
+                "plan_locked": snapshot_from_db.plan_locked if hasattr(snapshot_from_db, "plan_locked") else False,
+            }
+        orch_state = OrchestratorState.from_dict(orch_state_data)
+        orch.save_orchestrator_state(orch_state)
+
+        # Retry once after restore
+        try:
+            snapshot = orch.execute_command(
+                session_id,
+                request.command,
+                payload=request.payload,
+            )
+            snapshot_model = SessionSnapshotModel(**snapshot)
+            save_snapshot(session_id, snapshot_model)
+            return snapshot_model
+        except Exception as exc:
+            raise HTTPException(status_code=500, detail=str(exc))
     except Exception as exc:
         raise HTTPException(status_code=500, detail=str(exc))
 
