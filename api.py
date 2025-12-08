@@ -119,12 +119,15 @@ def get_current_user(
 
 def send_verification_email(email: str, code: str) -> None:
     """
-    使用 Resend 发送邮箱验证码。
+    使用 Resend 发送邮箱验证码。如果失败，直接抛异常，让上层返回 500。
     """
+    print(f"[DEBUG] Preparing to send verification email to {email} with code {code}")
+    print(f"[DEBUG] RESEND_API_KEY set: {bool(RESEND_API_KEY)}, EMAIL_FROM: {EMAIL_FROM}")
+
     if not RESEND_API_KEY or not EMAIL_FROM:
-        # 没配置就只打日志，不中断注册流程（你也可以改成 raise）
-        print(f"[WARN] Email not sent, missing RESEND_API_KEY/EMAIL_FROM. Code for {email}: {code}")
-        return
+        msg = "Missing RESEND_API_KEY or EMAIL_FROM"
+        print(f"[ERROR] {msg}")
+        raise HTTPException(status_code=500, detail=msg)
 
     params = {
         "from": EMAIL_FROM,
@@ -135,7 +138,14 @@ def send_verification_email(email: str, code: str) -> None:
             "<p>This code will expire in 10 minutes.</p>"
         ),
     }
-    resend.Emails.send(params)
+
+    try:
+        print(f"[DEBUG] Calling Resend.Emails.send with params: {params}")
+        resend.Emails.send(params)
+        print("[DEBUG] Resend.Emails.send returned successfully")
+    except Exception as e:
+        print(f"[ERROR] Resend send failed: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to send verification email: {e}")
 
 
 def _iso_datetime(ts: Optional[float]) -> Optional[datetime]:
@@ -288,13 +298,8 @@ def register(payload: RegisterRequest):
         # 比如 Email already registered
         raise HTTPException(status_code=400, detail=str(e))
 
-    # 发送邮件
-    try:
-        send_verification_email(payload.email, verification_code)
-    except Exception as e:
-        # 发邮件失败时你可以视情况处理：这里先打印日志但不阻止注册
-        print(f"[ERROR] Failed to send verification email to {payload.email}: {e}")
-        # 也可以改成 raise HTTPException(500, "Failed to send verification email")
+    # 发送邮件 - 让 send_verification_email 自己抛 500 或成功
+    send_verification_email(payload.email, verification_code)
 
     return AuthResponse(
         message="Registered successfully. Please check your email for the verification code."

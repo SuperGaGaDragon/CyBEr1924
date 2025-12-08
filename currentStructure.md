@@ -1,24 +1,22 @@
-# Current Project Structure and Capabilities
+# Current Project Structure (Dec 2025)
 
-## Root Layout
-- `multi_agent_platform/`: core orchestration plus agent helpers (run_flow, session_store, message_bus, plan_model, interactive CLI).
-- `src/`: shared protocol definitions (`protocol.py`) and schema helpers used by `MessageBus`.
-- Top-level docs (`ARCHITECTURE_V2.md`, `IMPLEMENTATION_SUMMARY.md`, etc.) capture broader design goals and onboarding steps.
+## Root
+- Backend entrypoint/tests/scripts: `api.py` (FastAPI server), `validate_mvp.py`, `verify_fastapi_ready.py`, `verify_prompts_ready.py`, `test_*` suites.
+- Docs & summaries: `ARCHITECTURE_V2.md`, `FASTAPI_READY_SUMMARY.md`, `URL_SYNC_IMPLEMENTATION_SUMMARY.md`, `SESSION_RECOVERY_README.md`, etc.
+- Local data/assets: `local_dev.db` (SQLite fallback), `frontend/assets/logocyber1924.png`.
 
-## Key Runtime Flow
-- `run_example.py` now constructs an `ArtifactStore` & `MessageBus` and instantiates the configurable `Orchestrator`, which exposes `init_session`, `run_next_pending_subtask`, `run_all`, and `answer_user_question`.
-- The orchestrator cycles through Planner → Worker → Coordinator, saving artifacts (`session_store.save_artifact`), emitting protocol-validated envelopes (`MessageBus.send`), and logging user queries via `MessageBus.log_user_command` to `sessions/<id>/logs/envelopes.jsonl`.
-- `plan_model.Plan` parses Planner outlines into `Subtask`s, serializes to JSON, and exposes a brief text summary so other agents (or the interactive CLI) can share structured state.
+## Backend (multi_agent_platform/)
+- API/service layer: `api.py` routes leverage orchestrator + DB; auth and JWT in `auth_service.py`; request/response schemas in `api_models.py`.
+- Orchestrator & agents: `run_flow.py`, `run_example.py`, `agent_runner.py`, `session_state.py`, `session_store.py`, `interactive_session*.py`, `interactive_coordinator.py`, `plan_model.py`, `prompt_registry.py`, `message_bus.py`.
+- DB layer: `db/db.py` (SQLAlchemy engine/models for sessions/users), `db/db_session_store.py` (snapshot persistence, user-session links).
+- Config/logs: `configs/`, `logs/`.
+- Session artifacts: `sessions/<session_id>/` containing `state.json`, `orchestrator_state.json`, `logs/envelopes.jsonl`, and `artifacts/`.
 
-## Messaging & Protocol
-- `MessageBus` wraps `protocol.build_envelope` + `ProtocolValidator`, with helpers for building/appending envelopes and logging `user_command` payloads (`PayloadType.USER_COMMAND` added to `src/protocol.py`).
-- Every agent interaction emits a schema-validated envelope (`plan_created`, `subtask_result`, `coord_decision`, `outline/draft/review/summary`, etc.), keeping `logs/envelopes.jsonl` linearizable for debugging or playback.
+## Frontend (multi_agent_platform/ui/)
+- Vite + React + TypeScript app: `src/App.tsx` (auth, session list, URL sync), `src/api.ts` (client), `src/main.tsx`, styles `App.css` / `index.css`.
+- Tooling/config: `package.json`, `package-lock.json`, `vite.config.ts`, `tsconfig*.json`, `eslint.config.js`, `index.html`.
+- Assets/public/build: `src/assets/`, `public/`, production build in `dist/`.
 
-## Interactive Layer
-- `interactive_session.py` drives a CLI that creates sessions, shows `/plan`, executes `/next` or `/all`, and routes free-form questions to `Orchestrator.answer_user_question`, preserving plan context for the coordinator.
-- Commands and natural language inputs are recorded as envelopes so a future UI can replay both automated decisions and user intent.
-
-## Testability & Usage
-- `python3 -m multi_agent_platform.run_example` exercises the full sequence using stubbed agents when `OPENAI_API_KEY` is unset; real keys will hit OpenAI APIs per subtask.
-- Sessions persist under `multi_agent_platform/sessions/`, making artifacts, logs, and plan snapshots available for replay or recovery.
-
+## Protocol & Prompts
+- Shared protocol definitions: `src/protocol.py` (envelope/payload schemas used by MessageBus and agents).
+- Prompt templates: `prompts/` (planner/worker/coordinator); additional product/docs in `docs/` and `chanpinshuoming.txt`.
