@@ -597,6 +597,8 @@ type ProgressItem = {
   order: number;
 };
 
+type ViewMode = "timeline" | "output";
+
 function deriveProgressByAgent(snapshot: SessionSnapshot | null): Record<"worker" | "reviewer", ProgressItem[]> {
   if (!snapshot) {
     return { worker: [], reviewer: [] };
@@ -704,6 +706,14 @@ function App() {
     sessionId: string | null;
     sessionTopic: string | null;
   }>({ show: false, sessionId: null, sessionTopic: null });
+  const [viewModes, setViewModes] = useState<{ worker: ViewMode; reviewer: ViewMode }>({
+    worker: "timeline",
+    reviewer: "timeline",
+  });
+
+  useEffect(() => {
+    setViewModes({ worker: "timeline", reviewer: "timeline" });
+  }, [state.activeSessionId]);
 
   const isDraggingSidebar = useRef(false);
   const clearActiveSession = async (message: string) => {
@@ -2199,14 +2209,27 @@ function App() {
                 width: "100%",
                 height: "100%",
                 minHeight: 0,
-                overflow: "hidden",
+                overflow: "visible",
                 position: "relative",
                 alignItems: "stretch",
               }}
             >
               <PlanColumn snapshot={snapshot} />
-              <WorkerColumn snapshot={snapshot} progress={progressByAgent.worker} progressSeenCount={progressSeenCounts.worker} />
-              <CoordinatorColumn snapshot={snapshot} width={100} progress={progressByAgent.reviewer} progressSeenCount={progressSeenCounts.reviewer} />
+              <WorkerColumn
+                snapshot={snapshot}
+                progress={progressByAgent.worker}
+                progressSeenCount={progressSeenCounts.worker}
+                viewMode={viewModes.worker}
+                onViewModeChange={(mode) => setViewModes((prev) => ({ ...prev, worker: mode }))}
+              />
+              <CoordinatorColumn
+                snapshot={snapshot}
+                width={100}
+                progress={progressByAgent.reviewer}
+                progressSeenCount={progressSeenCounts.reviewer}
+                viewMode={viewModes.reviewer}
+                onViewModeChange={(mode) => setViewModes((prev) => ({ ...prev, reviewer: mode }))}
+              />
 
               <div
                 onMouseDown={() => {
@@ -2530,7 +2553,14 @@ function App() {
   );
 }
 
-type ColumnProps = { snapshot: SessionSnapshot | null; width: number; progress?: ProgressItem[]; progressSeenCount?: number };
+type ColumnProps = {
+  snapshot: SessionSnapshot | null;
+  width: number;
+  progress?: ProgressItem[];
+  progressSeenCount?: number;
+  viewMode?: ViewMode;
+  onViewModeChange?: (mode: ViewMode) => void;
+};
 
 function ProgressStrip({ items, label, sourceCount = 0 }: { items: ProgressItem[]; label: string; sourceCount?: number }) {
   const palette: Record<ProgressItem["status"], { bg: string; fg: string; badge: string }> = {
@@ -2793,8 +2823,9 @@ function PlanColumn({ snapshot }: { snapshot: SessionSnapshot | null }) {
   );
 }
 
-function WorkerColumn({ snapshot, progress, progressSeenCount = 0 }: { snapshot: SessionSnapshot | null; progress: ProgressItem[]; progressSeenCount?: number }) {
+function WorkerColumn({ snapshot, progress, progressSeenCount = 0, viewMode = "timeline", onViewModeChange }: { snapshot: SessionSnapshot | null; progress: ProgressItem[]; progressSeenCount?: number; viewMode?: ViewMode; onViewModeChange?: (mode: ViewMode) => void }) {
   const [descending, setDescending] = useState(true);
+  const activeViewMode: ViewMode = viewMode ?? "timeline";
   const outputs = [...(snapshot?.worker_outputs ?? [])].sort((a, b) => {
     const diff = new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime();
     return descending ? -diff : diff;
@@ -2820,8 +2851,8 @@ function WorkerColumn({ snapshot, progress, progressSeenCount = 0 }: { snapshot:
       height: "100%",
       overflowX: "hidden",
       overflowY: "auto",
-    }}>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "12px" }}>
+    }} data-view-mode={activeViewMode}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "12px", gap: "10px" }}>
         <h4 style={{
           margin: 0,
           fontSize: "15px",
@@ -2830,111 +2861,156 @@ function WorkerColumn({ snapshot, progress, progressSeenCount = 0 }: { snapshot:
         }}>
           Worker
         </h4>
-        <button
-          onClick={() => setDescending((prev) => !prev)}
-          title={descending ? "最新在前" : "最旧在前"}
-          aria-pressed={descending}
-          style={{
-            width: "38px",
-            height: "38px",
-            borderRadius: "12px",
-            border: "1px solid #d1d5db",
-            background: descending ? "linear-gradient(135deg, #0f172a 0%, #1f2937 100%)" : "#ffffff",
-            cursor: "pointer",
-            boxShadow: descending ? "0 12px 26px rgba(0,0,0,0.14)" : "0 6px 18px rgba(0,0,0,0.08)",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            transition: "all 0.2s ease",
-            zIndex: 5,
-          }}
-          onMouseOver={(e) => {
-            e.currentTarget.style.borderColor = "#0f172a";
-            e.currentTarget.style.boxShadow = "0 12px 30px rgba(0,0,0,0.16)";
-          }}
-          onMouseOut={(e) => {
-            e.currentTarget.style.borderColor = "#d1d5db";
-            e.currentTarget.style.boxShadow = descending ? "0 12px 26px rgba(0,0,0,0.14)" : "0 6px 18px rgba(0,0,0,0.08)";
-          }}
-          aria-label="Toggle worker task order"
-        >
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <path d="M8 5.5L12 2L16 5.5H13.5V14.5H10.5V5.5H8Z" fill={descending ? "#ffffff" : "#111827"} />
-            <path d="M16 18.5L12 22L8 18.5H10.5V9.5H13.5V18.5H16Z" fill={descending ? "#ffffff" : "#111827"} />
-          </svg>
-        </button>
-      </div>
-      <ProgressStrip items={progress} label="Worker" sourceCount={progressSeenCount} />
-      <div style={{ flex: 1, paddingRight: "6px", display: "flex", flexDirection: "column", gap: "10px" }}>
-        {outputs.length === 0 && (
-          <div style={{
-            color: "#4b5563",
-            fontSize: "14px",
-            padding: "12px",
-            borderRadius: "12px",
-            background: "#ffffff",
-            border: "1px dashed #d1d5db",
-          }}>
-            No worker output yet. If tasks are running, verify backend SUBTASK_RESULT logs and artifact access.
+        <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+          <div style={{ display: "inline-flex", borderRadius: "12px", border: "1px solid #d1d5db", background: "#ffffff", overflow: "hidden" }}>
+            {(["timeline", "output"] as ViewMode[]).map((mode) => {
+              const active = activeViewMode === mode;
+              return (
+                <button
+                  key={mode}
+                  onClick={() => onViewModeChange?.(mode)}
+                  aria-pressed={active}
+                  style={{
+                    padding: "8px 10px",
+                    border: "none",
+                    background: active ? "linear-gradient(135deg, #0f172a 0%, #1f2937 100%)" : "transparent",
+                    color: active ? "#ffffff" : "#111827",
+                    fontSize: "12px",
+                    fontWeight: 700,
+                    cursor: "pointer",
+                    minWidth: "70px",
+                    transition: "all 0.15s ease",
+                  }}
+                >
+                  {mode === "timeline" ? "Timeline" : "Output"}
+                </button>
+              );
+            })}
           </div>
-        )}
-        {outputs.map((out, idx) => {
-          const title = subtaskMap.get(out.subtask_id) ?? `Task ${out.subtask_id}`;
-          const content = out.content || out.preview || "No content.";
-          const order = subtaskOrder.get(out.subtask_id);
-          return (
-            <div key={idx} style={{
-              background: "#ffffff",
-              border: "1px solid #e5e7eb",
+          <button
+            onClick={() => setDescending((prev) => !prev)}
+            title={descending ? "最新在前" : "最旧在前"}
+            aria-pressed={descending}
+            style={{
+              width: "38px",
+              height: "38px",
               borderRadius: "12px",
-              padding: "14px 16px 14px 76px",
-              boxShadow: "0 8px 20px rgba(0,0,0,0.05)",
+              border: "1px solid #d1d5db",
+              background: descending ? "linear-gradient(135deg, #0f172a 0%, #1f2937 100%)" : "#ffffff",
+              cursor: "pointer",
+              boxShadow: descending ? "0 12px 26px rgba(0,0,0,0.14)" : "0 6px 18px rgba(0,0,0,0.08)",
               display: "flex",
-              flexDirection: "column",
-              gap: "8px",
-              position: "relative",
-            }}>
-              {order && (
-                <span style={{
-                  position: "absolute",
-                  top: "14px",
-                  left: "16px",
-                  width: "30px",
-                  height: "30px",
-                  borderRadius: "50%",
-                  background: "#111827",
-                  color: "#ffffff",
-                  fontSize: "12px",
-                  fontWeight: 700,
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  boxShadow: "0 6px 14px rgba(0,0,0,0.18)",
-                  textTransform: "uppercase",
-                }}>
-                  T{order}
-                </span>
-              )}
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "8px" }}>
-                <div style={{ fontWeight: 700, color: "#111827", fontSize: "13px" }}>{title}</div>
-                <span style={{ fontSize: "11px", color: "#6b7280" }}>
-                  {new Date(out.timestamp).toLocaleString()}
-                </span>
-              </div>
-              <div style={{ fontSize: "13px", color: "#1f2937", lineHeight: 1.5, whiteSpace: "pre-wrap" }}>
-                {content}
-              </div>
-            </div>
-          );
-        })}
+              alignItems: "center",
+              justifyContent: "center",
+              transition: "all 0.2s ease",
+              zIndex: 5,
+            }}
+            onMouseOver={(e) => {
+              e.currentTarget.style.borderColor = "#0f172a";
+              e.currentTarget.style.boxShadow = "0 12px 30px rgba(0,0,0,0.16)";
+            }}
+            onMouseOut={(e) => {
+              e.currentTarget.style.borderColor = "#d1d5db";
+              e.currentTarget.style.boxShadow = descending ? "0 12px 26px rgba(0,0,0,0.14)" : "0 6px 18px rgba(0,0,0,0.08)";
+            }}
+            aria-label="Toggle worker task order"
+          >
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M8 5.5L12 2L16 5.5H13.5V14.5H10.5V5.5H8Z" fill={descending ? "#ffffff" : "#111827"} />
+              <path d="M16 18.5L12 22L8 18.5H10.5V9.5H13.5V18.5H16Z" fill={descending ? "#ffffff" : "#111827"} />
+            </svg>
+          </button>
+        </div>
       </div>
+      {activeViewMode === "timeline" ? (
+        <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: "12px" }}>
+          <ProgressStrip items={progress} label="Worker" sourceCount={progressSeenCount} />
+          {progress.length === 0 && (
+            <div style={{
+              color: "#4b5563",
+              fontSize: "14px",
+              padding: "12px",
+              borderRadius: "12px",
+              background: "#ffffff",
+              border: "1px dashed #d1d5db",
+            }}>
+              No progress yet. Switch to Output to inspect generated artifacts when available.
+            </div>
+          )}
+        </div>
+      ) : (
+        <div style={{ flex: 1, paddingRight: "6px", display: "flex", flexDirection: "column", gap: "10px" }}>
+          {outputs.length === 0 && (
+            <div style={{
+              color: "#4b5563",
+              fontSize: "14px",
+              padding: "12px",
+              borderRadius: "12px",
+              background: "#ffffff",
+              border: "1px dashed #d1d5db",
+            }}>
+              No worker output yet. If tasks are running, verify backend SUBTASK_RESULT logs and artifact access.
+            </div>
+          )}
+          {outputs.map((out, idx) => {
+            const title = subtaskMap.get(out.subtask_id) ?? `Task ${out.subtask_id}`;
+            const content = out.content || out.preview || "No content.";
+            const order = subtaskOrder.get(out.subtask_id);
+            return (
+              <div key={idx} style={{
+                background: "#ffffff",
+                border: "1px solid #e5e7eb",
+                borderRadius: "12px",
+                padding: "14px 16px 14px 76px",
+                boxShadow: "0 8px 20px rgba(0,0,0,0.05)",
+                display: "flex",
+                flexDirection: "column",
+                gap: "8px",
+                position: "relative",
+              }}>
+                {order && (
+                  <span style={{
+                    position: "absolute",
+                    top: "14px",
+                    left: "16px",
+                    width: "30px",
+                    height: "30px",
+                    borderRadius: "50%",
+                    background: "#111827",
+                    color: "#ffffff",
+                    fontSize: "12px",
+                    fontWeight: 700,
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    boxShadow: "0 6px 14px rgba(0,0,0,0.18)",
+                    textTransform: "uppercase",
+                  }}>
+                    T{order}
+                  </span>
+                )}
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "8px" }}>
+                  <div style={{ fontWeight: 700, color: "#111827", fontSize: "13px" }}>{title}</div>
+                  <span style={{ fontSize: "11px", color: "#6b7280" }}>
+                    {new Date(out.timestamp).toLocaleString()}
+                  </span>
+                </div>
+                <div style={{ fontSize: "13px", color: "#1f2937", lineHeight: 1.5, whiteSpace: "pre-wrap" }}>
+                  {content}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }
 
-function CoordinatorColumn({ snapshot, width, progress = [], progressSeenCount = 0 }: ColumnProps) {
+function CoordinatorColumn({ snapshot, width, progress = [], progressSeenCount = 0, viewMode = "timeline", onViewModeChange }: ColumnProps) {
   const baseDecisions: any[] = snapshot?.coord_decisions ?? [];
   const subtaskOrder = new Map((snapshot?.subtasks ?? []).map((s, i) => [String(s.id), i + 1]));
+  const activeViewMode: ViewMode = viewMode ?? "timeline";
 
   // Derive reviewer-like statuses from subtasks when no explicit decision exists.
   const existingIds = new Set(
@@ -2974,161 +3050,209 @@ function CoordinatorColumn({ snapshot, width, progress = [], progressSeenCount =
         display: "flex",
         flexDirection: "column",
         background: "#ffffff",
-        overflow: "hidden",
+        overflow: "visible",
         minHeight: 0,
         height: "100%",
         flex: "1 1 0",
       }}
+      data-view-mode={activeViewMode}
     >
-      <h4 style={{
-        margin: "0 0 20px 0",
-        fontSize: "15px",
-        fontWeight: "600",
-        color: "#000000",
-        textTransform: "uppercase",
-        letterSpacing: "0.5px"
-      }}>Reviewer</h4>
-      <ProgressStrip items={progress} label="Reviewer" sourceCount={progressSeenCount} />
-      <div
-        style={{
-          flex: 1,
-          overflowY: "auto",
-          background: "#fafafa",
-          padding: "16px",
-          borderRadius: "10px",
-          border: "1px solid #e0e0e0",
-          marginBottom: "16px",
-        }}
-      >
-        {!snapshot && (
-          <div style={{ color: "#666666", fontSize: "14px" }}>
-            Reviewer decisions will appear here.
-          </div>
-        )}
-        {snapshot && decisions.length === 0 && (
-          <div style={{
-            color: "#4b5563",
-            fontSize: "14px",
-            padding: "12px",
-            borderRadius: "12px",
-            background: "linear-gradient(135deg, #f7f7f7 0%, #ededed 100%)",
-            border: "1px dashed #d1d5db",
-            textAlign: "center",
-          }}>
-            No reviewer decisions yet.
-          </div>
-        )}
-        {decisions.map((decision, index) => {
-          const statusRaw = typeof decision?.decision === "string" ? decision.decision : "";
-          const status = statusRaw ? statusRaw.toLowerCase() : "pending";
-          const subtaskId =
-            typeof decision?.subtask_id === "string" || typeof decision?.subtask_id === "number"
-              ? decision.subtask_id
-              : typeof (decision as any)?.id === "string" || typeof (decision as any)?.id === "number"
-                ? (decision as any).id
-                : "—";
-          const reason =
-            typeof decision?.reason === "string"
-              ? decision.reason
-              : typeof (decision as any)?.comment === "string"
-                ? (decision as any).comment
-                : "";
-          const ts = (decision as any)?.timestamp ?? (decision as any)?.ts ?? null;
-          const palette: Record<string, { bg: string; fg: string; shadow: string }> = {
-            accept: { bg: "rgba(16, 185, 129, 0.12)", fg: "#0f766e", shadow: "0 10px 24px rgba(16,185,129,0.18)" },
-            redo: { bg: "rgba(248, 113, 113, 0.12)", fg: "#b91c1c", shadow: "0 10px 24px rgba(248,113,113,0.18)" },
-            changes_requested: { bg: "#f5f5f5", fg: "#1f2937", shadow: "0 10px 24px rgba(0,0,0,0.06)" },
-            pending: { bg: "#f5f5f5", fg: "#1f2937", shadow: "0 10px 24px rgba(0,0,0,0.06)" },
-          };
-          const colors = palette[status] ?? palette.pending;
-
-          return (
-            <div
-              key={index}
-              style={{
-                marginBottom: "14px",
-              padding: "14px 16px 14px 76px",
-                borderRadius: "16px",
-                border: "1px solid #e4e4e7",
-                background: "#ffffff",
-                boxShadow: colors.shadow,
-                position: "relative",
-              }}
-            >
-              {subtaskOrder.has(String(subtaskId)) && (
-                <span style={{
-                  position: "absolute",
-                  top: "14px",
-                  left: "16px",
-                  width: "30px",
-                  height: "30px",
-                  borderRadius: "50%",
-                  background: "#111827",
-                  color: "#ffffff",
-                  fontSize: "12px",
-                  fontWeight: 700,
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  boxShadow: "0 6px 14px rgba(0,0,0,0.18)",
-                  textTransform: "uppercase",
-                  letterSpacing: "0.03em",
-                }}>
-                  T{subtaskOrder.get(String(subtaskId))}
-                </span>
-              )}
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "10px" }}>
-                <div style={{ display: "flex", alignItems: "center", gap: "10px", color: "#111827", fontWeight: 700, fontSize: "13px", minHeight: "28px" }}>
-                  <span style={{
-                    padding: "6px 12px",
-                    borderRadius: "999px",
-                    background: colors.bg,
-                    color: colors.fg,
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "10px", marginBottom: "12px" }}>
+        <h4 style={{
+          margin: 0,
+          fontSize: "15px",
+          fontWeight: "600",
+          color: "#000000",
+          textTransform: "uppercase",
+          letterSpacing: "0.5px"
+        }}>Reviewer</h4>
+        <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+          <div style={{ display: "inline-flex", borderRadius: "12px", border: "1px solid #d1d5db", background: "#ffffff", overflow: "hidden" }}>
+            {(["timeline", "output"] as ViewMode[]).map((mode) => {
+              const active = activeViewMode === mode;
+              return (
+                <button
+                  key={mode}
+                  onClick={() => onViewModeChange?.(mode)}
+                  aria-pressed={active}
+                  style={{
+                    padding: "8px 10px",
+                    border: "none",
+                    background: active ? "linear-gradient(135deg, #0f172a 0%, #1f2937 100%)" : "transparent",
+                    color: active ? "#ffffff" : "#111827",
                     fontSize: "12px",
-                    fontWeight: 800,
+                    fontWeight: 700,
+                    cursor: "pointer",
+                    minWidth: "70px",
+                    transition: "all 0.15s ease",
+                  }}
+                >
+                  {mode === "timeline" ? "Timeline" : "Output"}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+      {activeViewMode === "timeline" ? (
+        <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: "12px" }}>
+          <ProgressStrip items={progress} label="Reviewer" sourceCount={progressSeenCount} />
+          {progress.length === 0 && (
+            <div style={{
+              color: "#4b5563",
+              fontSize: "14px",
+              padding: "12px",
+              borderRadius: "12px",
+              background: "#ffffff",
+              border: "1px dashed #d1d5db",
+            }}>
+              No reviewer timeline data yet. Switch to Output to view decisions when available.
+            </div>
+          )}
+        </div>
+      ) : (
+        <div
+          style={{
+            flex: 1,
+            overflowY: "auto",
+            background: "#fafafa",
+            padding: "16px",
+            borderRadius: "10px",
+            border: "1px solid #e0e0e0",
+            marginBottom: "16px",
+            minHeight: 0,
+          }}
+        >
+          {!snapshot && (
+            <div style={{ color: "#666666", fontSize: "14px" }}>
+              Reviewer decisions will appear here.
+            </div>
+          )}
+          {snapshot && decisions.length === 0 && (
+            <div style={{
+              color: "#4b5563",
+              fontSize: "14px",
+              padding: "12px",
+              borderRadius: "12px",
+              background: "linear-gradient(135deg, #f7f7f7 0%, #ededed 100%)",
+              border: "1px dashed #d1d5db",
+              textAlign: "center",
+            }}>
+              No reviewer decisions yet.
+            </div>
+          )}
+          {decisions.map((decision, index) => {
+            const statusRaw = typeof decision?.decision === "string" ? decision.decision : "";
+            const status = statusRaw ? statusRaw.toLowerCase() : "pending";
+            const subtaskId =
+              typeof decision?.subtask_id === "string" || typeof decision?.subtask_id === "number"
+                ? decision.subtask_id
+                : typeof (decision as any)?.id === "string" || typeof (decision as any)?.id === "number"
+                  ? (decision as any).id
+                  : "—";
+            const reason =
+              typeof decision?.reason === "string"
+                ? decision.reason
+                : typeof (decision as any)?.comment === "string"
+                  ? (decision as any).comment
+                  : "";
+            const ts = (decision as any)?.timestamp ?? (decision as any)?.ts ?? null;
+            const palette: Record<string, { bg: string; fg: string; shadow: string }> = {
+              accept: { bg: "rgba(16, 185, 129, 0.12)", fg: "#0f766e", shadow: "0 10px 24px rgba(16,185,129,0.18)" },
+              redo: { bg: "rgba(248, 113, 113, 0.12)", fg: "#b91c1c", shadow: "0 10px 24px rgba(248,113,113,0.18)" },
+              changes_requested: { bg: "#f5f5f5", fg: "#1f2937", shadow: "0 10px 24px rgba(0,0,0,0.06)" },
+              pending: { bg: "#f5f5f5", fg: "#1f2937", shadow: "0 10px 24px rgba(0,0,0,0.06)" },
+            };
+            const colors = palette[status] ?? palette.pending;
+
+            return (
+              <div
+                key={index}
+                style={{
+                  marginBottom: "14px",
+                  padding: "14px 16px 14px 76px",
+                  borderRadius: "16px",
+                  border: "1px solid #e4e4e7",
+                  background: "#ffffff",
+                  boxShadow: colors.shadow,
+                  position: "relative",
+                }}
+              >
+                {subtaskOrder.has(String(subtaskId)) && (
+                  <span style={{
+                    position: "absolute",
+                    top: "14px",
+                    left: "16px",
+                    width: "30px",
+                    height: "30px",
+                    borderRadius: "50%",
+                    background: "#111827",
+                    color: "#ffffff",
+                    fontSize: "12px",
+                    fontWeight: 700,
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    boxShadow: "0 6px 14px rgba(0,0,0,0.18)",
                     textTransform: "uppercase",
-                    letterSpacing: "0.05em",
+                    letterSpacing: "0.03em",
                   }}>
-                    {statusRaw || "Pending"}
-                  </span>
-                </div>
-                {ts && (
-                  <span style={{ fontSize: "12px", color: "#52525b" }}>
-                    {new Date(ts).toLocaleString()}
+                    T{subtaskOrder.get(String(subtaskId))}
                   </span>
                 )}
-              </div>
-              <div style={{
-                fontSize: "13px",
-                color: "#1f2937",
-                lineHeight: "1.7",
-                whiteSpace: "pre-wrap",
-              }}>
-                {reason || "No additional notes provided."}
-              </div>
-              {decision.source && (
-                <div style={{
-                  marginTop: "10px",
-                  fontSize: "12px",
-                  color: "#6b7280",
-                  display: "flex",
-                  gap: "8px",
-                  alignItems: "center",
-                }}>
-                  <span style={{
-                    width: "6px",
-                    height: "6px",
-                    borderRadius: "999px",
-                    background: "#9ca3af",
-                    display: "inline-block",
-                  }} />
-                  <span>by {decision.source}</span>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "10px" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: "10px", color: "#111827", fontWeight: 700, fontSize: "13px", minHeight: "28px" }}>
+                    <span style={{
+                      padding: "6px 12px",
+                      borderRadius: "999px",
+                      background: colors.bg,
+                      color: colors.fg,
+                      fontSize: "12px",
+                      fontWeight: 800,
+                      textTransform: "uppercase",
+                      letterSpacing: "0.05em",
+                    }}>
+                      {statusRaw || "Pending"}
+                    </span>
+                  </div>
+                  {ts && (
+                    <span style={{ fontSize: "12px", color: "#52525b" }}>
+                      {new Date(ts).toLocaleString()}
+                    </span>
+                  )}
                 </div>
-              )}
-            </div>
-          );
-        })}
-      </div>
+                <div style={{
+                  fontSize: "13px",
+                  color: "#1f2937",
+                  lineHeight: "1.7",
+                  whiteSpace: "pre-wrap",
+                }}>
+                  {reason || "No additional notes provided."}
+                </div>
+                {decision.source && (
+                  <div style={{
+                    marginTop: "10px",
+                    fontSize: "12px",
+                    color: "#6b7280",
+                    display: "flex",
+                    gap: "8px",
+                    alignItems: "center",
+                  }}>
+                    <span style={{
+                      width: "6px",
+                      height: "6px",
+                      borderRadius: "999px",
+                      background: "#9ca3af",
+                      display: "inline-block",
+                    }} />
+                    <span>by {decision.source}</span>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }
