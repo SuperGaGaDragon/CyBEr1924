@@ -2837,6 +2837,88 @@ function WorkerColumn({ snapshot, progress, progressSeenCount = 0, viewMode = "t
     }
   }, [snapshot?.progress_events, outputs.length]);
 
+  const escapeHtml = (str: string) =>
+    String(str)
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#39;");
+
+  const handleViewAll = (out: any, fallbackIndex: number) => {
+    const title = subtaskMap.get(out.subtask_id) ?? `Task ${out.subtask_id ?? fallbackIndex + 1}`;
+    const body = out.content || out.preview || "No content.";
+    const html = `
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>${escapeHtml(title)}</title>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; padding: 24px; color: #111827; background: #ffffff; line-height: 1.6; }
+    h1 { margin-top: 0; font-size: 20px; }
+    pre { white-space: pre-wrap; background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 12px; padding: 16px; }
+  </style>
+</head>
+<body>
+  <h1>${escapeHtml(title)}</h1>
+  <pre>${escapeHtml(body)}</pre>
+</body>
+</html>`;
+    const blob = new Blob([html], { type: "text/html" });
+    const url = URL.createObjectURL(blob);
+    window.open(url, "_blank", "noopener,noreferrer");
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `output-${out.subtask_id ?? fallbackIndex + 1}.html`;
+    link.click();
+    setTimeout(() => URL.revokeObjectURL(url), 1500);
+  };
+
+  const handlePackAll = () => {
+    if (outputs.length === 0) return;
+    const entries = outputs.map((out, idx) => {
+      const title = subtaskMap.get(out.subtask_id) ?? `Task ${out.subtask_id ?? idx + 1}`;
+      const content = out.content || out.preview || "No content.";
+      const order = subtaskOrder.get(out.subtask_id);
+      return { title, content, order, ts: out.timestamp, idx };
+    });
+    const html = `
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>Worker Outputs</title>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; padding: 24px; color: #111827; background: #ffffff; line-height: 1.6; }
+    h1 { margin-top: 0; font-size: 22px; }
+    article { border: 1px solid #e5e7eb; border-radius: 12px; padding: 16px 16px 16px 20px; margin-bottom: 16px; background: #ffffff; box-shadow: 0 8px 20px rgba(0,0,0,0.05); }
+    .meta { display: flex; justify-content: space-between; align-items: center; font-size: 12px; color: #6b7280; margin-bottom: 8px; }
+    .pill { display: inline-flex; align-items: center; justify-content: center; width: 32px; height: 32px; border-radius: 999px; background: #111827; color: #fff; font-weight: 800; margin-right: 10px; box-shadow: 0 6px 14px rgba(0,0,0,0.18); }
+    pre { white-space: pre-wrap; background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 10px; padding: 12px; font-size: 13px; }
+  </style>
+</head>
+<body>
+  <h1>Worker Outputs</h1>
+  ${entries
+    .map((e) => {
+      const badge = e.order ? `<span class="pill">T${e.order}</span>` : "";
+      const ts = e.ts ? new Date(e.ts).toLocaleString() : "";
+      return `<article>${badge}<div class="meta"><strong>${escapeHtml(e.title)}</strong><span>${escapeHtml(ts)}</span></div><pre>${escapeHtml(e.content)}</pre></article>`;
+    })
+    .join("\n")}
+</body>
+</html>`;
+    const blob = new Blob([html], { type: "text/html" });
+    const url = URL.createObjectURL(blob);
+    window.open(url, "_blank", "noopener,noreferrer");
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = "worker-outputs.html";
+    link.click();
+    setTimeout(() => URL.revokeObjectURL(url), 1500);
+  };
+
   const subtaskMap = new Map((snapshot?.subtasks ?? []).map((s) => [s.id, s.title]));
   const subtaskOrder = new Map((snapshot?.subtasks ?? []).map((s, i) => [s.id, i + 1]));
   return (
@@ -2887,6 +2969,26 @@ function WorkerColumn({ snapshot, progress, progressSeenCount = 0, viewMode = "t
               );
             })}
           </div>
+          {activeViewMode === "output" && (
+            <button
+              onClick={handlePackAll}
+              disabled={outputs.length === 0}
+              style={{
+                padding: "8px 12px",
+                borderRadius: "10px",
+                border: "1px solid #d1d5db",
+                background: outputs.length === 0 ? "#f3f4f6" : "#ffffff",
+                color: outputs.length === 0 ? "#9ca3af" : "#111827",
+                fontSize: "12px",
+                fontWeight: 700,
+                cursor: outputs.length === 0 ? "not-allowed" : "pointer",
+                boxShadow: outputs.length === 0 ? "none" : "0 8px 18px rgba(0,0,0,0.08)",
+              }}
+              aria-label="Pack all outputs"
+            >
+              Pack everything
+            </button>
+          )}
           <button
             onClick={() => setDescending((prev) => !prev)}
             title={descending ? "最新在前" : "最旧在前"}
@@ -2956,6 +3058,10 @@ function WorkerColumn({ snapshot, progress, progressSeenCount = 0, viewMode = "t
             const title = subtaskMap.get(out.subtask_id) ?? `Task ${out.subtask_id}`;
             const content = out.content || out.preview || "No content.";
             const order = subtaskOrder.get(out.subtask_id);
+            const previewLimit = 300;
+            const needsTruncate = content.length > previewLimit;
+            const preview = needsTruncate ? `${content.slice(0, previewLimit)}…` : content;
+            const viewAllLabel = "View all";
             return (
               <div key={idx} style={{
                 background: "#ffffff",
@@ -2996,7 +3102,24 @@ function WorkerColumn({ snapshot, progress, progressSeenCount = 0, viewMode = "t
                   </span>
                 </div>
                 <div style={{ fontSize: "13px", color: "#1f2937", lineHeight: 1.5, whiteSpace: "pre-wrap" }}>
-                  {content}
+                  {preview}
+                </div>
+                <div style={{ display: "flex", justifyContent: "flex-end" }}>
+                  <button
+                    onClick={() => handleViewAll(out, idx)}
+                    style={{
+                      padding: "8px 10px",
+                      borderRadius: "10px",
+                      border: "1px solid #d1d5db",
+                      background: "#ffffff",
+                      color: "#111827",
+                      fontSize: "12px",
+                      fontWeight: 700,
+                      cursor: "pointer",
+                    }}
+                  >
+                    {viewAllLabel}{needsTruncate ? " →" : ""}
+                  </button>
                 </div>
               </div>
             );

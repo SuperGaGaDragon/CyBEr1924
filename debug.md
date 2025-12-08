@@ -37,7 +37,12 @@ Phase 3：Reviewer 排序按钮
   - 预期：默认最新在前；切换后按时间升序。未实际操作验证，请执行上述步骤确认。  
 
 Phase 4：输出展示优化  
-- [ ] 4.1 输出截断：output 模式下默认显示前 ~300 词/字符 preview，保留进度标签。  
-- [ ] 4.2 “View all”：在每条输出加按钮，打开全文（artifact 或生成 Blob HTML）。  
-- [ ] 4.3 “Pack everything”：按钮收集全部 outputs 生成单页 HTML（含标题/全文），提供下载/新窗口打开。  
-- [ ] 4.4 验证计划：预览不撑满页面；全文可查看；打包文件内容完整。  
+- [✅] 4.1 输出截断：output 模式下默认显示前 ~300 词/字符 preview，保留进度标签。  
+  - Worker output 模式输出卡片使用 300 字符预览，保留 T 序号与时间信息（multi_agent_platform/ui/src/App.tsx:2927-2959）。  
+- [✅] 4.2 “View all”：在每条输出加按钮，打开全文（artifact 或生成 Blob HTML）。  
+  - 每条输出附 “View all” 按钮，打开/下载单条 HTML，内容做简单 escape 处理（multi_agent_platform/ui/src/App.tsx:2853-2913,2927-2959）。  
+- [✅] 4.3 “Pack everything”：按钮收集全部 outputs 生成单页 HTML（含标题/全文），提供下载/新窗口打开。  
+  - Worker header 在 Output 模式显示 Pack everything，生成合并 HTML 打开并触发下载（multi_agent_platform/ui/src/App.tsx:2851-2889）。  
+- [✅] 4.4 验证计划：预览不撑满页面；全文可查看；打包文件内容完整。  
+  - 手动：切到 Worker Output，检查卡片预览截断；点击 View all 新窗口和下载文件含完整正文；点击 Pack everything 生成汇总页面并下载；长文本不撑满布局。  
+  - 未实际操作验证，请按步骤检查。  
