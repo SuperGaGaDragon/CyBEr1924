@@ -19,6 +19,7 @@ from .prompt_registry import (
 from .session_state import (
     OrchestratorState,
     OrchestratorEvent,
+    PlannerChatMessage,
     build_session_snapshot,
 )
 
@@ -510,6 +511,18 @@ class Orchestrator:
         """
         Entry point for planning-phase user messages. Currently delegates to existing answer logic.
         """
+        text = (user_text or "").strip()
+        if text:
+            state.planner_chat.append(
+                PlannerChatMessage(role="user", content=text, ts=datetime.utcnow())
+            )
+        state.planner_chat.append(
+            PlannerChatMessage(
+                role="planner",
+                content="Planner (placeholder): 已收到你的输入。接下来规划阶段会整合你的想法为初步大纲。",
+                ts=datetime.utcnow(),
+            )
+        )
         return self.answer_user_question(session_id, plan, user_text)
 
     def save_state(self, session_id: str, plan: Plan) -> Path:
