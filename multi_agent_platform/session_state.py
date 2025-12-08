@@ -378,18 +378,10 @@ def build_session_snapshot(
     state_dict = orchestrator_state.to_dict()
     state_dict["session_mode"] = orchestrator_state.session_mode
 
-    orchestrator_messages = [
-        msg.dict() if hasattr(msg, "dict") else msg
-        for msg in orchestrator_state.orchestrator_messages
-    ]
-    orch_events = [
-        event.dict() if hasattr(event, "dict") else event
-        for event in orchestrator_state.orch_events
-    ]
-    planner_chat = [
-        msg.dict() if hasattr(msg, "dict") else msg
-        for msg in orchestrator_state.planner_chat
-    ]
+    # Use serialized versions from state_dict to avoid datetime leakage
+    orchestrator_messages = state_dict.get("orchestrator_messages", [])
+    orch_events = state_dict.get("orch_events", [])
+    planner_chat = state_dict.get("planner_chat", [])
 
     return SessionSnapshot(
         session_id=session_id,
