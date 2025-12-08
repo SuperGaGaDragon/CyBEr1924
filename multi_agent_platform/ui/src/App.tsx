@@ -551,30 +551,39 @@ function App() {
   const aboutButton = (
     <button
       onClick={() => window.location.assign("/about")}
+      aria-label="About CyBEr1924"
       style={{
         position: "fixed",
-        top: 18,
-        right: 18,
-        padding: "12px 16px",
+        left: 22,
+        bottom: 26,
+        width: 58,
+        height: 58,
         borderRadius: "999px",
-        border: "1px solid #e0e0e0",
-        background: "#0f0f0f",
+        border: "1px solid #d9d9d9",
+        background: "linear-gradient(145deg, #0f0f0f 0%, #1c1c1c 100%)",
         color: "#ffffff",
-        fontSize: "12px",
-        fontWeight: 700,
-        letterSpacing: "0.02em",
+        fontSize: "20px",
+        fontWeight: 800,
         cursor: "pointer",
         zIndex: 2000,
-        boxShadow: "0 10px 30px rgba(0,0,0,0.2)",
+        boxShadow: "0 16px 36px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.08)",
+        display: "inline-flex",
+        alignItems: "center",
+        justifyContent: "center",
+        transition: "transform 0.15s ease, box-shadow 0.15s ease, background 0.15s ease",
       }}
       onMouseOver={(e) => {
-        e.currentTarget.style.background = "#2b2b2b";
+        e.currentTarget.style.transform = "translateY(-2px)";
+        e.currentTarget.style.boxShadow = "0 20px 40px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.12)";
+        e.currentTarget.style.background = "linear-gradient(145deg, #1a1a1a 0%, #2a2a2a 100%)";
       }}
       onMouseOut={(e) => {
-        e.currentTarget.style.background = "#0f0f0f";
+        e.currentTarget.style.transform = "translateY(0)";
+        e.currentTarget.style.boxShadow = "0 16px 36px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.08)";
+        e.currentTarget.style.background = "linear-gradient(145deg, #0f0f0f 0%, #1c1c1c 100%)";
       }}
     >
-      About CyBEr1924
+      ?
     </button>
   );
 
