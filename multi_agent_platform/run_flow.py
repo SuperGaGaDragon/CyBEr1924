@@ -3,8 +3,9 @@ from __future__ import annotations
 import json
 from dataclasses import dataclass
 import os
+import threading
 from pathlib import Path
-from typing import Tuple, Optional, Dict, Any, List
+from typing import Tuple, Optional, Dict, Any, List, Callable
 from datetime import datetime
 
 from .agent_runner import Agent
@@ -558,6 +559,45 @@ class Orchestrator:
 
     def _has_pending_subtasks(self, plan: Plan) -> bool:
         return any(not self._is_subtask_complete(subtask) for subtask in plan.subtasks)
+
+    def _mark_background_error(self, session_id: str, exc: Exception) -> None:
+        """Persist a lightweight error marker if a background task fails."""
+        try:
+            state = self.load_orchestrator_state(session_id)
+        except FileNotFoundError:
+            return
+        state.status = "error"
+        try:
+            if state.extra is None:
+                state.extra = {}
+            state.extra["last_error"] = str(exc)
+        except Exception:
+            state.extra = {"last_error": str(exc)}
+        try:
+            self.save_orchestrator_state(state)
+        except Exception:
+            return
+
+    def _start_background_task(
+        self,
+        session_id: str,
+        label: str,
+        target: Callable[[], None],
+    ) -> None:
+        """Run a short-lived background task and capture errors onto orchestrator state."""
+
+        def _wrapper() -> None:
+            try:
+                target()
+            except Exception as exc:
+                self._mark_background_error(session_id, exc)
+
+        thread = threading.Thread(
+            target=_wrapper,
+            name=f"orch-{label}-{session_id}",
+            daemon=True,
+        )
+        thread.start()
 
     def save_orchestrator_state(self, state: OrchestratorState) -> None:
         """Save orchestrator state to orchestrator_state.json."""
@@ -1384,14 +1424,24 @@ class Orchestrator:
                     context=interactive_coordinator.get_context(),
                 )
             else:
-                plan, state = self.run_next_with_state(session_id, plan, state)
+                # Fire-and-return: mark running and kick off background execution.
+                subtask = self._next_pending_subtask(plan)
+                if subtask:
+                    state.status = "running"
+                    state.current_subtask_id = subtask.id
                 self._persist_plan_state(session_id, plan, state)
+
+                def _run_next_bg() -> None:
+                    self.run_next_with_state(session_id, plan, state)
+                    self._persist_plan_state(session_id, plan, state)
+
+                self._start_background_task(session_id, "next", _run_next_bg)
                 return self._render_session_snapshot(
                     session_id,
                     normalized,
                     plan,
                     state,
-                    message="已执行一个子任务",
+                    message="已触发后台执行一个子任务",
                 )
 
         if bare_cmd == "set_current_subtask":
@@ -1556,14 +1606,23 @@ class Orchestrator:
             )
 
         if bare_cmd == "all":
-            plan, state = self.run_all_pending(session_id, plan, state)
+            # Fire-and-return: mark running and execute all pending subtasks in background.
+            first_subtask = self._next_pending_subtask(plan)
+            state.status = "running"
+            state.current_subtask_id = first_subtask.id if first_subtask else None
             self._persist_plan_state(session_id, plan, state)
+
+            def _run_all_bg() -> None:
+                self.run_all_pending(session_id, plan, state)
+                self._persist_plan_state(session_id, plan, state)
+
+            self._start_background_task(session_id, "all", _run_all_bg)
             return self._render_session_snapshot(
                 session_id,
                 normalized,
                 plan,
                 state,
-                message="所有子任务已完成",
+                message="已触发后台执行所有待处理子任务",
             )
 
         if bare_cmd == "ask":
