@@ -2167,14 +2167,13 @@ function App() {
                     <ExecutionView session={snapshot} onSendExecutionMessage={sendExecutionMessage} />
                   </div>
                 </div>
-                {(["nw", "ne", "sw", "se"] as const).map((dir) => {
-                  const cursor =
-                    dir === "nw" || dir === "se" ? "nwse-resize" : "nesw-resize";
-                  const positionStyle: Record<string, string> = {};
-                  if (dir.includes("n")) positionStyle.top = "6px";
-                  if (dir.includes("s")) positionStyle.bottom = "6px";
-                  if (dir.includes("w")) positionStyle.left = "6px";
-                  if (dir.includes("e")) positionStyle.right = "6px";
+                {(["sw", "se"] as const).map((dir) => {
+                  const cursor = dir === "se" ? "nwse-resize" : "nesw-resize";
+                  const positionStyle: Record<string, string> = {
+                    bottom: "6px",
+                  };
+                  if (dir === "sw") positionStyle.left = "6px";
+                  if (dir === "se") positionStyle.right = "6px";
                   return (
                     <div
                       key={dir}
