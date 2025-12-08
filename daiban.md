@@ -176,7 +176,7 @@ stage 3
 - [x] 交互验证：在有多条 `worker_outputs` 的 session 里手动切换排序（时间戳差异大的样本），确认按钮点击事件未被覆盖层阻挡；滚动条应在 Worker 列内部生效。（布局修正后本地手测：滚动正常、排序按钮可点击且顺序切换明显）
 
 stage 4
-- [ ] 临时修复优先级：先上布局/交互修正，复用现有数据；如后端空数据，补充 `envelopes.jsonl` 解析/写入或 fallback 预览，确保有输出可渲染。
+- [x] 临时修复优先级：先上布局/交互修正，复用现有数据；如后端空数据，补充 `envelopes.jsonl` 解析/写入或 fallback 预览，确保有输出可渲染。（已上线布局与前端告警；若 outputs 为空则提醒检查 SUBTASK_RESULT/文件权限，必要时从 envelopes 读 preview 兜底）
 
 
 
