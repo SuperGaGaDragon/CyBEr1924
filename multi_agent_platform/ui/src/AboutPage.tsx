@@ -27,7 +27,7 @@ const roles = [
     bullets: [
       "Multi-turn clarification of goals, format, and style",
       "Outputs chapters, scenes, arguments, and sections",
-      "Structure locks after user confirmation; later tweaks flow via Coordinator",
+      "Structure locks after user confirmation; later tweaks flow via Reviewer",
     ],
   },
   {
@@ -40,7 +40,7 @@ const roles = [
     ],
   },
   {
-    title: "Coordinator — Project Manager",
+    title: "Reviewer — Project Manager",
     summary: "User’s proxy and traffic controller; decides rewrite, pause, or proceed.",
     bullets: [
       "Collects user feedback and relays to Planner/Worker",
@@ -129,6 +129,31 @@ export default function AboutPage() {
           </div>
         </section>
 
+        <section className="section developers">
+          <div className="section-title">Developers</div>
+          <div className="dev-meta">This website is developed by two high school students.</div>
+          <div className="dev-grid">
+            <div className="dev-card">
+              <div className="dev-avatar">
+                <img src={developer1} alt="Quanhao Li" />
+              </div>
+              <div className="dev-info">
+                <div className="dev-name">Quanhao Li</div>
+                <div className="dev-role">Co-developer</div>
+              </div>
+            </div>
+            <div className="dev-card">
+              <div className="dev-avatar">
+                <img src={developer2} alt="Qianyu Chen" />
+              </div>
+              <div className="dev-info">
+                <div className="dev-name">Qianyu Chen</div>
+                <div className="dev-role">Co-developer</div>
+              </div>
+            </div>
+          </div>
+        </section>
+
         <section className="section">
           <div className="section-title">What CyBEr1924 can do</div>
           <ul className="list two-col">
@@ -173,7 +198,7 @@ export default function AboutPage() {
         <section className="section">
           <div className="section-title">Orchestrator loop</div>
           <div className="loop">
-            <div className="loop-step">User → Planner → (confirm) → Worker → Reviewer → Coordinator → Worker → Reviewer → ...</div>
+            <div className="loop-step">User → Planner → (confirm) → Worker → Reviewer → Reviewer → Worker → Reviewer → ...</div>
             <div className="loop-meta">
               <div className="pill-ghost">Every step is logged with snapshots and artifacts—traceable and rewindable.</div>
               <div className="pill-ghost">All agent conversations are transparent, making supervision and edits easy.</div>
@@ -212,34 +237,9 @@ export default function AboutPage() {
           <ul className="list two-col">
             <li className="list-item">Clear structure (Planner) + progressive drafting (Worker) keep every step grounded.</li>
             <li className="list-item">Strict reviewer gate: disagree → rewrite; agree → move forward.</li>
-            <li className="list-item">Coordinator represents the user: pause, continue, rewrite, or resequence.</li>
+            <li className="list-item">Reviewer represents the user: pause, continue, rewrite, or resequence.</li>
             <li className="list-item">All intermediate reasoning is visible—no hidden jumps, higher trust.</li>
           </ul>
-        </section>
-
-        <section className="section developers">
-          <div className="section-title">Developers</div>
-          <div className="dev-meta">This website is developed by two high school students.</div>
-          <div className="dev-grid">
-            <div className="dev-card">
-              <div className="dev-avatar">
-                <img src={developer1} alt="Quanhao Li" />
-              </div>
-              <div className="dev-info">
-                <div className="dev-name">Quanhao Li</div>
-                <div className="dev-role">Co-developer</div>
-              </div>
-            </div>
-            <div className="dev-card">
-              <div className="dev-avatar">
-                <img src={developer2} alt="Qianyu Chen" />
-              </div>
-              <div className="dev-info">
-                <div className="dev-name">Qianyu Chen</div>
-                <div className="dev-role">Co-developer</div>
-              </div>
-            </div>
-          </div>
         </section>
       </div>
     </div>

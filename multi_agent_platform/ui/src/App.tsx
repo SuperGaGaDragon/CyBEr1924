@@ -2112,7 +2112,7 @@ function CoordinatorColumn({
         color: "#000000",
         textTransform: "uppercase",
         letterSpacing: "0.5px"
-      }}>Coordinator</h4>
+      }}>Reviewer</h4>
       <div
         style={{
           flex: 1,
@@ -2124,7 +2124,7 @@ function CoordinatorColumn({
           marginBottom: "16px",
         }}
       >
-        {!snapshot && <div style={{ color: "#666666", fontSize: "14px" }}>Chat with the Coordinator here.</div>}
+        {!snapshot && <div style={{ color: "#666666", fontSize: "14px" }}>Chat with the Reviewer here.</div>}
         {snapshot &&
           snapshot.chat_history.map((message, index) => {
             const response =
@@ -2175,7 +2175,7 @@ function CoordinatorColumn({
       >
         <input
           type="text"
-          placeholder="Ask the coordinator…"
+          placeholder="Ask the reviewer…"
           value={input}
           onChange={(event) => setInput(event.target.value)}
           style={{
