@@ -44,8 +44,11 @@ def _normalize_event_kind(kind: str | None) -> str:
     mapping = {
         "content_change": "REQUEST_CONTENT_CHANGE",
         "request_content_change": "REQUEST_CONTENT_CHANGE",
+        "content": "REQUEST_CONTENT_CHANGE",
         "plan_update": "REQUEST_PLAN_UPDATE",
         "request_plan_update": "REQUEST_PLAN_UPDATE",
+        "modify_plan": "REQUEST_PLAN_UPDATE",
+        "plan": "REQUEST_PLAN_UPDATE",
         "other": "REQUEST_OTHER",
         "request_other": "REQUEST_OTHER",
         "trigger_redo": "TRIGGER_REDO",
@@ -82,7 +85,7 @@ def consume_orchestrator_events(state: OrchestratorState, plan: Plan | None = No
     pending = list(state.orch_events or [])
     for ev in pending:
         payload = ev if isinstance(ev, dict) else getattr(ev, "payload", {}) or {}
-        raw_kind = payload.get("kind") or getattr(ev, "kind", None)
+        raw_kind = payload.get("raw_kind") or payload.get("kind") or getattr(ev, "kind", None)
         kind = _normalize_event_kind(raw_kind)
 
         # === CONTENT CHANGE ===
@@ -135,16 +138,54 @@ def consume_orchestrator_events(state: OrchestratorState, plan: Plan | None = No
         # === PLAN CHANGE ===
         elif kind == "REQUEST_PLAN_UPDATE":
             instr = payload.get("instructions")
+            updated_plan = plan
 
+            # Invoke planner to regenerate plan/subtasks when available.
             if plan is not None:
-                if hasattr(plan, "notes"):
-                    plan.notes = f"(Updated by orchestrator) {instr}"
+                if USE_REAL_PLANNER:
+                    plan_dict = plan.to_dict() if hasattr(plan, "to_dict") else None
+                    subtasks_dicts: List[Dict[str, Any]] = []
+                    for s in plan.subtasks or []:
+                        try:
+                            subtasks_dicts.append(s.to_dict())
+                        except AttributeError:
+                            subtasks_dicts.append(
+                                {
+                                    "subtask_id": getattr(s, "id", None) or getattr(s, "subtask_id", None),
+                                    "title": s.title,
+                                    "description": getattr(s, "description", ""),
+                                    "status": getattr(s, "status", "pending"),
+                                    "notes": getattr(s, "notes", ""),
+                                }
+                            )
+                    planner_chat = [
+                        msg.dict() if hasattr(msg, "dict") else msg
+                        for msg in getattr(state, "planner_chat", []) or []
+                    ]
+                    try:
+                        result = run_planner_agent(
+                            planner_chat=planner_chat,
+                            plan=plan_dict,
+                            subtasks=subtasks_dicts,
+                            latest_user_input=instr or "",
+                        )
+                        updated_plan = _apply_planner_result_to_state(
+                            state, result, fallback_user_text=instr or "", existing_plan=plan
+                        )
+                    except Exception:
+                        # Fallback to stub if planner call fails
+                        updated_plan = generate_stub_plan_from_planning_input(plan, instr or "")
                 else:
-                    setattr(plan, "notes", f"(Updated by orchestrator) {instr}")
+                    updated_plan = generate_stub_plan_from_planning_input(plan, instr or "")
+
+                plan.notes = getattr(updated_plan, "notes", plan.notes)
+                plan.title = getattr(updated_plan, "title", plan.title)
+                plan.description = getattr(updated_plan, "description", getattr(plan, "description", ""))
+                plan.subtasks = getattr(updated_plan, "subtasks", plan.subtasks)
 
             state.add_orchestrator_message(
                 "orchestrator",
-                f"Plan updated based on your request: {instr}"
+                f"Planner will redo the plan based on your request: {instr or '(no details provided)'}"
             )
 
         # === OTHER ===
@@ -231,6 +272,7 @@ def run_orchestrator_turn(
 
     state.orch_events.append({
         "kind": action.kind,
+        "raw_kind": action.raw_kind,
         "target_subtask_id": action.target_subtask_id,
         "instructions": action.instructions,
         "needs_redo": action.needs_redo,
@@ -239,7 +281,10 @@ def run_orchestrator_turn(
 
     state.add_orchestrator_message(
         role="orchestrator",
-        content=f"[intent-parser] Classified user request as {action.kind}",
+        content=(
+            f"[intent-parser] Classified user request as {action.kind}"
+            + (f" (raw: {action.raw_kind})" if action.raw_kind and action.raw_kind != action.kind else "")
+        ),
         ts=ts,
     )
 

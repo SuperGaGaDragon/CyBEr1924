@@ -84,19 +84,23 @@ stage3
   目标：orchestrator受到用户请求后，判定是plan还是content。如果是plan，应该要求planner redo plan！如果是content，应该要求对应的worker redo subtask！
 
   stage 1
- - [ ] 定义统一的 intent kind 规范表：plan → REQUEST_PLAN_UPDATE，content → REQUEST_CONTENT_CHANGE；兼容大小写/别名（如 modify_plan）。
+- [x] 定义统一的 intent kind 规范表：plan → REQUEST_PLAN_UPDATE，content → REQUEST_CONTENT_CHANGE；兼容大小写/别名（如 modify_plan）。
 
   stage 2
-- [ ] 在 intent agent 输出后立即规范化 kind，事件队列不再出现未知枚举；记录 raw_kind 便于调试。
+- [x] 在 intent agent 输出后立即规范化 kind，事件队列不再出现未知枚举；记录 raw_kind 便于调试。
 
   stage 3
-- [ ] 请求处理：REQUEST_PLAN_UPDATE 触发 planner 重跑/更新 plan+subtasks，并给 orchestrator 回执；REQUEST_CONTENT_CHANGE 触发标记 needs_redo + TRIGGER_REDO 调用 worker/reviewer。
+- [x] 请求处理：REQUEST_PLAN_UPDATE 触发 planner 重跑/更新 plan+subtasks，并给 orchestrator 回执；REQUEST_CONTENT_CHANGE 触发标记 needs_redo + TRIGGER_REDO 调用 worker/reviewer。
 
   stage 4
 - [ ] 前端反馈：plan/content 请求时展示 sending/redo 占位，planner/worker/reviewer 结果刷新后收起；Reviewer 列同步显示 redo/accept 状态。
 
   stage 5
 - [ ]  验证：手动走 plan 改动与 content 改动各一条；自动测试覆盖两条路径（plan 更新写入 plan/subtasks，content 触发 redo 输出与 reviewer 状态）。
+
+stage 6 
+- [ ]  检查是否存在可能的404，500等问题
+
 
 
 

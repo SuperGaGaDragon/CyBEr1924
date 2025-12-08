@@ -8,6 +8,7 @@ from .agent_runner import call_llm_json  # JSON structured LLM 调用
 class OrchestratorAction:
     """Structured intent returned by the Orchestrator LLM agent."""
     kind: str                           # e.g., REQUEST_CONTENT_CHANGE / REQUEST_PLAN_UPDATE / REQUEST_OTHER
+    raw_kind: str | None                # original kind from the LLM before normalization
     target_subtask_id: Optional[int]    # for content edits
     instructions: Optional[str]         # what the user wants changed
     needs_redo: bool                    # whether to redo worker output
@@ -22,8 +23,11 @@ def _normalize_intent_kind(kind: str | None) -> str:
     normalized = {
         "content_change": "REQUEST_CONTENT_CHANGE",
         "request_content_change": "REQUEST_CONTENT_CHANGE",
+        "content": "REQUEST_CONTENT_CHANGE",
         "plan_update": "REQUEST_PLAN_UPDATE",
         "request_plan_update": "REQUEST_PLAN_UPDATE",
+        "modify_plan": "REQUEST_PLAN_UPDATE",
+        "plan": "REQUEST_PLAN_UPDATE",
         "other": "REQUEST_OTHER",
         "request_other": "REQUEST_OTHER",
         "trigger_redo": "TRIGGER_REDO",
@@ -77,9 +81,11 @@ Return a JSON object:
 """
 
     result = call_llm_json(system_prompt, user_prompt)
+    result_kind = result.get("kind")
 
     return OrchestratorAction(
-        kind=_normalize_intent_kind(result.get("kind")),
+        kind=_normalize_intent_kind(result_kind),
+        raw_kind=result_kind,
         target_subtask_id=result.get("target_subtask_id"),
         instructions=result.get("instructions"),
         needs_redo=result.get("needs_redo", False),
