@@ -24,6 +24,7 @@ from .session_state import (
     OrchestratorState,
     PlannerChatMessage,
     PROGRESS_STAGE_STATUS_MAP,
+    WorkerOutputState,
     build_session_snapshot,
     _read_log_entries,
 )
@@ -686,6 +687,19 @@ class Orchestrator:
                     "result_artifact": ref_work.to_payload(),
                 },
             )
+            if state is not None:
+                try:
+                    state.worker_outputs.append(
+                        WorkerOutputState(
+                            subtask_id=subtask.id,
+                            title=subtask.title,
+                            artifact=ref_work,
+                            timestamp=datetime.utcnow(),
+                        )
+                    )
+                except Exception:
+                    # Keep orchestration running even if the in-memory cache fails
+                    pass
             _append_progress_event(
                 state,
                 agent="worker",

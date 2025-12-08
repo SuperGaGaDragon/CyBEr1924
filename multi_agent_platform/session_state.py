@@ -16,7 +16,7 @@ from pydantic import BaseModel, Field, root_validator
 
 from .message_bus import MessageBus
 from .plan_model import Plan
-from .session_store import ArtifactStore
+from .session_store import ArtifactStore, ArtifactRef
 from src.protocol import PayloadType
 
 
@@ -66,6 +66,56 @@ class PlannerChatMessage(BaseModel):
 
 
 @dataclass
+class WorkerOutputState:
+    """
+    Minimal worker output record stored on orchestrator state for snapshot recovery.
+
+    We persist the artifact ref plus timestamp so worker outputs can be reconstructed
+    even if envelopes are missing.
+    """
+    subtask_id: str
+    title: str
+    artifact: ArtifactRef
+    timestamp: datetime | str | None = None
+
+    def to_dict(self) -> Dict[str, Any]:
+        ts_val = self.timestamp
+        if isinstance(ts_val, datetime):
+            ts_val = ts_val.isoformat()
+        return {
+            "subtask_id": self.subtask_id,
+            "title": self.title,
+            "artifact": self.artifact.to_payload(),
+            "timestamp": ts_val,
+        }
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "WorkerOutputState":
+        artifact_data = data.get("artifact") or {}
+        if isinstance(artifact_data, ArtifactRef):
+            artifact = artifact_data
+        elif isinstance(artifact_data, dict):
+            try:
+                artifact = ArtifactRef(**artifact_data)
+            except Exception:
+                artifact = ArtifactRef(session_id="", artifact_id="", kind="text", path="")
+        else:
+            artifact = ArtifactRef(session_id="", artifact_id="", kind="text", path="")
+        ts_val = data.get("timestamp")
+        if isinstance(ts_val, str):
+            try:
+                ts_val = datetime.fromisoformat(ts_val)
+            except Exception:
+                pass
+        return cls(
+            subtask_id=data.get("subtask_id") or "",
+            title=data.get("title") or "",
+            artifact=artifact,
+            timestamp=ts_val,
+        )
+
+
+@dataclass
 class OrchestratorState:
     """
     Represents the current state of an orchestrator session.
@@ -83,6 +133,7 @@ class OrchestratorState:
     orch_events: List[OrchestratorEvent] = field(default_factory=list)
     progress_events: List[SubtaskProgressEvent] = field(default_factory=list)
     planner_chat: List[PlannerChatMessage] = field(default_factory=list)
+    worker_outputs: List[WorkerOutputState] = field(default_factory=list)
 
     @property
     def session_mode(self) -> str:
@@ -139,6 +190,12 @@ class OrchestratorState:
             }
             for msg in self.planner_chat
         ]
+        d["worker_outputs"] = []
+        for wo in self.worker_outputs:
+            if isinstance(wo, WorkerOutputState):
+                d["worker_outputs"].append(wo.to_dict())
+            elif isinstance(wo, dict):
+                d["worker_outputs"].append(wo)
         return d
 
     def to_json(self) -> str:
@@ -167,6 +224,7 @@ class OrchestratorState:
         orch_events_data = data.get("orch_events") or []
         progress_events_data = data.get("progress_events") or []
         planner_chat_data = data.get("planner_chat") or []
+        worker_outputs_data = data.get("worker_outputs") or []
 
         def _load_items(items: List[Any], model_cls: type[BaseModel]) -> List[BaseModel]:
             parsed: List[BaseModel] = []
@@ -194,6 +252,17 @@ class OrchestratorState:
             orch_events=_load_items(orch_events_data, OrchestratorEvent),
             progress_events=_load_items(progress_events_data, SubtaskProgressEvent),
             planner_chat=_load_items(planner_chat_data, PlannerChatMessage),
+            worker_outputs=[
+                item
+                for item in (
+                    [
+                        WorkerOutputState.from_dict(item)
+                        for item in worker_outputs_data
+                        if isinstance(item, (dict, WorkerOutputState))
+                    ]
+                )
+                if item
+            ],
         )
 
     @classmethod
@@ -427,6 +496,42 @@ def build_session_snapshot(
             )
 
     chat_history.sort(key=lambda entry: entry.get("timestamp", ""))
+
+    # Use in-memory cached worker outputs when envelopes are missing; prefer logs when available.
+    try:
+        cached_outputs = orchestrator_state.worker_outputs or []
+    except Exception:
+        cached_outputs = []
+
+    for cached in cached_outputs:
+        sub_id = getattr(cached, "subtask_id", None) or (cached.get("subtask_id") if isinstance(cached, dict) else None)
+        if not sub_id or sub_id in worker_outputs:
+            continue
+        title = getattr(cached, "title", "") or (cached.get("title") if isinstance(cached, dict) else "")
+        artifact_ref = getattr(cached, "artifact", None)
+        if isinstance(cached, dict):
+            artifact_ref = artifact_ref or cached.get("artifact")
+        artifact_payload = artifact_ref.to_payload() if hasattr(artifact_ref, "to_payload") else artifact_ref
+        artifact_path = artifact_payload.get("path") if isinstance(artifact_payload, dict) else None
+        full_text = _read_artifact_content(session_store, artifact_path, max_length=None)
+        if not full_text and isinstance(cached, dict):
+            full_text = str(cached.get("content") or "")
+        preview = _read_artifact_preview(session_store, artifact_path)
+        ts_val = getattr(cached, "timestamp", None)
+        if isinstance(cached, dict):
+            ts_val = ts_val or cached.get("timestamp")
+        if isinstance(ts_val, datetime):
+            ts_val = ts_val.isoformat()
+
+        worker_outputs[sub_id] = {
+            "subtask_id": sub_id,
+            "subtask_title": subtask_map.get(sub_id, title),
+            "artifact_path": artifact_path,
+            "content": full_text,
+            "preview": preview or (full_text[:400] if full_text else ""),
+            "timestamp": ts_val,
+            "source": "state_worker_output",
+        }
 
     # Fallback: if subtask outputs exist on plan but no subtask_result logs were written,
     # synthesize worker_outputs so UI can render content (e.g., TRIGGER_REDO path without artifact writes).
