@@ -71,11 +71,32 @@ stage1
 stage2 
   - [x] 在 `consume_orchestrator_events` 中为 content change 生成 redo/notes，并透出一条 user-facing 确认消息（说明目标 subtask 与执行动作）。
 
-  stage3 
-  - [ ] 为 orchestrator 聊天增加发送中态/短暂占位（前端），避免“输入被清空但无反馈”的空窗；header 的 Thinking… 也可与 orchestrator 请求联动。
+stage3 
+  - [x] 为 orchestrator 聊天增加发送中态/短暂占位（前端），避免“输入被清空但无反馈”的空窗；header 的 Thinking… 也可与 orchestrator 请求联动。
 
   stage4  
-  - [ ] 补充自动化/手动验证：发送 content 改名等指令应看到 redo 触发、worker/reviewer 输出更新，orchestrator 消息回执正确。
+  - [x] 补充自动化/手动验证：发送 content 改名等指令应看到 redo 触发、worker/reviewer 输出更新，orchestrator 消息回执正确（含 pending 占位）。手动：执行态输入“改名/改内容”，确认 orch message 未提示未处理，worker/reviewer 有 redo/新输出。自动：补充一条集成测试覆盖 content_change → TRIGGER_REDO → worker/reviewer。
+
+  ------
+
+  ##我的期望
+
+  目标：orchestrator受到用户请求后，判定是plan还是content。如果是plan，应该要求planner redo plan！如果是content，应该要求对应的worker redo subtask！
+
+  stage 1
+ - [ ] 定义统一的 intent kind 规范表：plan → REQUEST_PLAN_UPDATE，content → REQUEST_CONTENT_CHANGE；兼容大小写/别名（如 modify_plan）。
+
+  stage 2
+- [ ] 在 intent agent 输出后立即规范化 kind，事件队列不再出现未知枚举；记录 raw_kind 便于调试。
+
+  stage 3
+- [ ] 请求处理：REQUEST_PLAN_UPDATE 触发 planner 重跑/更新 plan+subtasks，并给 orchestrator 回执；REQUEST_CONTENT_CHANGE 触发标记 needs_redo + TRIGGER_REDO 调用 worker/reviewer。
+
+  stage 4
+- [ ] 前端反馈：plan/content 请求时展示 sending/redo 占位，planner/worker/reviewer 结果刷新后收起；Reviewer 列同步显示 redo/accept 状态。
+
+  stage 5
+- [ ]  验证：手动走 plan 改动与 content 改动各一条；自动测试覆盖两条路径（plan 更新写入 plan/subtasks，content 触发 redo 输出与 reviewer 状态）。
 
 
 
@@ -139,4 +160,4 @@ stage 3
 5、您希望文笔类似什么风格
 请输入（请描述风格，推荐您输入一个您希望我模仿的作家）
 
-全部answer后，自动在对话框
+全部answer后，自动在对话框生成

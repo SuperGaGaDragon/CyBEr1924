@@ -134,10 +134,13 @@ function PlanningView({ session, onSendPlanningMessage, onConfirmPlan }: Plannin
 type ExecutionViewProps = {
   session: SessionSnapshot;
   onSendExecutionMessage: (text: string) => void;
+  pendingMessage?: string | null;
+  isSending?: boolean;
 };
 
-function ExecutionView({ session, onSendExecutionMessage }: ExecutionViewProps) {
+function ExecutionView({ session, onSendExecutionMessage, pendingMessage, isSending }: ExecutionViewProps) {
   const [input, setInput] = useState("");
+  const pendingText = (pendingMessage ?? "").trim();
 
   const handleSubmit = (e: FormEvent) => {
     e.preventDefault();
@@ -163,6 +166,19 @@ function ExecutionView({ session, onSendExecutionMessage }: ExecutionViewProps) 
             Talk directly with the Orchestrator; all agent work happens behind the scenes.
           </p>
         </div>
+        {isSending && (
+          <div className="orch-pulse" style={{
+            fontSize: "12px",
+            fontWeight: 700,
+            color: "#111827",
+            padding: "6px 10px",
+            borderRadius: "999px",
+            border: "1px solid #e5e7eb",
+            background: "#f9fafb",
+          }}>
+            Thinking…
+          </div>
+        )}
       </div>
 
       <div style={{
@@ -201,6 +217,46 @@ function ExecutionView({ session, onSendExecutionMessage }: ExecutionViewProps) 
               <div style={{ whiteSpace: "pre-wrap", lineHeight: "1.6", fontSize: "14px" }}>{msg.content}</div>
             </div>
           ))
+        )}
+        {pendingText && (
+          <div
+            style={{
+              alignSelf: "flex-end",
+              maxWidth: "70%",
+              padding: "12px 14px",
+              borderRadius: "12px",
+              background: "#111827",
+              color: "#ffffff",
+              border: "none",
+              boxShadow: "0 8px 20px rgba(0,0,0,0.2)",
+              opacity: 0.8,
+            }}
+          >
+            <div style={{ fontSize: "11px", letterSpacing: "0.5px", textTransform: "uppercase", opacity: 0.7, marginBottom: "4px" }}>
+              You · sending…
+            </div>
+            <div style={{ whiteSpace: "pre-wrap", lineHeight: "1.6", fontSize: "14px" }}>{pendingText}</div>
+          </div>
+        )}
+        {isSending && (
+          <div
+            className="orch-pulse"
+            style={{
+              alignSelf: "flex-start",
+              maxWidth: "68%",
+              padding: "12px 14px",
+              borderRadius: "12px",
+              background: "#f3f4f6",
+              color: "#111827",
+              border: "1px solid #e5e7eb",
+              boxShadow: "0 8px 20px rgba(0,0,0,0.06)",
+            }}
+          >
+            <div style={{ fontSize: "11px", letterSpacing: "0.5px", textTransform: "uppercase", opacity: 0.6, marginBottom: "4px" }}>
+              Orchestrator
+            </div>
+            <div style={{ whiteSpace: "pre-wrap", lineHeight: "1.6", fontSize: "14px" }}>Thinking…</div>
+          </div>
         )}
       </div>
 
@@ -560,6 +616,8 @@ function App() {
   const [orchChatOpen, setOrchChatOpen] = useState(false);
   const [orchSize, setOrchSize] = useState<{ width: number; height: number }>({ width: 360, height: 420 });
   const [orchPos, setOrchPos] = useState<{ x: number; y: number } | null>(null);
+  const [orchSending, setOrchSending] = useState(false);
+  const [orchPendingText, setOrchPendingText] = useState<string | null>(null);
   const orchDrag = useRef(false);
   const orchResize = useRef<{
     resizing: boolean;
@@ -1015,6 +1073,8 @@ function App() {
   async function sendExecutionMessage(text: string) {
     const sessionId = state.activeSessionId;
     if (!sessionId) return;
+    setOrchPendingText(text);
+    setOrchSending(true);
     setState((prev) => ({ ...prev, loading: true, error: null }));
     try {
       const snapshot = await sendCommand(sessionId, "ask", { question: text });
@@ -1030,6 +1090,9 @@ function App() {
         loading: false,
         error: err.message ?? "Send message failed",
       }));
+    } finally {
+      setOrchSending(false);
+      setOrchPendingText(null);
     }
   }
 
@@ -2147,6 +2210,23 @@ function App() {
                 >
                   <div style={{ fontWeight: 700, fontSize: "13px" }}>Orchestrator</div>
                   <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                    {orchSending && (
+                      <span
+                        className="orch-pulse"
+                        style={{
+                          fontSize: "12px",
+                          fontWeight: 700,
+                          color: "#111827",
+                          padding: "6px 10px",
+                          borderRadius: "999px",
+                          border: "1px solid #e5e7eb",
+                          background: "#ffffff",
+                        }}
+                        aria-live="polite"
+                      >
+                        Thinking…
+                      </span>
+                    )}
                     <button
                       onClick={() => setOrchChatOpen(false)}
                       style={{
@@ -2162,9 +2242,14 @@ function App() {
                     </button>
                   </div>
                 </div>
-                <div style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column", overflow: "hidden" }}>
+                  <div style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column", overflow: "hidden" }}>
                   <div style={{ flex: 1, overflowY: "auto" }}>
-                    <ExecutionView session={snapshot} onSendExecutionMessage={sendExecutionMessage} />
+                    <ExecutionView
+                      session={snapshot}
+                      onSendExecutionMessage={sendExecutionMessage}
+                      pendingMessage={orchPendingText}
+                      isSending={orchSending}
+                    />
                   </div>
                 </div>
                 {(["sw", "se"] as const).map((dir) => {
