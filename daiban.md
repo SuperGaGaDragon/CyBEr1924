@@ -118,7 +118,7 @@ stage 1
 - [x] 明确“subtask 方格”触发信号：定义 worker/reviewer 的 start/finish 事件结构（含 subtask_id、agent、timestamp、状态），补充缺省状态映射（生成中/完成）。
 
 stage 2
-- [ ] 后端落地事件流：worker/reviewer 在开始执行时立刻写 start 事件，完成时写 finish 事件；确保 orchestrator/plan redo 时也能按 subtask 划分事件。
+- [x] 后端落地事件流：worker/reviewer 在开始执行时立刻写 start 事件，完成时写 finish 事件；确保 orchestrator/plan redo 时也能按 subtask 划分事件。
 
 stage 3 
 - [ ] 前端状态建模：引入 per-agent subtask list state，start 事件立即生成方格占位，finish 事件更新状态/时间/序号；支持 session 恢复时的初始化。

@@ -20,7 +20,12 @@ from .prompt_registry import (
     build_worker_prompt,
 )
 from .plan_model import Plan, Subtask
-from .session_state import OrchestratorState, PlannerChatMessage, build_session_snapshot
+from .session_state import (
+    OrchestratorState,
+    PlannerChatMessage,
+    PROGRESS_STAGE_STATUS_MAP,
+    build_session_snapshot,
+)
 
 USE_REAL_PLANNER = os.getenv("USE_REAL_PLANNER", "false").lower() in (
     "1",
@@ -60,6 +65,32 @@ def _normalize_event_kind(kind: str | None) -> str:
     if kind.isupper():
         return kind
     return kind.upper()
+
+
+def _append_progress_event(
+    state: OrchestratorState | None,
+    agent: str,
+    subtask_id: str | None,
+    stage: str,
+    payload: Optional[Dict[str, Any]] = None,
+    ts: Optional[datetime] = None,
+) -> None:
+    """Record a subtask progress event on state; no-op if state/subtask missing."""
+    if state is None or not subtask_id:
+        return
+    event = {
+        "agent": agent,
+        "subtask_id": subtask_id,
+        "stage": stage or "start",
+        "status": PROGRESS_STAGE_STATUS_MAP.get(stage or "start", "in_progress"),
+        "payload": payload or {},
+        "ts": ts or datetime.utcnow(),
+    }
+    try:
+        state.progress_events.append(event)
+    except Exception:
+        # Defensive: avoid breaking flows if state storage is unexpected
+        return
 
 
 def run_worker_for_subtask(plan: Plan, subtask: Subtask, instructions: str | None) -> str:
@@ -213,14 +244,48 @@ def consume_orchestrator_events(state: OrchestratorState, plan: Plan | None = No
             # 1) worker rewrite (stubbed)
             worker_output = ""
             if subtask:
+                _append_progress_event(
+                    state,
+                    agent="worker",
+                    subtask_id=subtask.id,
+                    stage="start",
+                    payload={"source": "orchestrator_event", "kind": kind},
+                )
                 worker_output = run_worker_for_subtask(plan, subtask, instr)
                 subtask.output = worker_output
                 subtask.needs_redo = False
+                _append_progress_event(
+                    state,
+                    agent="worker",
+                    subtask_id=subtask.id,
+                    stage="finish",
+                    payload={"source": "orchestrator_event", "kind": kind},
+                )
 
             # 2) reviewer eval (stubbed)
+            if subtask:
+                _append_progress_event(
+                    state,
+                    agent="reviewer",
+                    subtask_id=subtask.id,
+                    stage="start",
+                    payload={"source": "orchestrator_event", "kind": kind},
+                )
             review = run_reviewer_on_output(plan, subtask, worker_output) if subtask else {"decision": "accept", "notes": ""}
             decision = review.get("decision", "").lower()
             notes = review.get("notes", "")
+            if subtask:
+                _append_progress_event(
+                    state,
+                    agent="reviewer",
+                    subtask_id=subtask.id,
+                    stage="finish",
+                    payload={
+                        "source": "orchestrator_event",
+                        "kind": kind,
+                        "decision": decision or "accept",
+                    },
+                )
 
             # 3) update state/subtask status
             if subtask:
@@ -555,6 +620,7 @@ class Orchestrator:
         self,
         session_id: str,
         plan: Plan,
+        state: OrchestratorState | None = None,
         interactive: bool = False,
         user_feedback_callback=None
     ) -> Plan:
@@ -577,6 +643,13 @@ class Orchestrator:
 
         while True:
             subtask.status = "in_progress"
+            _append_progress_event(
+                state,
+                agent="worker",
+                subtask_id=subtask.id,
+                stage="start",
+                payload={"title": subtask.title, "session_id": session_id},
+            )
 
             # 如果有用户反馈，把它传递给 Worker
             if user_feedback_text:
@@ -604,9 +677,23 @@ class Orchestrator:
                     "result_artifact": ref_work.to_payload(),
                 },
             )
+            _append_progress_event(
+                state,
+                agent="worker",
+                subtask_id=subtask.id,
+                stage="finish",
+                payload={"artifact_path": ref_work.path, "session_id": session_id},
+            )
 
             # 交互模式：让用户审核
             if interactive and user_feedback_callback:
+                _append_progress_event(
+                    state,
+                    agent="reviewer",
+                    subtask_id=subtask.id,
+                    stage="start",
+                    payload={"mode": "interactive", "session_id": session_id},
+                )
                 user_decision = user_feedback_callback(worker_output)
 
                 if user_decision is None:
@@ -637,12 +724,31 @@ class Orchestrator:
                     )
             else:
                 # 自动模式：AI 审核
+                _append_progress_event(
+                    state,
+                    agent="reviewer",
+                    subtask_id=subtask.id,
+                    stage="start",
+                    payload={"mode": "auto", "session_id": session_id},
+                )
                 decision_text = self._call_coordinator(plan, subtask, worker_output)
                 lines = [line.strip() for line in decision_text.strip().splitlines() if line.strip()]
                 first_line = (lines[0] if lines else "").upper()
                 decision = "ACCEPT" if "ACCEPT" in first_line else "REDO"
                 reason = "\\n".join(lines[1:]) if len(lines) > 1 else ""
                 user_feedback_text = None
+
+            _append_progress_event(
+                state,
+                agent="reviewer",
+                subtask_id=subtask.id,
+                stage="finish",
+                payload={
+                    "decision": decision,
+                    "reason": reason,
+                    "session_id": session_id,
+                },
+            )
 
             if decision == "ACCEPT":
                 subtask.status = "done"
@@ -685,7 +791,8 @@ class Orchestrator:
     def run_all(self, topic: str) -> dict:
         session_id, plan, state = self.init_session(topic)
         while self._has_pending_subtasks(plan):
-            plan = self.run_next_pending_subtask(session_id, plan)
+            plan = self.run_next_pending_subtask(session_id, plan, state=state)
+            self.save_orchestrator_state(state)
         ref_final_plan = self.store.save_artifact(
             session_id,
             plan.to_dict(),
@@ -969,7 +1076,7 @@ class Orchestrator:
         self.save_orchestrator_state(state)
 
         # Call the existing run_next_pending_subtask for actual execution
-        plan = self.run_next_pending_subtask(session_id, plan)
+        plan = self.run_next_pending_subtask(session_id, plan, state=state)
 
         # Update state: back to idle
         state.status = "idle"
@@ -1118,6 +1225,13 @@ class Orchestrator:
 
                 print(f"\n▶ 正在执行: {subtask.id} - {subtask.title}")
                 subtask.status = "in_progress"
+                _append_progress_event(
+                    state,
+                    agent="worker",
+                    subtask_id=subtask.id,
+                    stage="start",
+                    payload={"title": subtask.title, "session_id": session_id},
+                )
                 worker_output = self._call_worker(plan, subtask)
 
                 ref_work = self.store.save_artifact(
@@ -1126,9 +1240,23 @@ class Orchestrator:
                     kind="markdown",
                     description=f"子任务 {subtask.id} 的执行结果",
                 )
+                _append_progress_event(
+                    state,
+                    agent="worker",
+                    subtask_id=subtask.id,
+                    stage="finish",
+                    payload={"artifact_path": ref_work.path, "session_id": session_id},
+                )
 
                 interactive_coordinator.enter_review_mode(
                     session_id, subtask, worker_output, ref_work
+                )
+                _append_progress_event(
+                    state,
+                    agent="reviewer",
+                    subtask_id=subtask.id,
+                    stage="start",
+                    payload={"mode": "interactive", "session_id": session_id},
                 )
 
                 self._persist_plan_state(session_id, plan, state)
