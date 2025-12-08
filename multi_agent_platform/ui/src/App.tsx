@@ -2345,13 +2345,19 @@ function App() {
                     />
                   </div>
                 </div>
-                {(["sw", "se"] as const).map((dir) => {
-                  const cursor = dir === "se" ? "nwse-resize" : "nesw-resize";
-                  const positionStyle: Record<string, string> = {
-                    bottom: "6px",
+                {(["nw", "ne", "sw", "se"] as const).map((dir) => {
+                  const cursorMap: Record<typeof dir, string> = {
+                    nw: "nwse-resize",
+                    se: "nwse-resize",
+                    ne: "nesw-resize",
+                    sw: "nesw-resize",
                   };
-                  if (dir === "sw") positionStyle.left = "6px";
-                  if (dir === "se") positionStyle.right = "6px";
+                  const cursor = cursorMap[dir];
+                  const positionStyle: Record<string, string> = {};
+                  if (dir === "nw" || dir === "ne") positionStyle.top = "6px";
+                  if (dir === "sw" || dir === "se") positionStyle.bottom = "6px";
+                  if (dir === "nw" || dir === "sw") positionStyle.left = "6px";
+                  if (dir === "ne" || dir === "se") positionStyle.right = "6px";
                   return (
                     <div
                       key={dir}
@@ -2875,7 +2881,7 @@ function WorkerColumn({ snapshot, progress, progressSeenCount = 0 }: { snapshot:
               background: "#ffffff",
               border: "1px solid #e5e7eb",
               borderRadius: "12px",
-              padding: "12px 14px 12px 64px",
+              padding: "14px 16px 14px 76px",
               boxShadow: "0 8px 20px rgba(0,0,0,0.05)",
               display: "flex",
               flexDirection: "column",
@@ -2885,14 +2891,14 @@ function WorkerColumn({ snapshot, progress, progressSeenCount = 0 }: { snapshot:
               {order && (
                 <span style={{
                   position: "absolute",
-                  top: "12px",
-                  left: "12px",
-                  width: "26px",
-                  height: "26px",
+                  top: "14px",
+                  left: "16px",
+                  width: "30px",
+                  height: "30px",
                   borderRadius: "50%",
                   background: "#111827",
                   color: "#ffffff",
-                  fontSize: "11px",
+                  fontSize: "12px",
                   fontWeight: 700,
                   display: "flex",
                   alignItems: "center",
@@ -3035,7 +3041,7 @@ function CoordinatorColumn({ snapshot, width, progress = [], progressSeenCount =
               key={index}
               style={{
                 marginBottom: "14px",
-                padding: "14px 16px 14px 64px",
+              padding: "14px 16px 14px 76px",
                 borderRadius: "16px",
                 border: "1px solid #e4e4e7",
                 background: "#ffffff",
@@ -3046,14 +3052,14 @@ function CoordinatorColumn({ snapshot, width, progress = [], progressSeenCount =
               {subtaskOrder.has(String(subtaskId)) && (
                 <span style={{
                   position: "absolute",
-                  top: "12px",
-                  left: "12px",
-                  width: "26px",
-                  height: "26px",
+                  top: "14px",
+                  left: "16px",
+                  width: "30px",
+                  height: "30px",
                   borderRadius: "50%",
                   background: "#111827",
                   color: "#ffffff",
-                  fontSize: "11px",
+                  fontSize: "12px",
                   fontWeight: 700,
                   display: "flex",
                   alignItems: "center",

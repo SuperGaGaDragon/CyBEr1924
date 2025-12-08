@@ -52,9 +52,9 @@ stage4
 
 - [x] 当前worker板块的的task序号挡住了文字，请修复。
 
-- [ ] reviewer 顶部带有“Task x”字样的白色圆圈请删除（当前与黑色圆圈t x重复，仅需保留黑色的和worker相同格式的）并重新编排序号，状态，日期的距离，使得他们好看。
+- [x] reviewer 顶部带有“Task x”字样的白色圆圈请删除（当前与黑色圆圈t x重复，仅需保留黑色的和worker相同格式的）并重新编排序号，状态，日期的距离，使得他们好看。
 
-- [ ] orchestrator 的对话框。用户可以通过拉取四个边角放大其尺寸，也可以在框上面栏通过按住鼠标在页面内自由拖动此对话框。
+- [x] orchestrator 的对话框。用户可以通过拉取四个边角放大其尺寸，也可以在框上面栏通过按住鼠标在页面内自由拖动此对话框。
 
 -----
 
@@ -178,7 +178,14 @@ stage 3
 stage 4
 - [x] 临时修复优先级：先上布局/交互修正，复用现有数据；如后端空数据，补充 `envelopes.jsonl` 解析/写入或 fallback 预览，确保有输出可渲染。（已上线布局与前端告警；若 outputs 为空则提醒检查 SUBTASK_RESULT/文件权限，必要时从 envelopes 读 preview 兜底）
 
+-----
+###解决方案
 
+- Planner 必须 real 模式调试大纲
+  - [x] 确认运行环境的 env：设置 `USE_REAL_PLANNER=true`，并确保 `OPENAI_API_KEY` / `OPENAI_BASE_URL` 生效（无 key 会走 stub）。
+  - [x] 后端启动/部署流程补充 env 校验：缺失时启动即抛错或显式警告阻止 fallback stub。
+  - [] 本地快速验证：执行一次 planning 对话，观察 planner_chat 长度递增且 plan/subtasks 被重写（不再追加 stub）。
+  - [] 如有需要，补一条集成测试覆盖 `USE_REAL_PLANNER=true` 下 planner 更新 plan/subtasks。
 
 
 ### 小说专用模式设计

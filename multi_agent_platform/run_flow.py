@@ -27,11 +27,19 @@ from .session_state import (
     build_session_snapshot,
 )
 
-USE_REAL_PLANNER = os.getenv("USE_REAL_PLANNER", "false").lower() in (
+USE_REAL_PLANNER = os.getenv("USE_REAL_PLANNER", "true").lower() in (
     "1",
     "true",
     "yes",
 )
+
+
+def _require_real_planner() -> None:
+    """Guardrail: real planner must have credentials; fail fast instead of stubbing."""
+    if not USE_REAL_PLANNER:
+        return
+    if not os.getenv("OPENAI_API_KEY"):
+        raise RuntimeError("USE_REAL_PLANNER=true but OPENAI_API_KEY is missing; refusing to fall back to stub planner.")
 
 PLAN_EDITING_KINDS = {
     "set_current_subtask",
@@ -936,6 +944,7 @@ class Orchestrator:
             )
         )
         if USE_REAL_PLANNER:
+            _require_real_planner()
             plan_dict = plan.to_dict() if hasattr(plan, "to_dict") else None
 
             subtasks_dicts: List[Dict[str, Any]] = []
