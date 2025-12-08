@@ -2190,6 +2190,7 @@ function App() {
                 height: "100%",
                 overflow: "hidden",
                 position: "relative",
+                alignItems: "stretch",
               }}
             >
               <PlanColumn snapshot={snapshot} />
@@ -2689,8 +2690,10 @@ function PlanColumn({ snapshot }: { snapshot: SessionSnapshot | null }) {
       background: "#ffffff",
       display: "flex",
       flexDirection: "column",
+      flex: "1 1 0",
       padding: "20px",
       minHeight: 0,
+      height: "100%",
       overflow: "hidden",
     }}>
       <h4 style={{
@@ -2788,8 +2791,10 @@ function WorkerColumn({ snapshot, progress, progressSeenCount = 0 }: { snapshot:
       background: "#f9fafb",
       display: "flex",
       flexDirection: "column",
+      flex: "1 1 0",
       padding: "20px",
       minHeight: 0,
+      height: "100%",
       overflow: "hidden",
     }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "12px" }}>
@@ -2946,6 +2951,8 @@ function CoordinatorColumn({ snapshot, width, progress = [], progressSeenCount =
         background: "#ffffff",
         overflow: "hidden",
         minHeight: 0,
+        height: "100%",
+        flex: "1 1 0",
       }}
     >
       <h4 style={{

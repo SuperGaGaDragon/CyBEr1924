@@ -157,11 +157,30 @@ stage 3
 stage 4
 - [ ] 观察线上日志，如仍有异常体量输出再做分段渲染。
 
-stage 5
+stage 5 
 
 
 
 -----
+##临时任务
+
+当前问题： Worker 列表不显示、滚动/排序失效排查方案：
+
+stage 1
+- [x] 前端布局：给执行态三栏容器及 Plan/Worker/Reviewer 外层补 `flex:1; minHeight:0; height:100%`，确保内部 `overflowY:auto` 的列表有可滚动高度；确认拖拽分隔条宽度/位置不覆盖排序按钮，必要时在非拖拽时设置 `pointer-events:none`。
+
+stage 2 
+- [ ] 数据回填：用 Network 面板确认 `/sessions/<id>` 返回的 `worker_outputs` 是否为空；若为空，检查后端 `build_session_snapshot` 是否读到 `SUBTASK_RESULT`（路径/权限/日志文件是否存在）。
+
+stage 3 
+- [ ] 交互验证：在有多条 `worker_outputs` 的 session 里手动切换排序（时间戳差异大的样本），确认按钮点击事件未被覆盖层阻挡；滚动条应在 Worker 列内部生效。
+
+stage 4
+- [ ] 临时修复优先级：先上布局/交互修正，复用现有数据；如后端空数据，补充 `envelopes.jsonl` 解析/写入或 fallback 预览，确保有输出可渲染。
+
+
+
+
 ### 小说专用模式设计
 
 - stage 1
