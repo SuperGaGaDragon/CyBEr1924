@@ -48,6 +48,7 @@ type UIState = {
 type AuthState = {
   email: string;
   password: string;
+  confirmPassword: string;
   verificationCode: string;
   accessToken: string | null;
   isLoggedIn: boolean;
@@ -75,6 +76,7 @@ function App() {
   const [auth, setAuth] = useState<AuthState>({
     email: "",
     password: "",
+    confirmPassword: "",
     verificationCode: "",
     accessToken: null,
     isLoggedIn: false,
@@ -190,6 +192,15 @@ function App() {
   async function handleRegister(e: React.FormEvent) {
     e.preventDefault();
     setAuth((prev) => ({ ...prev, authError: null }));
+
+    // Check if passwords match
+    if (auth.password !== auth.confirmPassword) {
+      setAuth((prev) => ({
+        ...prev,
+        authError: "Passwords do not match",
+      }));
+      return;
+    }
 
     try {
       await register(auth.email, auth.password);
@@ -339,6 +350,7 @@ function App() {
     setAuth({
       email: "",
       password: "",
+      confirmPassword: "",
       verificationCode: "",
       accessToken: null,
       isLoggedIn: false,
@@ -419,6 +431,19 @@ function App() {
                 color: "#666",
                 margin: 0,
               }}>Verify Your Email</p>
+            </div>
+
+            <div style={{
+              padding: "16px",
+              background: "#f0f9ff",
+              border: "1px solid #bae6fd",
+              borderRadius: "12px",
+              marginBottom: "24px",
+              fontSize: "14px",
+              color: "#0369a1",
+              lineHeight: "1.6",
+            }}>
+              A verification code has been sent to your email address. Please check your inbox and spam folder.
             </div>
 
             <form onSubmit={handleVerify} style={{
@@ -627,6 +652,37 @@ function App() {
                   type="password"
                   value={auth.password}
                   onChange={(e) => setAuth((prev) => ({ ...prev, password: e.target.value }))}
+                  placeholder="••••••••"
+                  required
+                  style={{
+                    width: "100%",
+                    padding: "14px 16px",
+                    fontSize: "15px",
+                    border: "2px solid #e0e0e0",
+                    borderRadius: "12px",
+                    boxSizing: "border-box",
+                    transition: "all 0.2s",
+                    outline: "none",
+                  }}
+                  onFocus={(e) => e.target.style.borderColor = "#000"}
+                  onBlur={(e) => e.target.style.borderColor = "#e0e0e0"}
+                />
+              </div>
+
+              <div>
+                <label style={{
+                  display: "block",
+                  fontSize: "14px",
+                  fontWeight: "600",
+                  marginBottom: "8px",
+                  color: "#333",
+                }}>
+                  Confirm Password
+                </label>
+                <input
+                  type="password"
+                  value={auth.confirmPassword}
+                  onChange={(e) => setAuth((prev) => ({ ...prev, confirmPassword: e.target.value }))}
                   placeholder="••••••••"
                   required
                   style={{
