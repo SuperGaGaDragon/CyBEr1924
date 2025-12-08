@@ -14,10 +14,9 @@
 ## 目标 2：规划阶段与 plan 锁定
 - [x] 规划模式入口：新 session 进入 planning，confirm_plan 将 session_mode 切到 execution
 - [x] plan_locked 生效：锁后禁止 planner 路由/plan 编辑（现有 plan 命令与 ask fallback 仍可改 plan 或走 coordinator）
-- [ ] ⏳ 真实 Planner 接入：用 planner agent 基于 planner_chat 更新 plan/subtasks，而非占位提示
+- [x] 真实 Planner 接入：用 planner agent 基于 planner_chat 更新 plan/subtasks，而非占位提示
 
 ## 目标 3：前端 orchestrator & 调试
 - [x] 主聊天窗切换 orchestrator_messages 为对接人（当前仍是三栏 planner/worker/reviewer 视图）
 - [ ] ⏳ （可选）orch_events / coord_decisions 调试视图
-
 

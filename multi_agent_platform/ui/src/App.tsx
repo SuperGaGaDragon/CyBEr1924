@@ -1926,7 +1926,17 @@ function App() {
                   onSendExecutionMessage={sendExecutionMessage}
                 />
               )}
-              <div style={{ width: "32%", borderLeft: "1px solid #e5e7eb", background: "#ffffff" }}>
+              <div
+                style={{
+                  width: "32%",
+                  borderLeft: "1px solid #e5e7eb",
+                  background: "#ffffff",
+                  display: "flex",
+                  flexDirection: "column",
+                  overflowY: "auto",
+                  minHeight: 0,
+                }}
+              >
                 <CoordinatorColumn snapshot={snapshot} width={100} />
               </div>
             </div>
