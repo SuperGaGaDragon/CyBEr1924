@@ -190,7 +190,7 @@ def run_orchestrator_turn(
         return
 
     if ts is None:
-        ts = datetime.utcnow()
+        ts = datetime.utcnow().isoformat()
 
     action = run_orchestrator_intent_agent(state, text)
 

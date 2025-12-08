@@ -70,19 +70,32 @@ class OrchestratorState:
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary for JSON serialization."""
         d = asdict(self)
+        def _ser_ts(value: Any) -> Any:
+            if isinstance(value, datetime):
+                return value.isoformat()
+            return value
         # Ensure extra is always a dict
         if d.get("extra") is None:
             d["extra"] = {}
         d["orchestrator_messages"] = [
-            msg.dict() if isinstance(msg, OrchestratorMessage) else msg
+            {
+                **(msg.dict() if isinstance(msg, OrchestratorMessage) else msg),
+                "ts": _ser_ts(getattr(msg, "ts", None) if hasattr(msg, "ts") else (msg.get("ts") if isinstance(msg, dict) else None)),
+            }
             for msg in self.orchestrator_messages
         ]
         d["orch_events"] = [
-            event.dict() if isinstance(event, OrchestratorEvent) else event
+            {
+                **(event.dict() if isinstance(event, OrchestratorEvent) else event),
+                "ts": _ser_ts(getattr(event, "ts", None) if hasattr(event, "ts") else (event.get("ts") if isinstance(event, dict) else None)),
+            }
             for event in self.orch_events
         ]
         d["planner_chat"] = [
-            msg.dict() if isinstance(msg, PlannerChatMessage) else msg
+            {
+                **(msg.dict() if isinstance(msg, PlannerChatMessage) else msg),
+                "ts": _ser_ts(getattr(msg, "ts", None) if hasattr(msg, "ts") else (msg.get("ts") if isinstance(msg, dict) else None)),
+            }
             for msg in self.planner_chat
         ]
         return d
@@ -101,7 +114,7 @@ class OrchestratorState:
         if role not in ("user", "orchestrator"):
             return
         if ts is None:
-            ts = datetime.utcnow()
+            ts = datetime.utcnow().isoformat()
         self.orchestrator_messages.append(
             OrchestratorMessage(role=role, content=content, ts=ts)
         )
