@@ -10,10 +10,12 @@ import {
   verifyEmail,
   setAccessToken,
   deleteSession,
+  ApiError,
 } from "./api";
 import "./App.css";
 
 const SESSION_TOKEN_KEY = "cyber1924_last_session_id";
+const LOGIN_REQUIRED_MESSAGE = "登录状态已过期，请重新登录";
 
 // 支持两种写法：1) ?session=<id> 2) /c/<id>
 function getSessionIdFromLocation(): string | null {
@@ -101,6 +103,43 @@ function App() {
   const isDraggingWorker = useRef(false);
 
   const coordinatorWidth = 100 - plannerWidth - workerWidth;
+
+  const resetToLoggedOut = (authMessage?: string, clearEmail = false) => {
+    localStorage.removeItem("cyber1924_token");
+    localStorage.removeItem(SESSION_TOKEN_KEY);
+    setAccessToken(null);
+    setAuth((prev) => ({
+      email: clearEmail ? "" : prev.email,
+      password: "",
+      confirmPassword: "",
+      verificationCode: "",
+      accessToken: null,
+      isLoggedIn: false,
+      authError: authMessage ?? null,
+      showVerification: false,
+      showRegister: false,
+    }));
+    setState({
+      sessions: [],
+      activeSessionId: null,
+      snapshot: null,
+      loading: false,
+      error: null,
+    });
+
+    const url = new URL(window.location.href);
+    url.pathname = "/";
+    url.search = "";
+    window.history.replaceState(null, "", url.toString());
+  };
+
+  const handleAuthError = (err: unknown) => {
+    if (err instanceof ApiError && err.status === 401) {
+      resetToLoggedOut(LOGIN_REQUIRED_MESSAGE);
+      return true;
+    }
+    return false;
+  };
 
   // Initialize token from localStorage on mount
   useEffect(() => {
@@ -199,9 +238,11 @@ function App() {
             snapshot,
           }));
         } catch (err: any) {
+          if (handleAuthError(err)) return;
           console.error("Failed to restore fallback session", err);
         }
       } catch (err: any) {
+        if (handleAuthError(err)) return;
         setState((prev) => ({
           ...prev,
           error: err.message ?? "Failed to load sessions",
@@ -316,6 +357,7 @@ function App() {
         snapshot,
       }));
     } catch (err: any) {
+      if (handleAuthError(err)) return;
       setState((prev) => ({
         ...prev,
         loading: false,
@@ -341,6 +383,7 @@ function App() {
         snapshot,
       }));
     } catch (err: any) {
+      if (handleAuthError(err)) return;
       setState((prev) => ({
         ...prev,
         loading: false,
@@ -356,6 +399,7 @@ function App() {
       const snapshot = await sendCommand(state.activeSessionId, command);
       setState((prev) => ({ ...prev, loading: false, snapshot }));
     } catch (err: any) {
+      if (handleAuthError(err)) return;
       setState((prev) => ({
         ...prev,
         loading: false,
@@ -375,6 +419,7 @@ function App() {
       const snapshot = await sendCommand(sessionId, command, payload);
       setState((prev) => ({ ...prev, loading: false, snapshot }));
     } catch (err: any) {
+      if (handleAuthError(err)) return;
       setState((prev) => ({
         ...prev,
         loading: false,
@@ -392,6 +437,7 @@ function App() {
       });
       setState((prev) => ({ ...prev, loading: false, snapshot }));
     } catch (err: any) {
+      if (handleAuthError(err)) return;
       setState((prev) => ({
         ...prev,
         loading: false,
@@ -458,6 +504,7 @@ function App() {
 
       setDeleteConfirm({ show: false, sessionId: null, sessionTopic: null });
     } catch (err: any) {
+      if (handleAuthError(err)) return;
       setState((prev) => ({
         ...prev,
         loading: false,
@@ -472,32 +519,7 @@ function App() {
   }
 
   function handleLogout() {
-    localStorage.removeItem("cyber1924_token");
-    localStorage.removeItem(SESSION_TOKEN_KEY);
-    setAccessToken(null);
-    setAuth({
-      email: "",
-      password: "",
-      confirmPassword: "",
-      verificationCode: "",
-      accessToken: null,
-      isLoggedIn: false,
-      authError: null,
-      showVerification: false,
-      showRegister: false,
-    });
-    setState({
-      sessions: [],
-      activeSessionId: null,
-      snapshot: null,
-      loading: false,
-      error: null,
-    });
-
-    const url = new URL(window.location.href);
-    url.pathname = "/";
-    url.search = "";
-    window.history.replaceState(null, "", url.toString());
+    resetToLoggedOut(undefined, true);
   }
 
   useEffect(() => {

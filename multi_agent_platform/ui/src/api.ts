@@ -60,6 +60,15 @@ const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:8000";
 
 let accessToken: string | null = null;
 
+export class ApiError extends Error {
+  status: number;
+
+  constructor(status: number, message: string) {
+    super(message);
+    this.status = status;
+  }
+}
+
 export function setAccessToken(token: string | null) {
   accessToken = token;
 }
@@ -68,13 +77,25 @@ async function request<T>(
   path: string,
   options: RequestInit = {}
 ): Promise<T> {
-  const headers: HeadersInit = {
+  const headers: Record<string, string> = {
     "Content-Type": "application/json",
-    ...(options.headers || {}),
   };
 
+  const optionHeaders = options.headers;
+  if (optionHeaders instanceof Headers) {
+    optionHeaders.forEach((value, key) => {
+      headers[key] = value;
+    });
+  } else if (Array.isArray(optionHeaders)) {
+    for (const [key, value] of optionHeaders) {
+      headers[key] = value;
+    }
+  } else if (optionHeaders) {
+    Object.assign(headers, optionHeaders);
+  }
+
   if (accessToken) {
-    (headers as any)["Authorization"] = `Bearer ${accessToken}`;
+    headers["Authorization"] = `Bearer ${accessToken}`;
   }
 
   const resp = await fetch(`${API_BASE}${path}`, {
@@ -83,8 +104,17 @@ async function request<T>(
   });
 
   if (!resp.ok) {
-    const text = await resp.text().catch(() => "");
-    throw new Error(text || `Request failed with status ${resp.status}`);
+    let text: string;
+    try {
+      text = await resp.text();
+    } catch {
+      text = resp.statusText;
+    }
+    throw new ApiError(resp.status, text || resp.statusText);
+  }
+
+  if (resp.status === 204) {
+    return undefined as unknown as T;
   }
 
   return (await resp.json()) as T;
