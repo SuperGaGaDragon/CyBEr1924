@@ -342,12 +342,12 @@ class SessionSnapshot:
     plan: Dict[str, Any]
     subtasks: List[Dict[str, Any]]
     current_subtask_id: Optional[str]
-    orchestrator_state: Dict[str, Any]
+    orchestrator_state: Dict[str, Any] = field(default_factory=dict)
+    worker_outputs: List[Dict[str, Any]] = field(default_factory=list)
+    coord_decisions: List[Dict[str, Any]] = field(default_factory=list)
+    chat_history: List[Dict[str, Any]] = field(default_factory=list)
     is_running: bool = False
     last_progress_event_ts: Optional[str] = None
-    worker_outputs: List[Dict[str, Any]]
-    coord_decisions: List[Dict[str, Any]]
-    chat_history: List[Dict[str, Any]]
     plan_locked: bool = False
     session_mode: str = "planning"
     progress_events: List[Dict[str, Any]] = field(default_factory=list)

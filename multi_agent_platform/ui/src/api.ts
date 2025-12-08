@@ -76,6 +76,8 @@ export type SessionSnapshot = {
   plan: Record<string, any>;
   subtasks: Subtask[];
   current_subtask_id: string | null;
+  is_running?: boolean;
+  last_progress_event_ts?: string | null;
   orchestrator_state: Record<string, any>;
   worker_outputs: WorkerOutput[];
   coord_decisions: Record<string, any>[];
@@ -172,6 +174,20 @@ export async function createSession(topic: string): Promise<SessionSnapshot> {
 
 export async function getSession(id: string): Promise<SessionSnapshot> {
   return request<SessionSnapshot>(`/sessions/${id}`);
+}
+
+export type EventsResponse = {
+  progress_events: SubtaskProgressEvent[];
+  worker_outputs: WorkerOutput[];
+  since?: string | null;
+};
+
+export async function getSessionEvents(
+  id: string,
+  since?: string | null,
+): Promise<EventsResponse> {
+  const qs = since ? `?since=${encodeURIComponent(since)}` : "";
+  return request<EventsResponse>(`/sessions/${id}/events${qs}`);
 }
 
 export async function sendCommand(

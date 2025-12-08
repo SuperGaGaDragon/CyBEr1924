@@ -5,6 +5,7 @@ import {
   createSession,
   getSession,
   sendCommand,
+  getSessionEvents,
   login,
   register,
   verifyEmail,
@@ -566,6 +567,8 @@ type UIState = {
   snapshot: SessionSnapshot | null;
   loading: boolean;
   error: string | null;
+  lastEventTs: string | null;
+  pollingEvents: boolean;
 };
 
 type AuthState = {
@@ -654,6 +657,43 @@ function deriveProgressByAgent(snapshot: SessionSnapshot | null): Record<"worker
   };
 }
 
+function mergeSnapshotWithEvents(
+  snapshot: SessionSnapshot,
+  events: { progress_events?: any[]; worker_outputs?: any[] },
+): SessionSnapshot {
+  const mergedProgress = [...(snapshot.progress_events ?? [])];
+  const seen = new Set(mergedProgress.map((ev) => `${ev.agent}-${ev.subtask_id}-${ev.stage}-${ev.ts}`));
+  for (const ev of events.progress_events ?? []) {
+    const key = `${ev.agent}-${ev.subtask_id}-${ev.stage}-${ev.ts}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    mergedProgress.push(ev);
+  }
+  mergedProgress.sort((a, b) => {
+    const ta = a?.ts ? new Date(a.ts).getTime() : 0;
+    const tb = b?.ts ? new Date(b.ts).getTime() : 0;
+    return ta - tb;
+  });
+
+  const mergedOutputs = [...(snapshot.worker_outputs ?? [])];
+  const existingOutputs = new Set(mergedOutputs.map((o) => `${o.subtask_id}-${o.timestamp}`));
+  for (const wo of events.worker_outputs ?? []) {
+    const key = `${wo.subtask_id}-${wo.timestamp}`;
+    if (existingOutputs.has(key)) continue;
+    existingOutputs.add(key);
+    mergedOutputs.push(wo);
+  }
+
+  return {
+    ...snapshot,
+    progress_events: mergedProgress,
+    worker_outputs: mergedOutputs,
+    last_progress_event_ts: events.progress_events && events.progress_events.length
+      ? events.progress_events[events.progress_events.length - 1]?.ts ?? snapshot.last_progress_event_ts
+      : snapshot.last_progress_event_ts,
+  };
+}
+
 function App() {
   const isAboutPage = window.location.pathname.startsWith("/about");
   if (isAboutPage) {
@@ -666,6 +706,8 @@ function App() {
     snapshot: null,
     loading: false,
     error: null,
+    lastEventTs: null,
+    pollingEvents: false,
   });
 
   const [auth, setAuth] = useState<AuthState>({
@@ -710,10 +752,91 @@ function App() {
     worker: "timeline",
     reviewer: "timeline",
   });
+  const eventsPollTimer = useRef<number | null>(null);
+  const isRunning = state.snapshot?.is_running ?? false;
+  const commandsDisabled = isRunning || state.pollingEvents;
 
   useEffect(() => {
     setViewModes({ worker: "timeline", reviewer: "timeline" });
   }, [state.activeSessionId]);
+
+  useEffect(() => {
+    // Clear polling timer when session changes or app unmounts.
+    return () => {
+      if (eventsPollTimer.current) {
+        window.clearTimeout(eventsPollTimer.current);
+        eventsPollTimer.current = null;
+      }
+    };
+  }, []);
+
+  const stopEventPolling = () => {
+    if (eventsPollTimer.current) {
+      window.clearTimeout(eventsPollTimer.current);
+      eventsPollTimer.current = null;
+    }
+    setState((prev) => ({ ...prev, pollingEvents: false }));
+  };
+
+  const schedulePoll = (delayMs: number) => {
+    if (eventsPollTimer.current) {
+      window.clearTimeout(eventsPollTimer.current);
+      eventsPollTimer.current = null;
+    }
+    eventsPollTimer.current = window.setTimeout(() => {
+      void pollEventsOnce();
+    }, delayMs);
+  };
+
+  const pollEventsOnce = async () => {
+    if (!state.activeSessionId || !state.snapshot) return;
+    const since = state.lastEventTs || state.snapshot.last_progress_event_ts || null;
+    let stillRunning = false;
+    try {
+      const resp = await getSessionEvents(state.activeSessionId, since ?? undefined);
+      setState((prev) => {
+        if (!prev.snapshot) return prev;
+        const merged = mergeSnapshotWithEvents(prev.snapshot, resp);
+        const events = resp.progress_events ?? [];
+        const latestTs =
+          events.length > 0
+            ? events[events.length - 1]?.ts ?? merged.last_progress_event_ts
+            : merged.last_progress_event_ts ?? prev.lastEventTs;
+        stillRunning = merged.is_running ?? false;
+        return {
+          ...prev,
+          snapshot: merged,
+          lastEventTs: latestTs ?? null,
+          pollingEvents: merged.is_running ?? false,
+        };
+      });
+    } catch (err: any) {
+      if (!handleAuthError(err)) {
+        setState((prev) => ({ ...prev, error: err.message ?? "Polling failed" }));
+      }
+      stopEventPolling();
+      return;
+    }
+
+    if (stillRunning) {
+      schedulePoll(1200);
+    } else {
+      stopEventPolling();
+    }
+  };
+
+  useEffect(() => {
+    const shouldPoll = !!state.activeSessionId && (state.snapshot?.is_running || state.snapshot?.current_subtask_id);
+    if (shouldPoll) {
+      setState((prev) => ({ ...prev, pollingEvents: true }));
+      if (!eventsPollTimer.current) {
+        void pollEventsOnce();
+      }
+    } else {
+      stopEventPolling();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [state.activeSessionId, state.snapshot?.is_running, state.snapshot?.current_subtask_id]);
 
   const isDraggingSidebar = useRef(false);
   const clearActiveSession = async (message: string) => {
@@ -724,6 +847,8 @@ function App() {
       activeSessionId: null,
       snapshot: null,
       error: message,
+      lastEventTs: null,
+      pollingEvents: false,
     }));
     try {
       const sessions = await listSessions();
@@ -758,6 +883,8 @@ function App() {
       snapshot: null,
       loading: false,
       error: null,
+      lastEventTs: null,
+      pollingEvents: false,
     });
 
     const url = new URL(window.location.href);
@@ -930,6 +1057,8 @@ function App() {
               ...prev,
               activeSessionId: id,
               snapshot,
+              lastEventTs: snapshot.last_progress_event_ts ?? null,
+              pollingEvents: snapshot.is_running ?? false,
             }));
             return;
           } catch {
@@ -948,6 +1077,8 @@ function App() {
             ...prev,
             activeSessionId: fallbackId,
             snapshot,
+            lastEventTs: snapshot.last_progress_event_ts ?? null,
+            pollingEvents: snapshot.is_running ?? false,
           }));
         } catch (err: any) {
           if (handleAuthError(err)) return;
@@ -1110,10 +1241,15 @@ function App() {
 
   async function handleCommand(command: "plan" | "next" | "all") {
     if (!state.activeSessionId) return;
-    setState((prev) => ({ ...prev, loading: true, error: null }));
+    setState((prev) => ({ ...prev, error: null, pollingEvents: true }));
     try {
       const snapshot = await sendCommand(state.activeSessionId, command);
-      setState((prev) => ({ ...prev, loading: false, snapshot }));
+      setState((prev) => ({
+        ...prev,
+        snapshot,
+        lastEventTs: snapshot.last_progress_event_ts ?? prev.lastEventTs,
+        pollingEvents: snapshot.is_running ?? prev.pollingEvents,
+      }));
     } catch (err: any) {
       if (handleAuthError(err)) return;
       if (err instanceof ApiError && err.status === 404) {
@@ -1122,7 +1258,6 @@ function App() {
       }
       setState((prev) => ({
         ...prev,
-        loading: false,
         error: err.message ?? "Command failed",
       }));
     }
@@ -1134,7 +1269,13 @@ function App() {
     setState((prev) => ({ ...prev, loading: true, error: null }));
     try {
       const snapshot = await sendCommand(sessionId, "ask", { question: text });
-      setState((prev) => ({ ...prev, loading: false, snapshot }));
+      setState((prev) => ({
+        ...prev,
+        loading: false,
+        snapshot,
+        lastEventTs: snapshot.last_progress_event_ts ?? prev.lastEventTs,
+        pollingEvents: snapshot.is_running ?? prev.pollingEvents,
+      }));
     } catch (err: any) {
       if (handleAuthError(err)) return;
       if (err instanceof ApiError && err.status === 404) {
@@ -1157,7 +1298,13 @@ function App() {
     setState((prev) => ({ ...prev, loading: true, error: null }));
     try {
       const snapshot = await sendCommand(sessionId, "ask", { question: text });
-      setState((prev) => ({ ...prev, loading: false, snapshot }));
+      setState((prev) => ({
+        ...prev,
+        loading: false,
+        snapshot,
+        lastEventTs: snapshot.last_progress_event_ts ?? prev.lastEventTs,
+        pollingEvents: snapshot.is_running ?? prev.pollingEvents,
+      }));
     } catch (err: any) {
       if (handleAuthError(err)) return;
       if (err instanceof ApiError && err.status === 404) {
@@ -1184,7 +1331,13 @@ function App() {
     setState((prev) => ({ ...prev, loading: true, error: null }));
     try {
       const snapshot = await sendCommand(sessionId, command, payload);
-      setState((prev) => ({ ...prev, loading: false, snapshot }));
+      setState((prev) => ({
+        ...prev,
+        loading: false,
+        snapshot,
+        lastEventTs: snapshot.last_progress_event_ts ?? prev.lastEventTs,
+        pollingEvents: snapshot.is_running ?? prev.pollingEvents,
+      }));
     } catch (err: any) {
       if (handleAuthError(err)) return;
       if (err instanceof ApiError && err.status === 404) {
@@ -1205,7 +1358,13 @@ function App() {
     setState((prev) => ({ ...prev, loading: true, error: null }));
     try {
       const snapshot = await sendCommand(sessionId, "confirm_plan");
-      setState((prev) => ({ ...prev, loading: false, snapshot }));
+      setState((prev) => ({
+        ...prev,
+        loading: false,
+        snapshot,
+        lastEventTs: snapshot.last_progress_event_ts ?? prev.lastEventTs,
+        pollingEvents: snapshot.is_running ?? prev.pollingEvents,
+      }));
     } catch (err: any) {
       if (handleAuthError(err)) return;
       setState((prev) => ({
@@ -2133,22 +2292,25 @@ function App() {
             <div style={{ display: "flex", gap: "8px" }}>
               <button
                 onClick={() => handleCommand("next")}
+                disabled={commandsDisabled}
                 style={{
                   padding: "10px 20px",
-                  background: "#ffffff",
-                  color: "#000000",
+                  background: commandsDisabled ? "#f3f4f6" : "#ffffff",
+                  color: commandsDisabled ? "#9ca3af" : "#000000",
                   border: "1px solid #e0e0e0",
                   borderRadius: "8px",
                   fontSize: "14px",
                   fontWeight: "600",
-                  cursor: "pointer",
+                  cursor: commandsDisabled ? "not-allowed" : "pointer",
                   transition: "all 0.2s ease",
                 }}
                 onMouseOver={(e) => {
+                  if (commandsDisabled) return;
                   e.currentTarget.style.background = "#000000";
                   e.currentTarget.style.color = "#ffffff";
                 }}
                 onMouseOut={(e) => {
+                  if (commandsDisabled) return;
                   e.currentTarget.style.background = "#ffffff";
                   e.currentTarget.style.color = "#000000";
                 }}
@@ -2157,19 +2319,26 @@ function App() {
               </button>
               <button
                 onClick={() => handleCommand("all")}
+                disabled={commandsDisabled}
                 style={{
                   padding: "10px 20px",
-                  background: "#000000",
-                  color: "#ffffff",
+                  background: commandsDisabled ? "#1f2937" : "#000000",
+                  color: commandsDisabled ? "#9ca3af" : "#ffffff",
                   border: "none",
                   borderRadius: "8px",
                   fontSize: "14px",
                   fontWeight: "600",
-                  cursor: "pointer",
+                  cursor: commandsDisabled ? "not-allowed" : "pointer",
                   transition: "all 0.2s ease",
                 }}
-                onMouseOver={(e) => e.currentTarget.style.background = "#333333"}
-                onMouseOut={(e) => e.currentTarget.style.background = "#000000"}
+                onMouseOver={(e) => {
+                  if (commandsDisabled) return;
+                  e.currentTarget.style.background = "#333333";
+                }}
+                onMouseOut={(e) => {
+                  if (commandsDisabled) return;
+                  e.currentTarget.style.background = "#000000";
+                }}
               >
                 Run All
               </button>
