@@ -2164,7 +2164,10 @@ function App() {
         </header>
 
         {snapshot && snapshot.session_mode === "planning" ? (
-          <section id="main-content" style={{ flex: 1, display: "flex", overflow: "hidden", position: "relative" }}>
+          <section
+            id="main-content"
+            style={{ flex: 1, display: "flex", overflow: "hidden", position: "relative", minHeight: 0 }}
+          >
             <div style={{ flex: 2, minWidth: 0, borderRight: "1px solid #e5e7eb" }}>
               <PlanningView
                 session={snapshot}
@@ -2180,7 +2183,10 @@ function App() {
             </div>
           </section>
         ) : (
-          <section id="main-content" style={{ flex: 1, display: "flex", overflow: "hidden", position: "relative" }}>
+          <section
+            id="main-content"
+            style={{ flex: 1, display: "flex", overflow: "hidden", position: "relative", minHeight: 0 }}
+          >
             <div
               ref={layoutRef}
               style={{
@@ -2188,6 +2194,7 @@ function App() {
                 gridTemplateColumns: `${layoutWidths[0]}% ${layoutWidths[1]}% ${layoutWidths[2]}%`,
                 width: "100%",
                 height: "100%",
+                minHeight: 0,
                 overflow: "hidden",
                 position: "relative",
                 alignItems: "stretch",
