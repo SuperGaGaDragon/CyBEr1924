@@ -24,8 +24,7 @@
 
 ----------
 
-##优先级最高的调整代办
-
+###UI重新设计 
 总要求：
 1、尽量不要出现bug
 2、现代、优雅、简约风格的设计。你有非常好的审美。是个优秀设计师。
@@ -34,8 +33,34 @@ stage1
 - [x] 新建会话弹窗仅用于命名项目：提示文案改为“项目名称…”（需求在对话里说），占位符/引导改成让用户把需求发给 Planner。
 
 stage2
-- [ ] 计划确认后恢复“三栏”执行视图：Plan（只读）、Worker（输出/当前子任务）、Reviewer（现有 coord_decisions）。禁用 plan 编辑。
+- [x] 计划确认后恢复“三栏”执行视图：Plan（只读）、Worker（输出/当前子任务）、Reviewer（现有 coord_decisions）。禁用 plan 编辑。
 
-- [ ] Orchestrator 浮动对话框：右下角按钮打开/关闭，内容沿用现有 orchestrator 聊天，默认隐藏不占主视图。
+- [x] Orchestrator 浮动对话框：右下角按钮打开/关闭，内容沿用现有 orchestrator 聊天，默认隐藏不占主视图。
 
 stage3 
+
+- [x] 允许用户调整三个板块（plan/worker/reviewer）宽度。
+
+stage4
+
+- [ ] 三个板块(plan/worker/reviewer)都要可以分别scroll down（上下滑动）。（但不允许整体的左右和上下滑动）
+
+- [ ] Worker的板块也要通过t1 t2这样的左上角黑色圆圈排序
+
+-----
+
+###工作进程透明化
+
+目标：
+- 每一个subtask都展现出worker和reviewer的工作进程。以subtask为单位生成
+
+stage 1
+
+stage 2
+
+stage 3 
+
+
+-----
+
+### 小说专用模式设计

@@ -554,6 +554,9 @@ function App() {
   });
 
   const [sidebarWidth, setSidebarWidth] = useState(320);
+  const [layoutWidths, setLayoutWidths] = useState<[number, number, number]>([32, 36, 32]);
+  const layoutRef = useRef<HTMLDivElement | null>(null);
+  const layoutDrag = useRef<"left" | "right" | null>(null);
   const [orchChatOpen, setOrchChatOpen] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState<{
     show: boolean;
@@ -639,11 +642,36 @@ function App() {
       if (isDraggingSidebar.current) {
         const newWidth = Math.max(260, Math.min(520, e.clientX));
         setSidebarWidth(newWidth);
+        return;
+      }
+
+      if (layoutDrag.current && layoutRef.current) {
+        const rect = layoutRef.current.getBoundingClientRect();
+        if (rect.width <= 0) return;
+        const pct = ((e.clientX - rect.left) / rect.width) * 100;
+        const MIN = 18;
+        setLayoutWidths((prev) => {
+          let [plan, worker, reviewer] = prev;
+          if (layoutDrag.current === "left") {
+            const safePlan = Math.max(MIN, Math.min(pct, 100 - reviewer - MIN));
+            const safeWorker = Math.max(MIN, 100 - reviewer - safePlan);
+            plan = safePlan;
+            worker = safeWorker;
+          } else if (layoutDrag.current === "right") {
+            const safeReviewer = Math.max(MIN, Math.min(100 - plan - MIN, 100 - pct));
+            const safeWorker = Math.max(MIN, 100 - plan - safeReviewer);
+            reviewer = safeReviewer;
+            worker = safeWorker;
+          }
+          const total = plan + worker + reviewer;
+          return total > 0 ? [plan, worker, reviewer] : prev;
+        });
       }
     };
 
     const handleMouseUp = () => {
       isDraggingSidebar.current = false;
+      layoutDrag.current = null;
       document.body.style.cursor = 'default';
       document.body.style.userSelect = 'auto';
     };
@@ -1920,10 +1948,55 @@ function App() {
           </section>
         ) : (
           <section id="main-content" style={{ flex: 1, display: "flex", overflow: "hidden", position: "relative" }}>
-            <div style={{ display: "grid", gridTemplateColumns: "32% 36% 32%", width: "100%", height: "100%", overflow: "hidden" }}>
+            <div
+              ref={layoutRef}
+              style={{
+                display: "grid",
+                gridTemplateColumns: `${layoutWidths[0]}% ${layoutWidths[1]}% ${layoutWidths[2]}%`,
+                width: "100%",
+                height: "100%",
+                overflow: "hidden",
+                position: "relative",
+              }}
+            >
               <PlanColumn snapshot={snapshot} />
               <WorkerColumn snapshot={snapshot} />
               <CoordinatorColumn snapshot={snapshot} width={100} />
+
+              <div
+                onMouseDown={() => {
+                  layoutDrag.current = "left";
+                  document.body.style.cursor = 'col-resize';
+                  document.body.style.userSelect = 'none';
+                }}
+                style={{
+                  position: "absolute",
+                  left: `calc(${layoutWidths[0]}% - 4px)`,
+                  top: 0,
+                  bottom: 0,
+                  width: "8px",
+                  cursor: "col-resize",
+                  background: "transparent",
+                  zIndex: 10,
+                }}
+              />
+              <div
+                onMouseDown={() => {
+                  layoutDrag.current = "right";
+                  document.body.style.cursor = 'col-resize';
+                  document.body.style.userSelect = 'none';
+                }}
+                style={{
+                  position: "absolute",
+                  left: `calc(${layoutWidths[0] + layoutWidths[1]}% - 4px)`,
+                  top: 0,
+                  bottom: 0,
+                  width: "8px",
+                  cursor: "col-resize",
+                  background: "transparent",
+                  zIndex: 10,
+                }}
+              />
             </div>
             <div style={{ position: "fixed", right: "24px", bottom: "24px", zIndex: 50 }}>
               <button
