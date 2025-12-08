@@ -6,6 +6,7 @@
 - [x] 规划阶段基础脚手架：session_mode(planning/execution)、PlanningView UI、confirm_plan 按钮、planner_chat 占位对话、占位 plan/subtasks 生成
 - [x] Orchestrator 事件消费器 v0.1：仅消费 USER_MESSAGE，按 intent 回占位确认
 
+
 ## 目标 1：Orchestrator 接管用户对话
 - [x] LLM/agent 意图识别：产出结构化行动（intent/target_subtask/needs_redo 等）并写标准 orch_events（当前仅关键词 heuristic）
 - [x] 行动消费器升级：按 orch_events 真正触发 redo / plan 更新，接入现有 redo/plan 编辑流（当前仅 ACK 且会清空其他事件）
@@ -41,7 +42,7 @@ stage3
 
 - [x] 允许用户调整三个板块（plan/worker/reviewer）宽度。
 
-- [x] stage4
+stage4
 
 - [x] 三个板块(plan/worker/reviewer)都要可以分别scroll down（上下滑动）。（但不允许整体的左右和上下滑动）
 
@@ -51,16 +52,41 @@ stage3
 
 - [x] 当前worker板块的的task序号挡住了文字，请修复。
 
-- [x] reviewer板块的左上角 t1，t2序号改成和worker的序号一个格式。
+- [ ] reviewer 顶部带有“Task x”字样的白色圆圈请删除（当前与黑色圆圈t x重复，仅需保留黑色的和worker相同格式的）并重新编排序号，状态，日期的距离，使得他们好看。
 
-- [x] orchestrator 请增加 1、scroll down功能 2、这个对话框可以在网站内自由拖动 3、用户可以自由在网站内放缩大小。
+- [ ] orchestrator 的对话框。用户可以通过拉取四个边角放大其尺寸，也可以在框上面栏通过按住鼠标在页面内自由拖动此对话框。
+
+-----
+
+## 当前最重要
+
+- 现象：用户在 execution 阶段发起内容修改需求后，orchestrator 回复 “Unhandled event type: content_change”，未触发任何 redo/plan 更新，也没有可见的处理中状态。
+- 根因：意图解析产出的 kind 是小写 `content_change`，但 `consume_orchestrator_events` 仅处理 `REQUEST_CONTENT_CHANGE/REQUEST_PLAN_UPDATE/REQUEST_OTHER/TRIGGER_REDO`；导致事件落入兜底分支，仅提示未处理。前端发送时清空输入，无 loading/spinner，进一步放大“什么都没发生”的感知。
+- 影响：用户无法通过 orchestrator 修改内容或触发 redo；体验上像“无响应”，阻断 execution 期的自然语言指令入口。
+- 解决计划：
+
+stage1 
+  - [x] 规范 orchestrator intent 输出：将 `run_orchestrator_intent_agent` 的 `action.kind` 映射到 `REQUEST_CONTENT_CHANGE` 等受支持的枚举（或在 `consume_orchestrator_events` 增加对小写 `content_change` 的兼容分支）。
+
+stage2 
+  - [x] 在 `consume_orchestrator_events` 中为 content change 生成 redo/notes，并透出一条 user-facing 确认消息（说明目标 subtask 与执行动作）。
+
+  stage3 
+  - [ ] 为 orchestrator 聊天增加发送中态/短暂占位（前端），避免“输入被清空但无反馈”的空窗；header 的 Thinking… 也可与 orchestrator 请求联动。
+
+  stage4  
+  - [ ] 补充自动化/手动验证：发送 content 改名等指令应看到 redo 触发、worker/reviewer 输出更新，orchestrator 消息回执正确。
+
+
+
+
 
 -----
 
 ###工作进程透明化
 
 目标：
-- 每一个subtask都展现出worker和reviewer的工作进程。以subtask为单位生成
+- worker和reviewer，每开始一个subtask，就显示一个subtask。
 
 stage 1
 
@@ -79,4 +105,38 @@ stage 3
 
 - Stage 2
 
-- [ ] stage1新建的方框右下角出现一个椭圆形标识 novel mode。如果点击，会加入
+- [ ] stage1新建的方框右下角出现一个椭圆形标识 novel mode。如果点击，会在用户进入和planner对话的页面前出现如下问题(全部用英文) 
+必须回答完一个问题，才会出现下一个问题。
+
+1、您的小说会是什么篇幅？
+选项1：flash fiction (<1000 words)
+选项2：short story (1000-7500 words)
+选项3：novelette (7500-17500 words)
+选项4：novella (17500-40000)
+选项5：novel (40000+ words)
+
+2、请输入您期望的小说发生的年份
+选项1: 架空历史
+选项2: 请输入大致年份区间（可以是未来年份）
+
+3、请输入您的希望的题材
+
+选项：Literary Fiction
+选项：Fantasy
+选项：Sci-Fi
+选项：Mystery / Crime
+选项：Horror
+选项：Romance
+选项：Historical
+选项：Adventure
+选项：Thriller
+选项：Hybrid
+选项：请输入您想到的其他体裁（如果有很多，“/”分割）：
+
+4、请给出您已经想到的一些角色姓名和身份
+角色姓名｜身份（如果没想好，可以不写）
+
+5、您希望文笔类似什么风格
+请输入（请描述风格，推荐您输入一个您希望我模仿的作家）
+
+全部answer后，自动在对话框

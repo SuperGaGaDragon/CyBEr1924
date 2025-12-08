@@ -14,6 +14,31 @@ class OrchestratorAction:
     raw_text: str                       # original user message
 
 
+def _normalize_intent_kind(kind: str | None) -> str:
+    """Map LLM intent kinds to the canonical enums the consumer understands."""
+    if not kind:
+        return "REQUEST_OTHER"
+
+    normalized = {
+        "content_change": "REQUEST_CONTENT_CHANGE",
+        "request_content_change": "REQUEST_CONTENT_CHANGE",
+        "plan_update": "REQUEST_PLAN_UPDATE",
+        "request_plan_update": "REQUEST_PLAN_UPDATE",
+        "other": "REQUEST_OTHER",
+        "request_other": "REQUEST_OTHER",
+        "trigger_redo": "TRIGGER_REDO",
+        "redo": "TRIGGER_REDO",
+    }.get(kind.strip().lower())
+
+    if normalized:
+        return normalized
+
+    # Preserve already-canonical forms; otherwise fall back to uppercase so it is visible in logs.
+    if kind.isupper():
+        return kind
+    return kind.upper()
+
+
 def run_orchestrator_intent_agent(state, user_text: str) -> OrchestratorAction:
     """
     Replaces keyword heuristic with a real LLM agent that returns
@@ -54,7 +79,7 @@ Return a JSON object:
     result = call_llm_json(system_prompt, user_prompt)
 
     return OrchestratorAction(
-        kind=result.get("kind", "REQUEST_OTHER"),
+        kind=_normalize_intent_kind(result.get("kind")),
         target_subtask_id=result.get("target_subtask_id"),
         instructions=result.get("instructions"),
         needs_redo=result.get("needs_redo", False),

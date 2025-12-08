@@ -36,6 +36,29 @@ PLAN_EDITING_KINDS = {
     "skip_subtask",
 }
 
+
+def _normalize_event_kind(kind: str | None) -> str:
+    """Normalize event kinds so variants still route to the consumer branches."""
+    if not kind:
+        return "REQUEST_OTHER"
+    mapping = {
+        "content_change": "REQUEST_CONTENT_CHANGE",
+        "request_content_change": "REQUEST_CONTENT_CHANGE",
+        "plan_update": "REQUEST_PLAN_UPDATE",
+        "request_plan_update": "REQUEST_PLAN_UPDATE",
+        "other": "REQUEST_OTHER",
+        "request_other": "REQUEST_OTHER",
+        "trigger_redo": "TRIGGER_REDO",
+        "redo": "TRIGGER_REDO",
+    }
+    lowered = kind.strip().lower()
+    if lowered in mapping:
+        return mapping[lowered]
+    if kind.isupper():
+        return kind
+    return kind.upper()
+
+
 def run_worker_for_subtask(plan: Plan, subtask: Subtask, instructions: str | None) -> str:
     """Placeholder worker rewrite using instructions."""
     instructions = instructions or ""
@@ -59,7 +82,8 @@ def consume_orchestrator_events(state: OrchestratorState, plan: Plan | None = No
     pending = list(state.orch_events or [])
     for ev in pending:
         payload = ev if isinstance(ev, dict) else getattr(ev, "payload", {}) or {}
-        kind = payload.get("kind") or getattr(ev, "kind", None)
+        raw_kind = payload.get("kind") or getattr(ev, "kind", None)
+        kind = _normalize_event_kind(raw_kind)
 
         # === CONTENT CHANGE ===
         if kind == "REQUEST_CONTENT_CHANGE":
@@ -85,7 +109,8 @@ def consume_orchestrator_events(state: OrchestratorState, plan: Plan | None = No
                         subtask.needs_redo = True
                     if instr:
                         note_prefix = f"[redo request] {instr}"
-                        subtask.notes = f"{subtask.notes}\n{note_prefix}".strip()
+                        existing_notes = getattr(subtask, "notes", "") or ""
+                        subtask.notes = f"{existing_notes}\n{note_prefix}".strip()
                     target_label = subtask.id or target_index
             elif hasattr(state, "subtasks") and target is not None:
                 # Fallback for state-managed subtasks
@@ -95,10 +120,11 @@ def consume_orchestrator_events(state: OrchestratorState, plan: Plan | None = No
                 except Exception:
                     pass
 
-            state.add_orchestrator_message(
-                "orchestrator",
-                f"I'll revise subtask {target_label} based on your instructions: {instr}"
+            confirmation = (
+                f"Got it. Triggering a redo for subtask {target_label} "
+                f"with instructions: {instr or '(no specific instructions provided)'}"
             )
+            state.add_orchestrator_message("orchestrator", confirmation)
 
             new_events.append({
                 "kind": "TRIGGER_REDO",
@@ -176,7 +202,7 @@ def consume_orchestrator_events(state: OrchestratorState, plan: Plan | None = No
         else:
             state.add_orchestrator_message(
                 "orchestrator",
-                f"Unhandled event type: {kind}"
+                f"Unhandled event type: {raw_kind or kind}"
             )
 
     state.orch_events = new_events
