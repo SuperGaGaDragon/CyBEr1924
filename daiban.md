@@ -187,6 +187,12 @@ stage 4
   - [x] 本地快速验证：执行一次 planning 对话，观察 planner_chat 长度递增且 plan/subtasks 被重写（不再追加 stub）。
   - [x] 如有需要，补一条集成测试覆盖 `USE_REAL_PLANNER=true` 下 planner 更新 plan/subtasks。
 
+----
+
+
+
+
+
 
 ### 小说专用模式设计
 
@@ -234,3 +240,23 @@ stage 4
 
 stage 3 
 - [ ] 要求planner的agent的plan涉及到正文的内容，给worker的description中必须涵盖写完所有内容。
+
+### 自动化问题
+
+TRANSStage1 
+
+- [x] 复核 reviewer 判定 REDO 时的自动化：`run_next_pending_subtask` 在同一调用内循环，协调人返回 REDO 会立刻重跑 worker（带 progress start/finish），直到接受为止；intent 触发的 `TRIGGER_REDO` 也会串 worker/reviewer stub。
+
+TRANSStage2 
+- [x] 补钩子：当 reviewer/coord_decision 日志异步写入并标记 `decision=redo` 时，自动 enqueue `TRIGGER_REDO` 事件并触发一次 `consume_orchestrator_events`，避免需要手动点击/等待下一次 orchestrator 调度。
+
+### worker 误执行 plan title 解决
+
+WORKStage1 
+- [ ] 在 `_next_pending_subtask` 中跳过明显的 meta 节点（如标题含 “plan title”/“subtasks” 的占位行），避免 worker 执行计划标题。
+
+WORKStage2 
+- [ ] 规划结果归并时（`_apply_planner_result_to_state`）过滤掉空壳或 meta 子任务，或改写 planner prompt 要求不要输出计划标题/目录占位到 subtasks。
+
+WORKStage3
+- [ ] 前端 Plan 列也隐藏/标记 meta 项，防止误导用户点击执行；必要时在后端将这些节点标记为 `skipped`。

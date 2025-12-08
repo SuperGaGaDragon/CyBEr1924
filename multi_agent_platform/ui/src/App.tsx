@@ -33,7 +33,10 @@ function PlanningView({ session, onSendPlanningMessage, onConfirmPlan }: Plannin
   };
 
   return (
-    <div className="planning-view" style={{ flex: 1, display: "flex", flexDirection: "column", gap: "16px", padding: "24px" }}>
+    <div
+      className="planning-view"
+      style={{ flex: 1, display: "flex", flexDirection: "column", gap: "16px", padding: "24px", minHeight: 0, overflow: "hidden" }}
+    >
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "16px" }}>
         <div>
           <h2 style={{ margin: 0, fontSize: "20px" }}>Planning Phase</h2>
@@ -68,6 +71,7 @@ function PlanningView({ session, onSendPlanningMessage, onConfirmPlan }: Plannin
         display: "flex",
         flexDirection: "column",
         gap: "12px",
+        minHeight: 0,
       }}>
         {session.planner_chat.length === 0 ? (
           <div style={{ color: "#6b7280", fontSize: "14px" }}>
@@ -2168,7 +2172,7 @@ function App() {
             id="main-content"
             style={{ flex: 1, display: "flex", overflow: "hidden", position: "relative", minHeight: 0 }}
           >
-            <div style={{ flex: 2, minWidth: 0, borderRight: "1px solid #e5e7eb" }}>
+            <div style={{ flex: 2, minWidth: 0, borderRight: "1px solid #e5e7eb", minHeight: 0, overflow: "hidden" }}>
               <PlanningView
                 session={snapshot}
                 onSendPlanningMessage={sendPlanningMessage}

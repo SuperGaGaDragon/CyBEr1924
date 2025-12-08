@@ -25,6 +25,7 @@ from .session_state import (
     PlannerChatMessage,
     PROGRESS_STAGE_STATUS_MAP,
     build_session_snapshot,
+    _read_log_entries,
 )
 
 USE_REAL_PLANNER = os.getenv("USE_REAL_PLANNER", "true").lower() in (
@@ -1027,6 +1028,84 @@ class Orchestrator:
         self.save_state(session_id, plan)
         self.save_orchestrator_state(state)
 
+    def _auto_trigger_redo_from_logs(self, session_id: str, plan: Plan, state: OrchestratorState) -> None:
+        """
+        If the latest coord_decision logs contain a REDO, enqueue TRIGGER_REDO and consume it.
+        Avoids waiting for a manual orchestrator turn when reviewer marks redo asynchronously.
+        """
+        try:
+            log_path = self.store.logs_dir(session_id) / "envelopes.jsonl"
+            envelopes = _read_log_entries(log_path)
+        except Exception:
+            return
+
+        latest: Dict[str, Dict[str, Any]] = {}
+        for env in envelopes:
+            payload_type = (env.get("payload_type") or "").lower()
+            if payload_type != "coord_decision":
+                continue
+            payload = env.get("payload", {}) or {}
+            sub_id = payload.get("subtask_id")
+            if not sub_id:
+                continue
+            ts = env.get("timestamp") or ""
+            existing = latest.get(sub_id)
+            if existing and existing.get("timestamp", "") >= ts:
+                continue
+            latest[sub_id] = {
+                "decision": (payload.get("decision") or "").lower(),
+                "reason": payload.get("reason") or "",
+                "timestamp": ts,
+            }
+
+        if not latest:
+            return
+
+        processed: Dict[str, str] = {}
+        try:
+            if isinstance(state.extra.get("processed_redo_decisions"), dict):
+                processed.update(state.extra.get("processed_redo_decisions"))
+        except Exception:
+            processed = {}
+
+        new_events: list[Dict[str, Any]] = []
+        existing_targets = {
+            str(ev.get("target_subtask_id"))
+            for ev in state.orch_events
+            if isinstance(ev, dict) and ev.get("kind") == "TRIGGER_REDO"
+        }
+
+        for sub_id, info in latest.items():
+            ts = info.get("timestamp", "")
+            if info.get("decision") != "redo":
+                continue
+            if ts and processed.get(str(sub_id), "") >= ts:
+                continue
+            if str(sub_id) in existing_targets:
+                processed[str(sub_id)] = ts or processed.get(str(sub_id), "")
+                continue
+
+            instructions = info.get("reason") or f"Redo requested by reviewer at {ts or 'latest'}"
+            new_events.append(
+                {
+                    "kind": "TRIGGER_REDO",
+                    "target_subtask_id": sub_id,
+                    "instructions": instructions,
+                    "source": "coord_decision",
+                    "ts": ts or None,
+                }
+            )
+            if ts:
+                processed[str(sub_id)] = ts
+
+        if not new_events:
+            return
+
+        state.orch_events.extend(new_events)
+        state.extra["processed_redo_decisions"] = processed
+        consume_orchestrator_events(state, plan)
+        self._persist_plan_state(session_id, plan, state)
+
     def _render_session_snapshot(
         self,
         session_id: str,
@@ -1040,6 +1119,8 @@ class Orchestrator:
         context: Optional[Dict[str, Any]] = None,
     ) -> Dict[str, Any]:
         _ = plan
+        # Auto-trigger redo if reviewer logs contain a REDO decision written outside the orchestrator loop.
+        self._auto_trigger_redo_from_logs(session_id, plan, state)
         snapshot = build_session_snapshot(
             self.store,
             state,
