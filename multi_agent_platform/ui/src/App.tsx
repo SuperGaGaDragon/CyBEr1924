@@ -561,6 +561,26 @@ function App() {
   }>({ show: false, sessionId: null, sessionTopic: null });
 
   const isDraggingSidebar = useRef(false);
+  const clearActiveSession = async (message: string) => {
+    localStorage.removeItem(SESSION_TOKEN_KEY);
+    setState((prev) => ({
+      ...prev,
+      loading: false,
+      activeSessionId: null,
+      snapshot: null,
+      error: message,
+    }));
+    try {
+      const sessions = await listSessions();
+      setState((prev) => ({ ...prev, sessions }));
+    } catch {
+      /* ignore refresh errors */
+    }
+    const url = new URL(window.location.href);
+    url.pathname = "/";
+    url.search = "";
+    window.history.replaceState(null, "", url.toString());
+  };
 
   const resetToLoggedOut = (authMessage?: string, clearEmail = false) => {
     localStorage.removeItem("cyber1924_token");
@@ -826,20 +846,7 @@ function App() {
     } catch (err: any) {
       if (handleAuthError(err)) return;
       if (err instanceof ApiError && err.status === 404) {
-        localStorage.removeItem(SESSION_TOKEN_KEY);
-        setState((prev) => ({
-          ...prev,
-          loading: false,
-          activeSessionId: null,
-          snapshot: null,
-          error: "Session not found; please pick or create a new one.",
-        }));
-        try {
-          const sessions = await listSessions();
-          setState((prev) => ({ ...prev, sessions }));
-        } catch {
-          /* ignore secondary errors */
-        }
+        await clearActiveSession("Session not found; please pick or create a new one.");
         return;
       }
       setState((prev) => ({
@@ -859,20 +866,7 @@ function App() {
     } catch (err: any) {
       if (handleAuthError(err)) return;
       if (err instanceof ApiError && err.status === 404) {
-        localStorage.removeItem(SESSION_TOKEN_KEY);
-        setState((prev) => ({
-          ...prev,
-          loading: false,
-          activeSessionId: null,
-          snapshot: null,
-          error: "Session not found; please re-open or create a session.",
-        }));
-        try {
-          const sessions = await listSessions();
-          setState((prev) => ({ ...prev, sessions }));
-        } catch {
-          /* ignore */
-        }
+        await clearActiveSession("Session not found; please re-open or create a session.");
         return;
       }
       setState((prev) => ({
@@ -893,20 +887,7 @@ function App() {
     } catch (err: any) {
       if (handleAuthError(err)) return;
       if (err instanceof ApiError && err.status === 404) {
-        localStorage.removeItem(SESSION_TOKEN_KEY);
-        setState((prev) => ({
-          ...prev,
-          loading: false,
-          activeSessionId: null,
-          snapshot: null,
-          error: "Session not found; please re-open or create a session.",
-        }));
-        try {
-          const sessions = await listSessions();
-          setState((prev) => ({ ...prev, sessions }));
-        } catch {
-          /* ignore */
-        }
+        await clearActiveSession("Session not found; please re-open or create a session.");
         return;
       }
       setState((prev) => ({
@@ -927,20 +908,7 @@ function App() {
     } catch (err: any) {
       if (handleAuthError(err)) return;
       if (err instanceof ApiError && err.status === 404) {
-        localStorage.removeItem(SESSION_TOKEN_KEY);
-        setState((prev) => ({
-          ...prev,
-          loading: false,
-          activeSessionId: null,
-          snapshot: null,
-          error: "Session not found; please re-open or create a session.",
-        }));
-        try {
-          const sessions = await listSessions();
-          setState((prev) => ({ ...prev, sessions }));
-        } catch {
-          /* ignore */
-        }
+        await clearActiveSession("Session not found; please re-open or create a session.");
         return;
       }
       setState((prev) => ({
@@ -964,20 +932,7 @@ function App() {
     } catch (err: any) {
       if (handleAuthError(err)) return;
       if (err instanceof ApiError && err.status === 404) {
-        localStorage.removeItem(SESSION_TOKEN_KEY);
-        setState((prev) => ({
-          ...prev,
-          loading: false,
-          activeSessionId: null,
-          snapshot: null,
-          error: "Session not found; please re-open or create a session.",
-        }));
-        try {
-          const sessions = await listSessions();
-          setState((prev) => ({ ...prev, sessions }));
-        } catch {
-          /* ignore */
-        }
+        await clearActiveSession("Session not found; please re-open or create a session.");
         return;
       }
       setState((prev) => ({
