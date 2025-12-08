@@ -8,6 +8,7 @@ from datetime import datetime
 
 from .agent_runner import Agent
 from .message_bus import MessageBus
+from .orchestrator_intent_agent import run_orchestrator_intent_agent
 from .prompt_registry import (
     COORDINATOR_CHAT_PROMPT,
     COORDINATOR_PROMPT,
@@ -16,12 +17,154 @@ from .prompt_registry import (
     build_coordinator_review_prompt,
     build_worker_prompt,
 )
-from .session_state import (
-    OrchestratorState,
-    OrchestratorEvent,
-    PlannerChatMessage,
-    build_session_snapshot,
-)
+from .session_state import OrchestratorState, PlannerChatMessage, build_session_snapshot
+
+
+def run_worker_for_subtask(plan: Plan, subtask: Subtask, instructions: str | None) -> str:
+    """Placeholder worker rewrite using instructions."""
+    instructions = instructions or ""
+    base = f"[worker rewrite for {subtask.id}]"
+    if instructions:
+        return f"{base} Applying instructions: {instructions}"
+    return f"{base} No additional instructions provided."
+
+
+def run_reviewer_on_output(plan: Plan, subtask: Subtask, text: str) -> Dict[str, str]:
+    """Placeholder reviewer evaluation for a worker output."""
+    return {
+        "decision": "accept",
+        "notes": "placeholder review",
+    }
+
+def consume_orchestrator_events(state: OrchestratorState, plan: Plan | None = None) -> None:
+    """v0.2: true action consumer — handles structured events produced by the intent agent."""
+
+    new_events = []
+    pending = list(state.orch_events or [])
+    for ev in pending:
+        payload = ev if isinstance(ev, dict) else getattr(ev, "payload", {}) or {}
+        kind = payload.get("kind") or getattr(ev, "kind", None)
+
+        # === CONTENT CHANGE ===
+        if kind == "REQUEST_CONTENT_CHANGE":
+            target = payload.get("target_subtask_id")
+            instr = payload.get("instructions")
+
+            target_index = None
+            target_label = target
+
+            if plan and plan.subtasks:
+                if isinstance(target, int) and 0 <= target < len(plan.subtasks):
+                    target_index = target
+                elif isinstance(target, str):
+                    for idx, subtask in enumerate(plan.subtasks):
+                        if subtask.id == target:
+                            target_index = idx
+                            break
+                if target_index is not None:
+                    subtask = plan.subtasks[target_index]
+                    if not hasattr(subtask, "needs_redo"):
+                        setattr(subtask, "needs_redo", True)
+                    else:
+                        subtask.needs_redo = True
+                    if instr:
+                        note_prefix = f"[redo request] {instr}"
+                        subtask.notes = f"{subtask.notes}\n{note_prefix}".strip()
+                    target_label = subtask.id or target_index
+            elif hasattr(state, "subtasks") and target is not None:
+                # Fallback for state-managed subtasks
+                try:
+                    if 0 <= target < len(state.subtasks):
+                        state.subtasks[target].needs_redo = True
+                except Exception:
+                    pass
+
+            state.add_orchestrator_message(
+                "orchestrator",
+                f"I'll revise subtask {target_label} based on your instructions: {instr}"
+            )
+
+            new_events.append({
+                "kind": "TRIGGER_REDO",
+                "target_subtask_id": target,
+                "instructions": instr,
+            })
+
+        # === PLAN CHANGE ===
+        elif kind == "REQUEST_PLAN_UPDATE":
+            instr = payload.get("instructions")
+
+            if plan is not None:
+                if hasattr(plan, "notes"):
+                    plan.notes = f"(Updated by orchestrator) {instr}"
+                else:
+                    setattr(plan, "notes", f"(Updated by orchestrator) {instr}")
+
+            state.add_orchestrator_message(
+                "orchestrator",
+                f"Plan updated based on your request: {instr}"
+            )
+
+        # === OTHER ===
+        elif kind == "REQUEST_OTHER":
+            state.add_orchestrator_message(
+                "orchestrator",
+                "Understood. (General request acknowledged.)"
+            )
+
+        # === TRIGGER REDO ===
+        elif kind == "TRIGGER_REDO":
+            target = payload.get("target_subtask_id")
+            instr = payload.get("instructions")
+            subtask = None
+            target_label = target
+
+            if plan and plan.subtasks:
+                if isinstance(target, int) and 0 <= target < len(plan.subtasks):
+                    subtask = plan.subtasks[target]
+                elif isinstance(target, str):
+                    subtask = next((s for s in plan.subtasks if s.id == target), None)
+                if subtask:
+                    target_label = subtask.id
+
+            # 1) worker rewrite (stubbed)
+            worker_output = ""
+            if subtask:
+                worker_output = run_worker_for_subtask(plan, subtask, instr)
+                subtask.output = worker_output
+                subtask.needs_redo = False
+
+            # 2) reviewer eval (stubbed)
+            review = run_reviewer_on_output(plan, subtask, worker_output) if subtask else {"decision": "accept", "notes": ""}
+            decision = review.get("decision", "").lower()
+            notes = review.get("notes", "")
+
+            # 3) update state/subtask status
+            if subtask:
+                subtask.notes = notes or subtask.notes
+                if decision == "redo":
+                    subtask.status = "pending"
+                    subtask.needs_redo = True
+                else:
+                    subtask.status = "done"
+                    subtask.needs_redo = False
+
+            # 4) orchestrator user-visible message
+            final_text = (
+                f"I’ve rewritten subtask {target_label} based on your instructions.\n\n"
+                f"Updated version:\n{worker_output}\n\n"
+                f"Reviewer notes:\n{notes or 'accept'}"
+            )
+            state.add_orchestrator_message("orchestrator", final_text)
+
+        else:
+            state.add_orchestrator_message(
+                "orchestrator",
+                f"Unhandled event type: {kind}"
+            )
+
+    state.orch_events = new_events
+
 
 def run_orchestrator_turn(
     state: OrchestratorState,
@@ -32,8 +175,8 @@ def run_orchestrator_turn(
     Unified orchestrator hook.
 
     Current behavior:
-      - No LLM calls, no plan changes, no redo triggers.
-      - Performs a coarse intent guess and records an internal orch_event for future orchestration.
+      - Uses LLM intent parser to classify requests and enqueue structured orch_events.
+      - No plan changes or redo triggers executed yet.
     """
     text = (user_text or "").strip()
     if not text:
@@ -42,49 +185,19 @@ def run_orchestrator_turn(
     if ts is None:
         ts = datetime.utcnow()
 
-    lower = text.lower()
+    action = run_orchestrator_intent_agent(state, text)
 
-    plan_keywords = [
-        "outline", "structure", "chapter", "chapters", "section", "sections",
-        "plan", "大纲", "结构", "章节", "目录", "多加一章", "删掉一章",
-    ]
-    content_keywords = [
-        "rewrite", "rewriting", "tone", "style", "make it funnier",
-        "改内容", "重写", "风格", "语气", "搞笑一点", "严肃一点", "润色", "改这段",
-    ]
-
-    intent = "other"
-    to_role = "worker"
-
-    if any(k in lower for k in plan_keywords):
-        intent = "plan_change"
-        to_role = "planner"
-    elif any(k in lower for k in content_keywords):
-        intent = "content_change"
-        to_role = "reviewer"
-
-    event = OrchestratorEvent(
-        from_role="orchestrator",
-        to_role=to_role,
-        kind="USER_MESSAGE",
-        payload={
-            "raw_text": text,
-            "intent": intent,
-        },
-        ts=ts,
-    )
-    state.orch_events.append(event)
-
-    if intent == "plan_change":
-        summary_text = "Orchestrator (internal): detected this as a possible plan change request."
-    elif intent == "content_change":
-        summary_text = "Orchestrator (internal): detected this as a possible content change request."
-    else:
-        summary_text = "Orchestrator (internal): intent unclear or general question; no action taken yet."
+    state.orch_events.append({
+        "kind": action.kind,
+        "target_subtask_id": action.target_subtask_id,
+        "instructions": action.instructions,
+        "needs_redo": action.needs_redo,
+        "raw_text": action.raw_text,
+    })
 
     state.add_orchestrator_message(
         role="orchestrator",
-        content=summary_text,
+        content=f"[intent-parser] Classified user request as {action.kind}",
         ts=ts,
     )
 
@@ -1033,6 +1146,7 @@ class Orchestrator:
                 answer = self.handle_planning_turn(session_id, plan, state, question)
             else:
                 answer = self.answer_user_question(session_id, plan, question)
+                consume_orchestrator_events(state, plan)
             self._persist_plan_state(session_id, plan, state)
             return self._render_session_snapshot(
                 session_id,
@@ -1049,6 +1163,7 @@ class Orchestrator:
             plan, message = interactive_coordinator.process_user_input(
                 session_id, plan, normalized
             )
+            consume_orchestrator_events(state, plan)
             self._persist_plan_state(session_id, plan, state)
             return self._render_session_snapshot(
                 session_id,
@@ -1063,6 +1178,7 @@ class Orchestrator:
             state.add_orchestrator_message(role="user", content=normalized)
             run_orchestrator_turn(state, normalized)
             answer = self.answer_user_question(session_id, plan, normalized)
+            consume_orchestrator_events(state, plan)
             self._persist_plan_state(session_id, plan, state)
             return self._render_session_snapshot(
                 session_id,

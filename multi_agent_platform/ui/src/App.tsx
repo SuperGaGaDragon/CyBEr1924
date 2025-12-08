@@ -15,6 +15,229 @@ import {
 import "./App.css";
 import AboutPage from "./AboutPage";
 
+type PlanningViewProps = {
+  session: SessionSnapshot;
+  onSendPlanningMessage: (text: string) => void;
+  onConfirmPlan: () => void;
+};
+
+function PlanningView({ session, onSendPlanningMessage, onConfirmPlan }: PlanningViewProps) {
+  const [input, setInput] = useState("");
+
+  const handleSubmit = (e: FormEvent) => {
+    e.preventDefault();
+    const text = input.trim();
+    if (!text) return;
+    onSendPlanningMessage(text);
+    setInput("");
+  };
+
+  return (
+    <div className="planning-view" style={{ flex: 1, display: "flex", flexDirection: "column", gap: "16px", padding: "24px" }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "16px" }}>
+        <div>
+          <h2 style={{ margin: 0, fontSize: "20px" }}>Planning Phase</h2>
+          <p style={{ margin: "4px 0 0 0", color: "#4b5563", fontSize: "14px" }}>
+            Chat with the Planner to refine the outline before execution starts.
+          </p>
+        </div>
+        <button
+          onClick={onConfirmPlan}
+          disabled={session.plan_locked}
+          style={{
+            padding: "12px 16px",
+            borderRadius: "10px",
+            border: "1px solid #e5e7eb",
+            background: session.plan_locked ? "#f3f4f6" : "#000000",
+            color: session.plan_locked ? "#6b7280" : "#ffffff",
+            cursor: session.plan_locked ? "not-allowed" : "pointer",
+            fontWeight: 700,
+          }}
+        >
+          {session.plan_locked ? "Plan already confirmed" : "Confirm Plan & Start Execution"}
+        </button>
+      </div>
+
+      <div style={{
+        flex: 1,
+        overflowY: "auto",
+        background: "#f9fafb",
+        border: "1px solid #e5e7eb",
+        borderRadius: "12px",
+        padding: "16px",
+        display: "flex",
+        flexDirection: "column",
+        gap: "12px",
+      }}>
+        {session.planner_chat.length === 0 ? (
+          <div style={{ color: "#6b7280", fontSize: "14px" }}>
+            No planning messages yet. Describe what you want to write!
+          </div>
+        ) : (
+          session.planner_chat.map((msg, idx) => (
+            <div
+              key={idx}
+              style={{
+                alignSelf: msg.role === "user" ? "flex-end" : "flex-start",
+                maxWidth: "70%",
+                padding: "12px 14px",
+                borderRadius: "12px",
+                background: msg.role === "user" ? "#000000" : "#ffffff",
+                color: msg.role === "user" ? "#ffffff" : "#111827",
+                border: msg.role === "user" ? "none" : "1px solid #e5e7eb",
+                boxShadow: msg.role === "user" ? "0 8px 20px rgba(0,0,0,0.18)" : "0 8px 20px rgba(0,0,0,0.06)",
+              }}
+            >
+              <div style={{ fontSize: "11px", letterSpacing: "0.5px", textTransform: "uppercase", opacity: 0.6, marginBottom: "4px" }}>
+                {msg.role === "user" ? "You" : "Planner"}
+              </div>
+              <div style={{ whiteSpace: "pre-wrap", lineHeight: "1.6", fontSize: "14px" }}>{msg.content}</div>
+            </div>
+          ))
+        )}
+      </div>
+
+      <form onSubmit={handleSubmit} style={{ display: "flex", gap: "10px" }}>
+        <input
+          type="text"
+          placeholder="Describe the project or adjust the plan..."
+          value={input}
+          onChange={(e) => setInput(e.target.value)}
+          style={{
+            flex: 1,
+            padding: "14px 16px",
+            borderRadius: "10px",
+            border: "1px solid #e5e7eb",
+            outline: "none",
+            fontSize: "14px",
+          }}
+        />
+        <button
+          type="submit"
+          style={{
+            padding: "14px 18px",
+            borderRadius: "10px",
+            border: "none",
+            background: "#000000",
+            color: "#ffffff",
+            fontWeight: 700,
+            cursor: "pointer",
+          }}
+        >
+          Send
+        </button>
+      </form>
+    </div>
+  );
+}
+
+type ExecutionViewProps = {
+  session: SessionSnapshot;
+  onSendExecutionMessage: (text: string) => void;
+};
+
+function ExecutionView({ session, onSendExecutionMessage }: ExecutionViewProps) {
+  const [input, setInput] = useState("");
+
+  const handleSubmit = (e: FormEvent) => {
+    e.preventDefault();
+    const text = input.trim();
+    if (!text) return;
+    onSendExecutionMessage(text);
+    setInput("");
+  };
+
+  return (
+    <div style={{
+      flex: 1,
+      display: "flex",
+      flexDirection: "column",
+      gap: "16px",
+      padding: "24px",
+      background: "#f9fafb",
+    }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+        <div>
+          <h2 style={{ margin: 0, fontSize: "20px" }}>Execution Chat</h2>
+          <p style={{ margin: "4px 0 0 0", color: "#4b5563", fontSize: "14px" }}>
+            Talk directly with the Orchestrator; all agent work happens behind the scenes.
+          </p>
+        </div>
+      </div>
+
+      <div style={{
+        flex: 1,
+        overflowY: "auto",
+        background: "#ffffff",
+        border: "1px solid #e5e7eb",
+        borderRadius: "12px",
+        padding: "16px",
+        display: "flex",
+        flexDirection: "column",
+        gap: "12px",
+      }}>
+        {session.orchestrator_messages.length === 0 ? (
+          <div style={{ color: "#6b7280", fontSize: "14px" }}>
+            No orchestrator messages yet. Ask for changes or new instructions to get started.
+          </div>
+        ) : (
+          session.orchestrator_messages.map((msg, idx) => (
+            <div
+              key={idx}
+              style={{
+                alignSelf: msg.role === "user" ? "flex-end" : "flex-start",
+                maxWidth: "70%",
+                padding: "12px 14px",
+                borderRadius: "12px",
+                background: msg.role === "user" ? "#111827" : "#f3f4f6",
+                color: msg.role === "user" ? "#ffffff" : "#111827",
+                border: msg.role === "user" ? "none" : "1px solid #e5e7eb",
+                boxShadow: msg.role === "user" ? "0 8px 20px rgba(0,0,0,0.2)" : "0 8px 20px rgba(0,0,0,0.06)",
+              }}
+            >
+              <div style={{ fontSize: "11px", letterSpacing: "0.5px", textTransform: "uppercase", opacity: 0.6, marginBottom: "4px" }}>
+                {msg.role === "user" ? "You" : "Orchestrator"}
+              </div>
+              <div style={{ whiteSpace: "pre-wrap", lineHeight: "1.6", fontSize: "14px" }}>{msg.content}</div>
+            </div>
+          ))
+        )}
+      </div>
+
+      <form onSubmit={handleSubmit} style={{ display: "flex", gap: "10px" }}>
+        <input
+          type="text"
+          placeholder="Tell the orchestrator what to change or ask a question..."
+          value={input}
+          onChange={(e) => setInput(e.target.value)}
+          style={{
+            flex: 1,
+            padding: "14px 16px",
+            borderRadius: "10px",
+            border: "1px solid #e5e7eb",
+            outline: "none",
+            fontSize: "14px",
+          }}
+        />
+        <button
+          type="submit"
+          style={{
+            padding: "14px 18px",
+            borderRadius: "10px",
+            border: "none",
+            background: "#000000",
+            color: "#ffffff",
+            fontWeight: 700,
+            cursor: "pointer",
+          }}
+        >
+          Send
+        </button>
+      </form>
+    </div>
+  );
+}
+
 const SESSION_TOKEN_KEY = "cyber1924_last_session_id";
 const LOGIN_REQUIRED_MESSAGE = "登录状态已过期，请重新登录";
 
@@ -61,13 +284,6 @@ type AuthState = {
   showRegister: boolean;
 };
 
-type PlanEditCommand =
-  | "set_current_subtask"
-  | "update_subtask"
-  | "insert_subtask"
-  | "append_subtask"
-  | "skip_subtask";
-
 function App() {
   const isAboutPage = window.location.pathname.startsWith("/about");
   if (isAboutPage) {
@@ -95,9 +311,6 @@ function App() {
   });
 
   const [sidebarWidth, setSidebarWidth] = useState(320);
-  const [plannerWidth, setPlannerWidth] = useState(33.33);
-  const [workerWidth, setWorkerWidth] = useState(33.33);
-
   const [deleteConfirm, setDeleteConfirm] = useState<{
     show: boolean;
     sessionId: string | null;
@@ -105,10 +318,6 @@ function App() {
   }>({ show: false, sessionId: null, sessionTopic: null });
 
   const isDraggingSidebar = useRef(false);
-  const isDraggingPlanner = useRef(false);
-  const isDraggingWorker = useRef(false);
-
-  const coordinatorWidth = 100 - plannerWidth - workerWidth;
 
   const resetToLoggedOut = (authMessage?: string, clearEmail = false) => {
     localStorage.removeItem("cyber1924_token");
@@ -167,27 +376,10 @@ function App() {
         const newWidth = Math.max(260, Math.min(520, e.clientX));
         setSidebarWidth(newWidth);
       }
-      if (isDraggingPlanner.current || isDraggingWorker.current) {
-        const mainContent = document.getElementById('main-content');
-        if (!mainContent) return;
-        const rect = mainContent.getBoundingClientRect();
-        const relativeX = e.clientX - rect.left;
-        const percentage = (relativeX / rect.width) * 100;
-
-        if (isDraggingPlanner.current) {
-          const newPlannerWidth = Math.max(15, Math.min(70, percentage));
-          setPlannerWidth(newPlannerWidth);
-        } else if (isDraggingWorker.current) {
-          const newWorkerWidth = Math.max(15, Math.min(70, percentage - plannerWidth));
-          setWorkerWidth(newWorkerWidth);
-        }
-      }
     };
 
     const handleMouseUp = () => {
       isDraggingSidebar.current = false;
-      isDraggingPlanner.current = false;
-      isDraggingWorker.current = false;
       document.body.style.cursor = 'default';
       document.body.style.userSelect = 'auto';
     };
@@ -198,7 +390,7 @@ function App() {
       document.removeEventListener('mousemove', handleMouseMove);
       document.removeEventListener('mouseup', handleMouseUp);
     };
-  }, [plannerWidth]);
+  }, []);
 
   useEffect(() => {
     if (!auth.isLoggedIn || !auth.accessToken) return;
@@ -414,22 +606,53 @@ function App() {
     }
   }
 
-  async function handlePlanCommand(
-    command: PlanEditCommand,
-    payload: Record<string, unknown> = {},
-  ) {
+  async function sendPlanningMessage(text: string) {
     const sessionId = state.activeSessionId;
     if (!sessionId) return;
     setState((prev) => ({ ...prev, loading: true, error: null }));
     try {
-      const snapshot = await sendCommand(sessionId, command, payload);
+      const snapshot = await sendCommand(sessionId, "ask", { question: text });
       setState((prev) => ({ ...prev, loading: false, snapshot }));
     } catch (err: any) {
       if (handleAuthError(err)) return;
       setState((prev) => ({
         ...prev,
         loading: false,
-        error: err.message ?? "Plan edit command failed",
+        error: err.message ?? "Send planning message failed",
+      }));
+    }
+  }
+
+  async function sendExecutionMessage(text: string) {
+    const sessionId = state.activeSessionId;
+    if (!sessionId) return;
+    setState((prev) => ({ ...prev, loading: true, error: null }));
+    try {
+      const snapshot = await sendCommand(sessionId, "ask", { question: text });
+      setState((prev) => ({ ...prev, loading: false, snapshot }));
+    } catch (err: any) {
+      if (handleAuthError(err)) return;
+      setState((prev) => ({
+        ...prev,
+        loading: false,
+        error: err.message ?? "Send message failed",
+      }));
+    }
+  }
+
+  async function confirmCurrentPlan() {
+    const sessionId = state.activeSessionId;
+    if (!sessionId) return;
+    setState((prev) => ({ ...prev, loading: true, error: null }));
+    try {
+      const snapshot = await sendCommand(sessionId, "confirm_plan");
+      setState((prev) => ({ ...prev, loading: false, snapshot }));
+    } catch (err: any) {
+      if (handleAuthError(err)) return;
+      setState((prev) => ({
+        ...prev,
+        loading: false,
+        error: err.message ?? "Confirm plan failed",
       }));
     }
   }
@@ -1327,7 +1550,7 @@ function App() {
               </span>
             )}
           </div>
-          {snapshot && (
+          {snapshot && snapshot.session_mode === "execution" && (
             <div style={{ display: "flex", gap: "8px" }}>
               <button
                 onClick={() => handleCommand("next")}
@@ -1375,49 +1598,29 @@ function App() {
           )}
         </header>
 
-        <section id="main-content" style={{ flex: 1, display: "flex", overflow: "hidden", position: "relative" }}>
-          <PlannerColumn
-            snapshot={snapshot}
-            onPlanCommand={handlePlanCommand}
-            width={plannerWidth}
-          />
-          <div
-            onMouseDown={() => {
-              isDraggingPlanner.current = true;
-              document.body.style.cursor = 'col-resize';
-              document.body.style.userSelect = 'none';
-            }}
-            style={{
-              width: "4px",
-              cursor: "col-resize",
-              background: "transparent",
-              position: "relative",
-              transition: "background 0.2s ease",
-              flexShrink: 0,
-            }}
-            onMouseOver={(e) => e.currentTarget.style.background = "#e0e0e0"}
-            onMouseOut={(e) => e.currentTarget.style.background = "transparent"}
-          />
-          <WorkerColumn snapshot={snapshot} width={workerWidth} />
-          <div
-            onMouseDown={() => {
-              isDraggingWorker.current = true;
-              document.body.style.cursor = 'col-resize';
-              document.body.style.userSelect = 'none';
-            }}
-            style={{
-              width: "4px",
-              cursor: "col-resize",
-              background: "transparent",
-              position: "relative",
-              transition: "background 0.2s ease",
-              flexShrink: 0,
-            }}
-            onMouseOver={(e) => e.currentTarget.style.background = "#e0e0e0"}
-            onMouseOut={(e) => e.currentTarget.style.background = "transparent"}
-          />
-          <CoordinatorColumn snapshot={snapshot} width={coordinatorWidth} />
-        </section>
+        {snapshot && snapshot.session_mode === "planning" ? (
+          <section id="main-content" style={{ flex: 1, display: "flex", overflow: "hidden", position: "relative" }}>
+            <PlanningView
+              session={snapshot}
+              onSendPlanningMessage={sendPlanningMessage}
+              onConfirmPlan={confirmCurrentPlan}
+            />
+          </section>
+        ) : (
+          <section id="main-content" style={{ flex: 1, display: "flex", overflow: "hidden", position: "relative" }}>
+            <div style={{ flex: 1, display: "flex", overflow: "hidden" }}>
+              {snapshot && (
+                <ExecutionView
+                  session={snapshot}
+                  onSendExecutionMessage={sendExecutionMessage}
+                />
+              )}
+              <div style={{ width: "32%", borderLeft: "1px solid #e5e7eb", background: "#ffffff" }}>
+                <CoordinatorColumn snapshot={snapshot} width={100} />
+              </div>
+            </div>
+          </section>
+        )}
       </main>
 
       {/* Delete Confirmation Modal */}
@@ -1546,521 +1749,6 @@ function App() {
 }
 
 type ColumnProps = { snapshot: SessionSnapshot | null; width: number };
-
-type PlannerColumnProps = ColumnProps & {
-  onPlanCommand: (
-    command: PlanEditCommand,
-    payload?: Record<string, unknown>,
-  ) => Promise<void>;
-};
-
-function PlannerColumn({ snapshot, onPlanCommand, width }: PlannerColumnProps) {
-  const [expandedSubtaskId, setExpandedSubtaskId] = useState<string | null>(null);
-  const [hoveredSubtaskId, setHoveredSubtaskId] = useState<string | null>(null);
-
-  // Close dropdown when clicking outside
-  useEffect(() => {
-    const handleClickOutside = () => {
-      if (expandedSubtaskId) {
-        setExpandedSubtaskId(null);
-      }
-    };
-
-    document.addEventListener('click', handleClickOutside);
-    return () => document.removeEventListener('click', handleClickOutside);
-  }, [expandedSubtaskId]);
-
-  const promptForSubtask = (
-    defaultTitle = "",
-    defaultNotes = "",
-  ): { title: string; notes?: string } | null => {
-    const rawTitle = window.prompt("Subtask title", defaultTitle);
-    if (rawTitle === null) return null;
-    const title = rawTitle.trim();
-    if (!title) return null;
-    const rawNotes = window.prompt("Description (optional)", defaultNotes);
-    const notes =
-      rawNotes === null || !rawNotes.trim() ? undefined : rawNotes.trim();
-    return { title, notes };
-  };
-
-  const handleAppend = () => {
-    const details = promptForSubtask();
-    if (!details) return;
-    const payload: Record<string, unknown> = { title: details.title };
-    if (details.notes) payload.notes = details.notes;
-    void onPlanCommand("append_subtask", payload);
-  };
-
-  return (
-    <div
-      style={{
-        width: `${width}%`,
-        padding: "20px",
-        overflowY: "auto",
-        background: "#ffffff",
-      }}
-    >
-      <h4 style={{
-        margin: "0 0 20px 0",
-        fontSize: "15px",
-        fontWeight: "600",
-        color: "#000000",
-        textTransform: "uppercase",
-        letterSpacing: "0.5px"
-      }}>Planner</h4>
-      {!snapshot && <div style={{ color: "#666666", fontSize: "14px" }}>Choose or create a session.</div>}
-      {snapshot && (
-        <>
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "space-between",
-              marginBottom: "16px",
-              gap: "12px",
-            }}
-          >
-            <div style={{ fontWeight: 600, fontSize: "14px", color: "#000000", flex: 1 }}>
-              {snapshot.plan?.title || snapshot.topic}
-            </div>
-            <button
-              onClick={handleAppend}
-              style={{
-                padding: "8px 14px",
-                background: "#000000",
-                color: "#ffffff",
-                border: "none",
-                borderRadius: "6px",
-                fontSize: "12px",
-                fontWeight: "600",
-                cursor: "pointer",
-                transition: "all 0.2s ease",
-                whiteSpace: "nowrap",
-              }}
-              onMouseOver={(e) => e.currentTarget.style.background = "#333333"}
-              onMouseOut={(e) => e.currentTarget.style.background = "#000000"}
-            >＋ Add</button>
-          </div>
-          <ol style={{ paddingLeft: 0, margin: 0, listStyle: "none" }}>
-            {snapshot.subtasks.map((subtask) => {
-              const isCurrent = snapshot.current_subtask_id === subtask.id;
-              const handleSetCurrent = () => {
-                void onPlanCommand("set_current_subtask", {
-                  subtask_id: subtask.id,
-                });
-              };
-              const handleUpdate = () => {
-                const titleInput = window.prompt("Edit title", subtask.title);
-                if (titleInput === null) return;
-                const notesInput = window.prompt(
-                  "Edit description (optional)",
-                );
-                const patch: Record<string, unknown> = {};
-                const trimmedTitle = titleInput.trim();
-                if (trimmedTitle) {
-                  patch.title = trimmedTitle;
-                }
-                if (notesInput !== null) {
-                  patch.notes = notesInput.trim();
-                }
-                if (!Object.keys(patch).length) return;
-                void onPlanCommand("update_subtask", {
-                  subtask_id: subtask.id,
-                  patch,
-                });
-              };
-              const handleInsertBelow = () => {
-                const details = promptForSubtask();
-                if (!details) return;
-                const payload: Record<string, unknown> = {
-                  title: details.title,
-                  after_id: subtask.id,
-                };
-                if (details.notes) payload.notes = details.notes;
-                void onPlanCommand("insert_subtask", payload);
-              };
-              const handleSkip = () => {
-                const confirmSkip = window.confirm(
-                  `Skip "${subtask.title}"?`,
-                );
-                if (!confirmSkip) return;
-                const reasonInput = window.prompt("Reason (optional)");
-                const payload: Record<string, unknown> = {
-                  subtask_id: subtask.id,
-                };
-                if (reasonInput !== null && reasonInput.trim()) {
-                  payload.reason = reasonInput.trim();
-                }
-                void onPlanCommand("skip_subtask", payload);
-              };
-              return (
-                <li
-                  key={subtask.id}
-                  style={{
-                    marginBottom: "8px",
-                    padding: "10px 12px",
-                    borderRadius: "8px",
-                    border: isCurrent
-                      ? "2px solid #000000"
-                      : "1px solid #e0e0e0",
-                    background: isCurrent ? "#fafafa" : "#ffffff",
-                    position: "relative",
-                    transition: "all 0.2s ease",
-                    display: "flex",
-                    alignItems: "center",
-                    gap: "10px",
-                  }}
-                  onMouseEnter={() => setHoveredSubtaskId(subtask.id)}
-                  onMouseLeave={() => setHoveredSubtaskId(null)}
-                >
-                  {isCurrent && (
-                    <div style={{
-                      position: "absolute",
-                      top: 0,
-                      left: 0,
-                      width: "3px",
-                      height: "100%",
-                      background: "#000000",
-                      borderRadius: "8px 0 0 8px",
-                    }} />
-                  )}
-
-                  {/* Task number badge */}
-                  <div style={{
-                    fontSize: "10px",
-                    color: "#999999",
-                    background: "#f5f5f5",
-                    padding: "3px 7px",
-                    borderRadius: "4px",
-                    fontWeight: "600",
-                    flexShrink: 0,
-                  }}>
-                    #{subtask.index + 1}
-                  </div>
-
-                  {/* Task content */}
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div
-                      style={{
-                        fontWeight: subtask.status === "in_progress" ? 600 : 500,
-                        textDecoration: subtask.status === "done" ? "line-through" : "none",
-                        color: subtask.status === "done" ? "#999999" : "#000000",
-                        fontSize: "12px",
-                        marginBottom: "3px",
-                        overflow: "hidden",
-                        textOverflow: "ellipsis",
-                        whiteSpace: "nowrap",
-                      }}
-                    >
-                      {subtask.title}
-                    </div>
-                    <div style={{
-                      fontSize: "9px",
-                      color: "#999999",
-                      textTransform: "uppercase",
-                      letterSpacing: "0.5px",
-                      fontWeight: "600",
-                    }}>
-                      {subtask.status}
-                    </div>
-                  </div>
-
-                  {/* Advanced Settings Button */}
-                  <div style={{ position: "relative", flexShrink: 0 }}>
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setExpandedSubtaskId(expandedSubtaskId === subtask.id ? null : subtask.id);
-                      }}
-                      onMouseEnter={() => setHoveredSubtaskId(subtask.id)}
-                      style={{
-                        width: "24px",
-                        height: "24px",
-                        borderRadius: "6px",
-                        border: "none",
-                        background: expandedSubtaskId === subtask.id ? "#000000" : "transparent",
-                        color: expandedSubtaskId === subtask.id ? "#ffffff" : "#999999",
-                        cursor: "pointer",
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        transition: "all 0.2s ease",
-                        position: "relative",
-                      }}
-                      onMouseOver={(e) => {
-                        if (expandedSubtaskId !== subtask.id) {
-                          e.currentTarget.style.background = "#f5f5f5";
-                          e.currentTarget.style.color = "#000000";
-                        }
-                      }}
-                      onMouseOut={(e) => {
-                        if (expandedSubtaskId !== subtask.id) {
-                          e.currentTarget.style.background = "transparent";
-                          e.currentTarget.style.color = "#999999";
-                        }
-                      }}
-                    >
-                      {/* Modern settings icon */}
-                      <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-                        <circle cx="8" cy="3" r="1" fill="currentColor"/>
-                        <circle cx="8" cy="8" r="1" fill="currentColor"/>
-                        <circle cx="8" cy="13" r="1" fill="currentColor"/>
-                      </svg>
-                    </button>
-
-                    {/* Tooltip */}
-                    {hoveredSubtaskId === subtask.id && expandedSubtaskId !== subtask.id && (
-                      <div
-                        style={{
-                          position: "absolute",
-                          bottom: "calc(100% + 6px)",
-                          right: 0,
-                          background: "#000000",
-                          color: "#ffffff",
-                          padding: "6px 10px",
-                          borderRadius: "6px",
-                          fontSize: "11px",
-                          fontWeight: "500",
-                          whiteSpace: "nowrap",
-                          zIndex: 200,
-                          pointerEvents: "none",
-                          boxShadow: "0 2px 8px rgba(0, 0, 0, 0.15)",
-                        }}
-                      >
-                        Advanced Settings
-                        {/* Arrow */}
-                        <div style={{
-                          position: "absolute",
-                          bottom: "-4px",
-                          right: "8px",
-                          width: "8px",
-                          height: "8px",
-                          background: "#000000",
-                          transform: "rotate(45deg)",
-                        }} />
-                      </div>
-                    )}
-
-                    {/* Dropdown Menu */}
-                    {expandedSubtaskId === subtask.id && (
-                      <div
-                        style={{
-                          position: "absolute",
-                          top: "calc(100% + 6px)",
-                          right: 0,
-                          background: "#000000",
-                          borderRadius: "8px",
-                          padding: "6px",
-                          boxShadow: "0 4px 16px rgba(0, 0, 0, 0.2)",
-                          zIndex: 100,
-                          minWidth: "150px",
-                          display: "flex",
-                          flexDirection: "column",
-                          gap: "2px",
-                        }}
-                      >
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleSetCurrent();
-                            setExpandedSubtaskId(null);
-                          }}
-                          style={{
-                            padding: "8px 12px",
-                            background: "transparent",
-                            color: "#ffffff",
-                            border: "none",
-                            borderRadius: "6px",
-                            fontSize: "12px",
-                            fontWeight: "500",
-                            cursor: "pointer",
-                            transition: "all 0.2s ease",
-                            textAlign: "left",
-                            whiteSpace: "nowrap",
-                          }}
-                          onMouseOver={(e) => e.currentTarget.style.background = "#333333"}
-                          onMouseOut={(e) => e.currentTarget.style.background = "transparent"}
-                        >Set current</button>
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleUpdate();
-                            setExpandedSubtaskId(null);
-                          }}
-                          style={{
-                            padding: "8px 12px",
-                            background: "transparent",
-                            color: "#ffffff",
-                            border: "none",
-                            borderRadius: "6px",
-                            fontSize: "12px",
-                            fontWeight: "500",
-                            cursor: "pointer",
-                            transition: "all 0.2s ease",
-                            textAlign: "left",
-                            whiteSpace: "nowrap",
-                          }}
-                          onMouseOver={(e) => e.currentTarget.style.background = "#333333"}
-                          onMouseOut={(e) => e.currentTarget.style.background = "transparent"}
-                        >Update</button>
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleInsertBelow();
-                            setExpandedSubtaskId(null);
-                          }}
-                          style={{
-                            padding: "8px 12px",
-                            background: "transparent",
-                            color: "#ffffff",
-                            border: "none",
-                            borderRadius: "6px",
-                            fontSize: "12px",
-                            fontWeight: "500",
-                            cursor: "pointer",
-                            transition: "all 0.2s ease",
-                            textAlign: "left",
-                            whiteSpace: "nowrap",
-                          }}
-                          onMouseOver={(e) => e.currentTarget.style.background = "#333333"}
-                          onMouseOut={(e) => e.currentTarget.style.background = "transparent"}
-                        >Insert below</button>
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleSkip();
-                            setExpandedSubtaskId(null);
-                          }}
-                          style={{
-                            padding: "8px 12px",
-                            background: "transparent",
-                            color: "#ffffff",
-                            border: "none",
-                            borderRadius: "6px",
-                            fontSize: "12px",
-                            fontWeight: "500",
-                            cursor: "pointer",
-                            transition: "all 0.2s ease",
-                            textAlign: "left",
-                            whiteSpace: "nowrap",
-                          }}
-                          onMouseOver={(e) => e.currentTarget.style.background = "#333333"}
-                          onMouseOut={(e) => e.currentTarget.style.background = "transparent"}
-                        >Skip</button>
-                      </div>
-                    )}
-                  </div>
-                </li>
-              );
-            })}
-          </ol>
-          <div style={{ marginTop: "16px" }}>
-            <button
-              onClick={handleAppend}
-              style={{
-                padding: "10px 16px",
-                background: "#ffffff",
-                color: "#000000",
-                border: "1px solid #e0e0e0",
-                borderRadius: "8px",
-                fontSize: "13px",
-                fontWeight: "600",
-                cursor: "pointer",
-                transition: "all 0.2s ease",
-                width: "100%",
-              }}
-              onMouseOver={(e) => {
-                e.currentTarget.style.background = "#000000";
-                e.currentTarget.style.color = "#ffffff";
-              }}
-              onMouseOut={(e) => {
-                e.currentTarget.style.background = "#ffffff";
-                e.currentTarget.style.color = "#000000";
-              }}
-            >＋ Append subtask</button>
-          </div>
-        </>
-      )}
-    </div>
-  );
-}
-
-function WorkerColumn({ snapshot, width }: ColumnProps) {
-  return (
-    <div
-      style={{
-        width: `${width}%`,
-        padding: "20px",
-        overflowY: "auto",
-        background: "#ffffff",
-      }}
-    >
-      <h4 style={{
-        margin: "0 0 20px 0",
-        fontSize: "15px",
-        fontWeight: "600",
-        color: "#000000",
-        textTransform: "uppercase",
-        letterSpacing: "0.5px"
-      }}>Worker</h4>
-      {!snapshot && <div style={{ color: "#666666", fontSize: "14px" }}>Worker outputs will appear here.</div>}
-      {snapshot &&
-        (snapshot.worker_outputs.length === 0 ? (
-          <div style={{ color: "#666666", fontSize: "14px" }}>No worker outputs yet.</div>
-        ) : (
-          snapshot.worker_outputs.map((output) => (
-            <div
-              key={output.subtask_id + output.timestamp}
-              style={{
-                marginBottom: "14px",
-                padding: "14px",
-                border: "1px solid #e0e0e0",
-                borderRadius: "10px",
-                background: "#fafafa",
-                transition: "all 0.2s ease",
-              }}
-            >
-              <div style={{
-                fontSize: "11px",
-                color: "#666666",
-                marginBottom: "10px",
-                fontWeight: "600",
-                display: "flex",
-                gap: "8px",
-                alignItems: "center",
-              }}>
-                <span style={{
-                  background: "#000000",
-                  color: "#ffffff",
-                  padding: "3px 8px",
-                  borderRadius: "6px",
-                  fontSize: "10px",
-                }}>
-                  {output.subtask_id}
-                </span>
-                <span>{output.timestamp}</span>
-              </div>
-              <pre style={{
-                whiteSpace: "pre-wrap",
-                margin: 0,
-                fontFamily: "ui-monospace, 'SF Mono', Monaco, monospace",
-                fontSize: "12px",
-                lineHeight: "1.6",
-                color: "#000000",
-                background: "#ffffff",
-                padding: "12px",
-                borderRadius: "8px",
-                border: "1px solid #e0e0e0",
-              }}>
-                {output.preview ?? output.content}
-              </pre>
-            </div>
-          ))
-        ))}
-    </div>
-  );
-}
 
 function CoordinatorColumn({ snapshot, width }: ColumnProps) {
   const decisions = snapshot?.coord_decisions ?? [];

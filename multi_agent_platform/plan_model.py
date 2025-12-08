@@ -19,6 +19,8 @@ class Subtask:
     title: str
     status: str = "pending"
     notes: str = ""
+    output: str = ""
+    needs_redo: bool = False
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -26,6 +28,8 @@ class Subtask:
             "title": self.title,
             "status": self.status,
             "notes": self.notes,
+            "output": self.output,
+            "needs_redo": self.needs_redo,
         }
 
     @classmethod
@@ -35,6 +39,8 @@ class Subtask:
             title=data["title"],
             status=data.get("status", "pending"),
             notes=data.get("notes", ""),
+            output=data.get("output", ""),
+            needs_redo=data.get("needs_redo", False),
         )
 
 
@@ -48,12 +54,14 @@ class Plan:
     """
     plan_id: str
     title: str
+    notes: str = ""
     subtasks: List[Subtask] = field(default_factory=list)
 
     def to_dict(self) -> Dict[str, Any]:
         return {
             "plan_id": self.plan_id,
             "title": self.title,
+            "notes": self.notes,
             "subtasks": [s.to_dict() for s in self.subtasks],
         }
 
@@ -63,7 +71,12 @@ class Plan:
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "Plan":
         subtasks = [Subtask.from_dict(s) for s in data.get("subtasks", [])]
-        return cls(plan_id=data["plan_id"], title=data["title"], subtasks=subtasks)
+        return cls(
+            plan_id=data["plan_id"],
+            title=data["title"],
+            notes=data.get("notes", ""),
+            subtasks=subtasks,
+        )
 
     @classmethod
     def from_outline(cls, topic: str, outline: str) -> "Plan":
@@ -102,6 +115,9 @@ class Plan:
         简单把 plan 变成文本，供 coordinator 回答问题。
         """
         lines = [f"Plan: {self.title} (id={self.plan_id})"]
+        if self.notes:
+            lines.append(f"Notes: {self.notes}")
         for subtask in self.subtasks:
-            lines.append(f"- [{subtask.status}] {subtask.id}: {subtask.title}")
+            suffix = " (redo)" if getattr(subtask, "needs_redo", False) else ""
+            lines.append(f"- [{subtask.status}] {subtask.id}: {subtask.title}{suffix}")
         return "\n".join(lines)

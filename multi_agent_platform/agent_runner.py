@@ -1,5 +1,6 @@
 from __future__ import annotations
 from dataclasses import dataclass
+import json
 from typing import Dict, Any, Sequence
 
 from openai import OpenAI
@@ -59,3 +60,41 @@ class Agent:
         )
 
         return response.choices[0].message.content.strip()
+
+
+def call_llm_json(
+    system_prompt: str,
+    user_prompt: str,
+    model: str = "gpt-4.1-mini",
+) -> Dict[str, Any]:
+    """
+    Call an LLM with JSON-mode enabled and return the parsed object.
+    """
+    api_key = os.getenv("OPENAI_API_KEY")
+    if not api_key:
+        # Offline fallback for local development
+        return {
+            "kind": "REQUEST_OTHER",
+            "target_subtask_id": None,
+            "instructions": None,
+            "needs_redo": False,
+        }
+
+    base_url = os.getenv("OPENAI_BASE_URL")
+    client = OpenAI(api_key=api_key, base_url=base_url) if base_url else OpenAI(api_key=api_key)
+
+    messages = [
+        {"role": "system", "content": system_prompt},
+        {"role": "user", "content": user_prompt},
+    ]
+
+    response = client.chat.completions.create(
+        model=model,
+        response_format={"type": "json_object"},
+        messages=messages,
+    )
+    content = response.choices[0].message.content
+    try:
+        return json.loads(content) if content else {}
+    except Exception:
+        return {}
