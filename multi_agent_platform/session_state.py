@@ -237,6 +237,19 @@ def _normalize_payload_type(payload_type: Any) -> str:
 
 
 def _read_artifact_preview(store: ArtifactStore, artifact_path: Optional[str]) -> str:
+    """Read artifact content for lightweight previews (legacy helper)."""
+    return _read_artifact_content(store, artifact_path, max_length=400)
+
+
+def _read_artifact_content(store: ArtifactStore, artifact_path: Optional[str], max_length: int | None = None) -> str:
+    """
+    Read artifact content with optional truncation.
+
+    Args:
+        store: Artifact store to resolve paths.
+        artifact_path: Relative artifact path.
+        max_length: If provided, returns a truncated string with ellipsis when exceeded.
+    """
     if not artifact_path:
         return ""
     full_path = Path(store.root.parent) / artifact_path
@@ -246,7 +259,11 @@ def _read_artifact_preview(store: ArtifactStore, artifact_path: Optional[str]) -
         content = full_path.read_text(encoding="utf-8")
     except Exception:
         return ""
-    return content[:400] + "..." if len(content) > 400 else content
+
+    if max_length is None:
+        return content
+
+    return content[:max_length] + "..." if len(content) > max_length else content
 
 
 @dataclass
@@ -364,12 +381,14 @@ def build_session_snapshot(
 
             artifact_info = payload.get("result_artifact", {})
             artifact_path = artifact_info.get("path")
+            full_text = _read_artifact_content(session_store, artifact_path, max_length=None)
             preview = _read_artifact_preview(session_store, artifact_path)
 
             worker_outputs[sub_id] = {
                 "subtask_id": sub_id,
                 "subtask_title": subtask_map.get(sub_id, ""),
                 "artifact_path": artifact_path,
+                "content": full_text,
                 "preview": preview,
                 "timestamp": timestamp,
                 "source": envelope.get("source"),

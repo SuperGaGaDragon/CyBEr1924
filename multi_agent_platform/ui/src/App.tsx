@@ -1299,6 +1299,25 @@ function App() {
 
   const { sessions, snapshot, loading, error, activeSessionId } = state;
   const progressByAgent = useMemo(() => deriveProgressByAgent(snapshot), [snapshot]);
+  const progressSeenCounts = useMemo(() => {
+    const events = snapshot?.progress_events ?? [];
+    const workerSet = new Set<string>();
+    const reviewerSet = new Set<string>();
+    for (const ev of events) {
+      if (!ev?.subtask_id) continue;
+      const sid = String(ev.subtask_id);
+      if (ev.agent === "worker") workerSet.add(sid);
+      if (ev.agent === "reviewer") reviewerSet.add(sid);
+    }
+    return { worker: workerSet.size, reviewer: reviewerSet.size };
+  }, [snapshot?.progress_events]);
+  useEffect(() => {
+    if (!snapshot?.progress_events?.length) return;
+    const invalid = snapshot.progress_events.filter((ev) => !ev?.agent || !ev?.subtask_id);
+    if (invalid.length > 0) {
+      console.warn("Dropped malformed progress events", invalid);
+    }
+  }, [snapshot?.progress_events]);
   const aboutButton = (
     <button
       onClick={() => window.location.assign("/about")}
@@ -2174,8 +2193,8 @@ function App() {
               }}
             >
               <PlanColumn snapshot={snapshot} />
-              <WorkerColumn snapshot={snapshot} progress={progressByAgent.worker} />
-              <CoordinatorColumn snapshot={snapshot} width={100} progress={progressByAgent.reviewer} />
+              <WorkerColumn snapshot={snapshot} progress={progressByAgent.worker} progressSeenCount={progressSeenCounts.worker} />
+              <CoordinatorColumn snapshot={snapshot} width={100} progress={progressByAgent.reviewer} progressSeenCount={progressSeenCounts.reviewer} />
 
               <div
                 onMouseDown={() => {
@@ -2493,9 +2512,9 @@ function App() {
   );
 }
 
-type ColumnProps = { snapshot: SessionSnapshot | null; width: number; progress?: ProgressItem[] };
+type ColumnProps = { snapshot: SessionSnapshot | null; width: number; progress?: ProgressItem[]; progressSeenCount?: number };
 
-function ProgressStrip({ items, label }: { items: ProgressItem[]; label: string }) {
+function ProgressStrip({ items, label, sourceCount = 0 }: { items: ProgressItem[]; label: string; sourceCount?: number }) {
   const palette: Record<ProgressItem["status"], { bg: string; fg: string; badge: string }> = {
     in_progress: { bg: "#f4f4f5", fg: "#111827", badge: "#f97316" },
     completed: { bg: "#ecfdf3", fg: "#065f46", badge: "#10b981" },
@@ -2507,6 +2526,22 @@ function ProgressStrip({ items, label }: { items: ProgressItem[]; label: string 
     if (Number.isNaN(date.getTime())) return "—";
     return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
   };
+
+  const durationLabel = (start?: string, finish?: string) => {
+    if (!start || !finish) return null;
+    const startDate = new Date(start);
+    const finishDate = new Date(finish);
+    if (Number.isNaN(startDate.getTime()) || Number.isNaN(finishDate.getTime())) return null;
+    const diff = Math.max(0, finishDate.getTime() - startDate.getTime());
+    const minutes = Math.floor(diff / 60000);
+    const seconds = Math.round((diff % 60000) / 1000);
+    if (minutes <= 0 && seconds <= 0) return null;
+    if (minutes === 0) return `${seconds}s`;
+    return `${minutes}m${seconds > 0 ? ` ${seconds}s` : ""}`;
+  };
+
+  const droppedHint = Math.max(0, sourceCount - items.length);
+  const waitingLabel = sourceCount > 0 ? "Subtask progress detected, waiting for details..." : "Waiting for a subtask to start.";
 
   return (
     <div style={{
@@ -2530,75 +2565,116 @@ function ProgressStrip({ items, label }: { items: ProgressItem[]; label: string 
             border: "1px dashed #e5e7eb",
             color: "#6b7280",
             fontSize: "12px",
-          }}>
-            No active subtasks yet.
+            }}>
+            {waitingLabel}
           </div>
         ) : items.map((item) => {
           const colors = palette[item.status] ?? palette.in_progress;
+          const isInProgress = item.status === "in_progress";
+          const duration = durationLabel(item.startedAt, item.finishedAt);
           return (
             <div key={`${item.agent}-${item.subtaskId}`} style={{
-              minWidth: "140px",
-              padding: "12px",
-              borderRadius: "12px",
+              minWidth: "180px",
+              padding: "14px 14px 12px 14px",
+              borderRadius: "14px",
               border: "1px solid #e5e7eb",
               background: colors.bg,
               color: colors.fg,
-              display: "grid",
-              gridTemplateColumns: "auto 1fr",
-              columnGap: "10px",
-              rowGap: "6px",
-              alignItems: "center",
-              boxShadow: "0 6px 16px rgba(0,0,0,0.06)",
+              display: "flex",
+              flexDirection: "column",
+              gap: "10px",
+              boxShadow: "0 8px 18px rgba(0,0,0,0.05)",
             }}>
-              <span style={{
-                width: "28px",
-                height: "28px",
-                borderRadius: "50%",
-                background: "#111827",
-                color: "#ffffff",
-                display: "inline-flex",
-                alignItems: "center",
-                justifyContent: "center",
-                fontSize: "11px",
-                fontWeight: 800,
-                letterSpacing: "0.04em",
-                textTransform: "uppercase",
-              }}>
-                T{item.order}
-              </span>
-              <div style={{ minWidth: 0 }}>
-                <div style={{
-                  fontWeight: 700,
-                  fontSize: "13px",
-                  color: colors.fg,
-                  overflow: "hidden",
-                  textOverflow: "ellipsis",
-                  whiteSpace: "nowrap",
+              <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+                <span style={{
+                  width: "30px",
+                  height: "30px",
+                  borderRadius: "50%",
+                  background: "#111827",
+                  color: "#ffffff",
+                  display: "inline-flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  fontSize: "11px",
+                  fontWeight: 800,
+                  letterSpacing: "0.04em",
+                  textTransform: "uppercase",
+                  boxShadow: "0 8px 16px rgba(0,0,0,0.18)",
                 }}>
-                  {item.title}
+                  T{item.order}
+                </span>
+                <div style={{ minWidth: 0, flex: 1 }}>
+                  <div style={{
+                    fontWeight: 700,
+                    fontSize: "13px",
+                    color: colors.fg,
+                    overflow: "hidden",
+                    textOverflow: "ellipsis",
+                    whiteSpace: "nowrap",
+                  }}>
+                    {item.title}
+                  </div>
+                  <div style={{ fontSize: "11px", color: "#6b7280", marginTop: "2px" }}>
+                    {isInProgress ? `Started ${formatted(item.startedAt)}` : `Finished ${formatted(item.finishedAt)}${duration ? ` · ${duration}` : ""}`}
+                  </div>
                 </div>
-                <div style={{ fontSize: "11px", color: "#6b7280", marginTop: "2px" }}>
-                  {item.status === "in_progress" ? `Started ${formatted(item.startedAt)}` : `Done ${formatted(item.finishedAt)}`}
+                <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                  {isInProgress ? (
+                    <span className="progress-spinner" aria-hidden="true" />
+                  ) : (
+                    <span style={{
+                      width: "18px",
+                      height: "18px",
+                      borderRadius: "50%",
+                      background: colors.badge,
+                      display: "inline-flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      color: "#ffffff",
+                      fontSize: "11px",
+                      fontWeight: 800,
+                    }}>
+                      ✓
+                    </span>
+                  )}
                 </div>
               </div>
-              <span style={{
-                gridColumn: "1 / span 2",
-                justifySelf: "flex-start",
-                padding: "4px 8px",
+              <div style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: "8px",
+                padding: "6px 10px",
                 borderRadius: "999px",
                 background: colors.badge,
                 color: "#ffffff",
                 fontSize: "11px",
-                fontWeight: 700,
+                fontWeight: 800,
                 letterSpacing: "0.04em",
                 textTransform: "uppercase",
+                alignSelf: "flex-start",
               }}>
-                {item.status === "in_progress" ? "In progress" : "Completed"}
-              </span>
+                {isInProgress ? "In progress" : "Completed"}
+                {!isInProgress && duration && (
+                  <span style={{ opacity: 0.85, fontWeight: 700 }}>{duration}</span>
+                )}
+              </div>
             </div>
           );
         })}
       </div>
+      {droppedHint > 0 && (
+        <div style={{
+          marginTop: "4px",
+          fontSize: "11px",
+          color: "#b91c1c",
+          background: "#fef2f2",
+          border: "1px solid #fecdd3",
+          padding: "6px 8px",
+          borderRadius: "10px",
+        }}>
+          Detected {droppedHint} extra {label.toLowerCase()} subtask event(s); awaiting data to render.
+        </div>
+      )}
     </div>
   );
 }
@@ -2697,7 +2773,7 @@ function PlanColumn({ snapshot }: { snapshot: SessionSnapshot | null }) {
   );
 }
 
-function WorkerColumn({ snapshot, progress }: { snapshot: SessionSnapshot | null; progress: ProgressItem[] }) {
+function WorkerColumn({ snapshot, progress, progressSeenCount = 0 }: { snapshot: SessionSnapshot | null; progress: ProgressItem[]; progressSeenCount?: number }) {
   const [descending, setDescending] = useState(true);
   const outputs = [...(snapshot?.worker_outputs ?? [])].sort((a, b) => {
     const diff = new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime();
@@ -2758,7 +2834,7 @@ function WorkerColumn({ snapshot, progress }: { snapshot: SessionSnapshot | null
           </svg>
         </button>
       </div>
-      <ProgressStrip items={progress} label="Worker" />
+      <ProgressStrip items={progress} label="Worker" sourceCount={progressSeenCount} />
       <div style={{ overflowY: "auto", flex: 1, paddingRight: "6px", display: "flex", flexDirection: "column", gap: "10px" }}>
         {outputs.length === 0 && (
           <div style={{
@@ -2774,7 +2850,7 @@ function WorkerColumn({ snapshot, progress }: { snapshot: SessionSnapshot | null
         )}
         {outputs.map((out, idx) => {
           const title = subtaskMap.get(out.subtask_id) ?? `Task ${out.subtask_id}`;
-          const content = out.preview || out.content || "No content.";
+          const content = out.content || out.preview || "No content.";
           const order = subtaskOrder.get(out.subtask_id);
           return (
             <div key={idx} style={{
@@ -2826,7 +2902,7 @@ function WorkerColumn({ snapshot, progress }: { snapshot: SessionSnapshot | null
   );
 }
 
-function CoordinatorColumn({ snapshot, width, progress = [] }: ColumnProps) {
+function CoordinatorColumn({ snapshot, width, progress = [], progressSeenCount = 0 }: ColumnProps) {
   const baseDecisions: any[] = snapshot?.coord_decisions ?? [];
   const subtaskOrder = new Map((snapshot?.subtasks ?? []).map((s, i) => [String(s.id), i + 1]));
 
@@ -2880,7 +2956,7 @@ function CoordinatorColumn({ snapshot, width, progress = [] }: ColumnProps) {
         textTransform: "uppercase",
         letterSpacing: "0.5px"
       }}>Reviewer</h4>
-      <ProgressStrip items={progress} label="Reviewer" />
+      <ProgressStrip items={progress} label="Reviewer" sourceCount={progressSeenCount} />
       <div
         style={{
           flex: 1,
