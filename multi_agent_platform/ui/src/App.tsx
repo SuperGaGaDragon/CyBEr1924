@@ -1467,6 +1467,7 @@ type PlannerColumnProps = ColumnProps & {
 
 function PlannerColumn({ snapshot, onPlanCommand, width }: PlannerColumnProps) {
   const [expandedSubtaskId, setExpandedSubtaskId] = useState<string | null>(null);
+  const [hoveredSubtaskId, setHoveredSubtaskId] = useState<string | null>(null);
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -1608,16 +1609,21 @@ function PlannerColumn({ snapshot, onPlanCommand, width }: PlannerColumnProps) {
                 <li
                   key={subtask.id}
                   style={{
-                    marginBottom: "10px",
-                    padding: "14px",
-                    borderRadius: "10px",
+                    marginBottom: "8px",
+                    padding: "10px 12px",
+                    borderRadius: "8px",
                     border: isCurrent
                       ? "2px solid #000000"
                       : "1px solid #e0e0e0",
                     background: isCurrent ? "#fafafa" : "#ffffff",
                     position: "relative",
                     transition: "all 0.2s ease",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "10px",
                   }}
+                  onMouseEnter={() => setHoveredSubtaskId(subtask.id)}
+                  onMouseLeave={() => setHoveredSubtaskId(null)}
                 >
                   {isCurrent && (
                     <div style={{
@@ -1627,209 +1633,234 @@ function PlannerColumn({ snapshot, onPlanCommand, width }: PlannerColumnProps) {
                       width: "3px",
                       height: "100%",
                       background: "#000000",
-                      borderRadius: "10px 0 0 10px",
+                      borderRadius: "8px 0 0 8px",
                     }} />
                   )}
-                  <div
-                    style={{
-                      display: "flex",
-                      alignItems: "baseline",
-                      justifyContent: "space-between",
-                      flexWrap: "wrap",
-                      gap: "8px",
-                      marginBottom: "10px",
-                    }}
-                  >
-                    <span
+
+                  {/* Task number badge */}
+                  <div style={{
+                    fontSize: "10px",
+                    color: "#999999",
+                    background: "#f5f5f5",
+                    padding: "3px 7px",
+                    borderRadius: "4px",
+                    fontWeight: "600",
+                    flexShrink: 0,
+                  }}>
+                    #{subtask.index + 1}
+                  </div>
+
+                  {/* Task content */}
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div
                       style={{
                         fontWeight: subtask.status === "in_progress" ? 600 : 500,
                         textDecoration: subtask.status === "done" ? "line-through" : "none",
                         color: subtask.status === "done" ? "#999999" : "#000000",
-                        fontSize: "13px",
-                        flex: 1,
+                        fontSize: "12px",
+                        marginBottom: "3px",
+                        overflow: "hidden",
+                        textOverflow: "ellipsis",
+                        whiteSpace: "nowrap",
                       }}
                     >
                       {subtask.title}
-                    </span>
-                    <span style={{
-                      fontSize: "11px",
+                    </div>
+                    <div style={{
+                      fontSize: "9px",
                       color: "#999999",
-                      background: "#f5f5f5",
-                      padding: "2px 8px",
-                      borderRadius: "6px",
+                      textTransform: "uppercase",
+                      letterSpacing: "0.5px",
                       fontWeight: "600",
                     }}>
-                      #{subtask.index + 1}
-                    </span>
-                  </div>
-                  <div style={{
-                    fontSize: "10px",
-                    color: "#666666",
-                    marginBottom: "10px",
-                    textTransform: "uppercase",
-                    letterSpacing: "0.5px",
-                    fontWeight: "600",
-                  }}>
-                    {subtask.status}
-                  </div>
-                  <div
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: "6px",
-                      position: "relative",
-                    }}
-                  >
-                    {/* Advanced Settings Button */}
-                    <div style={{ position: "relative" }}>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setExpandedSubtaskId(expandedSubtaskId === subtask.id ? null : subtask.id);
-                        }}
-                        style={{
-                          width: "28px",
-                          height: "28px",
-                          borderRadius: "6px",
-                          border: "1px solid #e0e0e0",
-                          background: expandedSubtaskId === subtask.id ? "#000000" : "#ffffff",
-                          color: expandedSubtaskId === subtask.id ? "#ffffff" : "#666666",
-                          cursor: "pointer",
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "center",
-                          fontSize: "14px",
-                          transition: "all 0.2s ease",
-                          position: "relative",
-                        }}
-                        onMouseOver={(e) => {
-                          if (expandedSubtaskId !== subtask.id) {
-                            e.currentTarget.style.background = "#f5f5f5";
-                          }
-                        }}
-                        onMouseOut={(e) => {
-                          if (expandedSubtaskId !== subtask.id) {
-                            e.currentTarget.style.background = "#ffffff";
-                          }
-                        }}
-                        title="Advanced Settings"
-                      >
-                        <svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg">
-                          <path d="M7 4.5C7.27614 4.5 7.5 4.27614 7.5 4C7.5 3.72386 7.27614 3.5 7 3.5C6.72386 3.5 6.5 3.72386 6.5 4C6.5 4.27614 6.72386 4.5 7 4.5Z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-                          <path d="M7 7.5C7.27614 7.5 7.5 7.27614 7.5 7C7.5 6.72386 7.27614 6.5 7 6.5C6.72386 6.5 6.5 6.72386 6.5 7C6.5 7.27614 6.72386 7.5 7 7.5Z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-                          <path d="M7 10.5C7.27614 10.5 7.5 10.2761 7.5 10C7.5 9.72386 7.27614 9.5 7 9.5C6.72386 9.5 6.5 9.72386 6.5 10C6.5 10.2761 6.72386 10.5 7 10.5Z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-                        </svg>
-                      </button>
-
-                      {/* Dropdown Menu */}
-                      {expandedSubtaskId === subtask.id && (
-                        <div
-                          style={{
-                            position: "absolute",
-                            top: "calc(100% + 4px)",
-                            left: 0,
-                            background: "#000000",
-                            borderRadius: "8px",
-                            padding: "6px",
-                            boxShadow: "0 4px 12px rgba(0, 0, 0, 0.15)",
-                            zIndex: 100,
-                            minWidth: "140px",
-                            display: "flex",
-                            flexDirection: "column",
-                            gap: "4px",
-                          }}
-                        >
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleSetCurrent();
-                              setExpandedSubtaskId(null);
-                            }}
-                            style={{
-                              padding: "8px 12px",
-                              background: "transparent",
-                              color: "#ffffff",
-                              border: "none",
-                              borderRadius: "6px",
-                              fontSize: "12px",
-                              fontWeight: "500",
-                              cursor: "pointer",
-                              transition: "all 0.2s ease",
-                              textAlign: "left",
-                              whiteSpace: "nowrap",
-                            }}
-                            onMouseOver={(e) => e.currentTarget.style.background = "#333333"}
-                            onMouseOut={(e) => e.currentTarget.style.background = "transparent"}
-                          >Set current</button>
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleUpdate();
-                              setExpandedSubtaskId(null);
-                            }}
-                            style={{
-                              padding: "8px 12px",
-                              background: "transparent",
-                              color: "#ffffff",
-                              border: "none",
-                              borderRadius: "6px",
-                              fontSize: "12px",
-                              fontWeight: "500",
-                              cursor: "pointer",
-                              transition: "all 0.2s ease",
-                              textAlign: "left",
-                              whiteSpace: "nowrap",
-                            }}
-                            onMouseOver={(e) => e.currentTarget.style.background = "#333333"}
-                            onMouseOut={(e) => e.currentTarget.style.background = "transparent"}
-                          >Update</button>
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleInsertBelow();
-                              setExpandedSubtaskId(null);
-                            }}
-                            style={{
-                              padding: "8px 12px",
-                              background: "transparent",
-                              color: "#ffffff",
-                              border: "none",
-                              borderRadius: "6px",
-                              fontSize: "12px",
-                              fontWeight: "500",
-                              cursor: "pointer",
-                              transition: "all 0.2s ease",
-                              textAlign: "left",
-                              whiteSpace: "nowrap",
-                            }}
-                            onMouseOver={(e) => e.currentTarget.style.background = "#333333"}
-                            onMouseOut={(e) => e.currentTarget.style.background = "transparent"}
-                          >Insert below</button>
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleSkip();
-                              setExpandedSubtaskId(null);
-                            }}
-                            style={{
-                              padding: "8px 12px",
-                              background: "transparent",
-                              color: "#ffffff",
-                              border: "none",
-                              borderRadius: "6px",
-                              fontSize: "12px",
-                              fontWeight: "500",
-                              cursor: "pointer",
-                              transition: "all 0.2s ease",
-                              textAlign: "left",
-                              whiteSpace: "nowrap",
-                            }}
-                            onMouseOver={(e) => e.currentTarget.style.background = "#333333"}
-                            onMouseOut={(e) => e.currentTarget.style.background = "transparent"}
-                          >Skip</button>
-                        </div>
-                      )}
+                      {subtask.status}
                     </div>
+                  </div>
+
+                  {/* Advanced Settings Button */}
+                  <div style={{ position: "relative", flexShrink: 0 }}>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setExpandedSubtaskId(expandedSubtaskId === subtask.id ? null : subtask.id);
+                      }}
+                      onMouseEnter={() => setHoveredSubtaskId(subtask.id)}
+                      style={{
+                        width: "24px",
+                        height: "24px",
+                        borderRadius: "6px",
+                        border: "none",
+                        background: expandedSubtaskId === subtask.id ? "#000000" : "transparent",
+                        color: expandedSubtaskId === subtask.id ? "#ffffff" : "#999999",
+                        cursor: "pointer",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        transition: "all 0.2s ease",
+                        position: "relative",
+                      }}
+                      onMouseOver={(e) => {
+                        if (expandedSubtaskId !== subtask.id) {
+                          e.currentTarget.style.background = "#f5f5f5";
+                          e.currentTarget.style.color = "#000000";
+                        }
+                      }}
+                      onMouseOut={(e) => {
+                        if (expandedSubtaskId !== subtask.id) {
+                          e.currentTarget.style.background = "transparent";
+                          e.currentTarget.style.color = "#999999";
+                        }
+                      }}
+                    >
+                      {/* Modern settings icon */}
+                      <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <circle cx="8" cy="3" r="1" fill="currentColor"/>
+                        <circle cx="8" cy="8" r="1" fill="currentColor"/>
+                        <circle cx="8" cy="13" r="1" fill="currentColor"/>
+                      </svg>
+                    </button>
+
+                    {/* Tooltip */}
+                    {hoveredSubtaskId === subtask.id && expandedSubtaskId !== subtask.id && (
+                      <div
+                        style={{
+                          position: "absolute",
+                          bottom: "calc(100% + 6px)",
+                          right: 0,
+                          background: "#000000",
+                          color: "#ffffff",
+                          padding: "6px 10px",
+                          borderRadius: "6px",
+                          fontSize: "11px",
+                          fontWeight: "500",
+                          whiteSpace: "nowrap",
+                          zIndex: 200,
+                          pointerEvents: "none",
+                          boxShadow: "0 2px 8px rgba(0, 0, 0, 0.15)",
+                        }}
+                      >
+                        Advanced Settings
+                        {/* Arrow */}
+                        <div style={{
+                          position: "absolute",
+                          bottom: "-4px",
+                          right: "8px",
+                          width: "8px",
+                          height: "8px",
+                          background: "#000000",
+                          transform: "rotate(45deg)",
+                        }} />
+                      </div>
+                    )}
+
+                    {/* Dropdown Menu */}
+                    {expandedSubtaskId === subtask.id && (
+                      <div
+                        style={{
+                          position: "absolute",
+                          top: "calc(100% + 6px)",
+                          right: 0,
+                          background: "#000000",
+                          borderRadius: "8px",
+                          padding: "6px",
+                          boxShadow: "0 4px 16px rgba(0, 0, 0, 0.2)",
+                          zIndex: 100,
+                          minWidth: "150px",
+                          display: "flex",
+                          flexDirection: "column",
+                          gap: "2px",
+                        }}
+                      >
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleSetCurrent();
+                            setExpandedSubtaskId(null);
+                          }}
+                          style={{
+                            padding: "8px 12px",
+                            background: "transparent",
+                            color: "#ffffff",
+                            border: "none",
+                            borderRadius: "6px",
+                            fontSize: "12px",
+                            fontWeight: "500",
+                            cursor: "pointer",
+                            transition: "all 0.2s ease",
+                            textAlign: "left",
+                            whiteSpace: "nowrap",
+                          }}
+                          onMouseOver={(e) => e.currentTarget.style.background = "#333333"}
+                          onMouseOut={(e) => e.currentTarget.style.background = "transparent"}
+                        >Set current</button>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleUpdate();
+                            setExpandedSubtaskId(null);
+                          }}
+                          style={{
+                            padding: "8px 12px",
+                            background: "transparent",
+                            color: "#ffffff",
+                            border: "none",
+                            borderRadius: "6px",
+                            fontSize: "12px",
+                            fontWeight: "500",
+                            cursor: "pointer",
+                            transition: "all 0.2s ease",
+                            textAlign: "left",
+                            whiteSpace: "nowrap",
+                          }}
+                          onMouseOver={(e) => e.currentTarget.style.background = "#333333"}
+                          onMouseOut={(e) => e.currentTarget.style.background = "transparent"}
+                        >Update</button>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleInsertBelow();
+                            setExpandedSubtaskId(null);
+                          }}
+                          style={{
+                            padding: "8px 12px",
+                            background: "transparent",
+                            color: "#ffffff",
+                            border: "none",
+                            borderRadius: "6px",
+                            fontSize: "12px",
+                            fontWeight: "500",
+                            cursor: "pointer",
+                            transition: "all 0.2s ease",
+                            textAlign: "left",
+                            whiteSpace: "nowrap",
+                          }}
+                          onMouseOver={(e) => e.currentTarget.style.background = "#333333"}
+                          onMouseOut={(e) => e.currentTarget.style.background = "transparent"}
+                        >Insert below</button>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleSkip();
+                            setExpandedSubtaskId(null);
+                          }}
+                          style={{
+                            padding: "8px 12px",
+                            background: "transparent",
+                            color: "#ffffff",
+                            border: "none",
+                            borderRadius: "6px",
+                            fontSize: "12px",
+                            fontWeight: "500",
+                            cursor: "pointer",
+                            transition: "all 0.2s ease",
+                            textAlign: "left",
+                            whiteSpace: "nowrap",
+                          }}
+                          onMouseOver={(e) => e.currentTarget.style.background = "#333333"}
+                          onMouseOut={(e) => e.currentTarget.style.background = "transparent"}
+                        >Skip</button>
+                      </div>
+                    )}
                   </div>
                 </li>
               );
