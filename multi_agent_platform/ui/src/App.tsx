@@ -14,9 +14,14 @@ import "./App.css";
 
 const SESSION_TOKEN_KEY = "cyber1924_last_session_id";
 
-// From /c/<id> -> <id>
+// 支持两种写法：1) ?session=<id> 2) /c/<id>
 function getSessionIdFromLocation(): string | null {
-  const parts = window.location.pathname.split("/").filter(Boolean);
+  const url = new URL(window.location.href);
+
+  const fromQuery = url.searchParams.get("session");
+  if (fromQuery) return fromQuery;
+
+  const parts = url.pathname.split("/").filter(Boolean);
   if (parts.length >= 2 && parts[0] === "c") {
     return parts[1];
   }
@@ -27,6 +32,7 @@ function getSessionIdFromLocation(): string | null {
 function navigateToSession(sessionId: string) {
   const url = new URL(window.location.href);
   url.pathname = `/c/${sessionId}`;
+  url.searchParams.delete("session");
   window.history.pushState(null, "", url.toString());
   localStorage.setItem(SESSION_TOKEN_KEY, sessionId);
 }
@@ -98,25 +104,43 @@ function App() {
         const sessions = await listSessions();
         setState((prev) => ({ ...prev, sessions }));
 
+        if (sessions.length === 0) {
+          return;
+        }
+
         const urlSessionId = getSessionIdFromLocation();
-        const fallbackId = urlSessionId || localStorage.getItem(SESSION_TOKEN_KEY);
+        const storedId = localStorage.getItem(SESSION_TOKEN_KEY);
+        const candidates = [urlSessionId, storedId].filter(Boolean) as string[];
 
-        if (!fallbackId) return;
+        for (const id of candidates) {
+          try {
+            const snapshot = await getSession(id);
+            navigateToSession(id);
+            setState((prev) => ({
+              ...prev,
+              activeSessionId: id,
+              snapshot,
+            }));
+            return;
+          } catch {
+            if (storedId === id) {
+              localStorage.removeItem(SESSION_TOKEN_KEY);
+            }
+          }
+        }
 
+        const fallbackId = sessions[0].session_id;
         try {
           const snapshot = await getSession(fallbackId);
-          if (!urlSessionId) {
-            navigateToSession(fallbackId);
-          } else {
-            localStorage.setItem(SESSION_TOKEN_KEY, fallbackId);
-          }
+          navigateToSession(fallbackId);
+          localStorage.setItem(SESSION_TOKEN_KEY, fallbackId);
           setState((prev) => ({
             ...prev,
             activeSessionId: fallbackId,
             snapshot,
           }));
-        } catch {
-          localStorage.removeItem(SESSION_TOKEN_KEY);
+        } catch (err: any) {
+          console.error("Failed to restore fallback session", err);
         }
       } catch (err: any) {
         setState((prev) => ({
