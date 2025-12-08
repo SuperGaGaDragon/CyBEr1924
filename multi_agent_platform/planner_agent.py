@@ -53,14 +53,6 @@ def run_planner_agent(
 
     result = call_llm_json(
         messages=messages,
-        response_schema={
-            "type": "object",
-            "properties": {
-                "plan": {"type": "object"},
-                "subtasks": {"type": "array", "items": {"type": "object"}},
-            },
-            "required": ["plan", "subtasks"],
-        },
         model=model,
     )
 
