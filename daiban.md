@@ -51,6 +51,9 @@ stage4
 
 - [x] 当前worker板块的的task序号挡住了文字，请修复。
 
+- [x] reviewer板块的左上角 t1，t2序号改成和worker的序号一个格式。
+
+- [x] orchestrator 请增加 1、scroll down功能 2、这个对话框可以在网站内自由拖动 3、用户可以自由在网站内放缩大小。
 
 -----
 
@@ -72,4 +75,8 @@ stage 3
 
 - stage 1
 
-- [ ] 点击 add section之后，不要用Google 弹窗，正常弹出网络窗口
+- [ ] 点击 add section之后，不要用Google 弹窗，正常弹出网页窗口。也是只允许黑白灰的简明现代风格。出现文字 “Please Name this Session" 。不需要加文字指路。
+
+- Stage 2
+
+- [ ] stage1新建的方框右下角出现一个椭圆形标识 novel mode。如果点击，会加入

@@ -558,6 +558,17 @@ function App() {
   const layoutRef = useRef<HTMLDivElement | null>(null);
   const layoutDrag = useRef<"left" | "right" | null>(null);
   const [orchChatOpen, setOrchChatOpen] = useState(false);
+  const [orchSize, setOrchSize] = useState<{ width: number; height: number }>({ width: 360, height: 420 });
+  const [orchPos, setOrchPos] = useState<{ x: number; y: number } | null>(null);
+  const orchDrag = useRef(false);
+  const orchResize = useRef<{
+    resizing: boolean;
+    startX: number;
+    startY: number;
+    startW: number;
+    startH: number;
+  }>({ resizing: false, startX: 0, startY: 0, startW: 360, startH: 420 });
+  const orchDragOffset = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
   const [deleteConfirm, setDeleteConfirm] = useState<{
     show: boolean;
     sessionId: string | null;
@@ -636,6 +647,23 @@ function App() {
     }
   }, []);
 
+  // Initialize orchestrator chat position when opened
+  useEffect(() => {
+    if (!orchChatOpen || orchPos) return;
+    const pad = 24;
+    const fallbackW = orchSize.width;
+    const fallbackH = orchSize.height;
+    if (typeof window === "undefined") return;
+    const maxW = Math.max(320, Math.min(fallbackW, window.innerWidth - pad * 2));
+    const maxH = Math.max(320, Math.min(fallbackH, window.innerHeight - pad * 2));
+    const x = Math.max(pad, window.innerWidth - maxW - pad);
+    const y = Math.max(pad, window.innerHeight - maxH - 90);
+    if (maxW !== fallbackW || maxH !== fallbackH) {
+      setOrchSize({ width: maxW, height: maxH });
+    }
+    setOrchPos({ x, y });
+  }, [orchChatOpen, orchPos, orchSize.width, orchSize.height]);
+
   // Handle mouse events for resizing panels
   useEffect(() => {
     const handleMouseMove = (e: MouseEvent) => {
@@ -666,12 +694,36 @@ function App() {
           const total = plan + worker + reviewer;
           return total > 0 ? [plan, worker, reviewer] : prev;
         });
+        return;
+      }
+
+      if (orchDrag.current && orchPos) {
+        const vw = window.innerWidth;
+        const vh = window.innerHeight;
+        const nextX = e.clientX - orchDragOffset.current.x;
+        const nextY = e.clientY - orchDragOffset.current.y;
+        const clampedX = Math.min(Math.max(8, nextX), Math.max(8, vw - orchSize.width - 8));
+        const clampedY = Math.min(Math.max(8, nextY), Math.max(8, vh - orchSize.height - 8));
+        setOrchPos({ x: clampedX, y: clampedY });
+        return;
+      }
+
+      if (orchResize.current.resizing) {
+        const { startX, startY, startW, startH } = orchResize.current;
+        const deltaX = e.clientX - startX;
+        const deltaY = e.clientY - startY;
+        const nextW = Math.max(320, startW + deltaX);
+        const nextH = Math.max(320, startH + deltaY);
+        setOrchSize({ width: nextW, height: nextH });
+        return;
       }
     };
 
     const handleMouseUp = () => {
       isDraggingSidebar.current = false;
       layoutDrag.current = null;
+      orchDrag.current = false;
+      orchResize.current.resizing = false;
       document.body.style.cursor = 'default';
       document.body.style.userSelect = 'auto';
     };
@@ -2020,10 +2072,12 @@ function App() {
               <div
                 style={{
                   position: "fixed",
-                  right: "24px",
-                  bottom: "90px",
-                  width: "360px",
-                  height: "420px",
+                  left: orchPos ? `${orchPos.x}px` : undefined,
+                  top: orchPos ? `${orchPos.y}px` : undefined,
+                  right: orchPos ? undefined : "24px",
+                  bottom: orchPos ? undefined : "90px",
+                  width: `${orchSize.width}px`,
+                  height: `${orchSize.height}px`,
                   background: "#ffffff",
                   borderRadius: "16px",
                   boxShadow: "0 20px 60px rgba(0,0,0,0.35)",
@@ -2034,32 +2088,77 @@ function App() {
                   zIndex: 60,
                 }}
               >
-                <div style={{
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "space-between",
-                  padding: "10px 14px",
-                  borderBottom: "1px solid #e5e7eb",
-                  background: "#f9fafb",
-                }}>
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    padding: "10px 14px",
+                    borderBottom: "1px solid #e5e7eb",
+                    background: "#f9fafb",
+                    cursor: "grab",
+                    userSelect: "none",
+                  }}
+                  onMouseDown={(e) => {
+                    const target = e.target as HTMLElement;
+                    if (target.closest("button")) return;
+                    const rect = (e.currentTarget.parentElement as HTMLDivElement).getBoundingClientRect();
+                    orchDrag.current = true;
+                    orchDragOffset.current = { x: e.clientX - rect.left, y: e.clientY - rect.top };
+                    if (!orchPos) {
+                      setOrchPos({ x: rect.left, y: rect.top });
+                    }
+                    document.body.style.cursor = 'grabbing';
+                    document.body.style.userSelect = 'none';
+                  }}
+                >
                   <div style={{ fontWeight: 700, fontSize: "13px" }}>Orchestrator</div>
-                  <button
-                    onClick={() => setOrchChatOpen(false)}
-                    style={{
-                      border: "none",
-                      background: "transparent",
-                      cursor: "pointer",
-                      fontSize: "16px",
-                      color: "#6b7280",
-                    }}
-                    aria-label="Close orchestrator chat"
-                  >
-                    ×
-                  </button>
+                  <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                    <button
+                      onClick={() => setOrchChatOpen(false)}
+                      style={{
+                        border: "none",
+                        background: "transparent",
+                        cursor: "pointer",
+                        fontSize: "16px",
+                        color: "#6b7280",
+                      }}
+                      aria-label="Close orchestrator chat"
+                    >
+                      ×
+                    </button>
+                  </div>
                 </div>
-                <div style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column" }}>
-                  <ExecutionView session={snapshot} onSendExecutionMessage={sendExecutionMessage} />
+                <div style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column", overflow: "hidden" }}>
+                  <div style={{ flex: 1, overflowY: "auto" }}>
+                    <ExecutionView session={snapshot} onSendExecutionMessage={sendExecutionMessage} />
+                  </div>
                 </div>
+                <div
+                  onMouseDown={(e) => {
+                    orchResize.current = {
+                      resizing: true,
+                      startX: e.clientX,
+                      startY: e.clientY,
+                      startW: orchSize.width,
+                      startH: orchSize.height,
+                    };
+                    document.body.style.cursor = 'nwse-resize';
+                    document.body.style.userSelect = 'none';
+                  }}
+                  style={{
+                    position: "absolute",
+                    right: "6px",
+                    bottom: "6px",
+                    width: "16px",
+                    height: "16px",
+                    borderRadius: "4px",
+                    background: "#f3f4f6",
+                    border: "1px solid #d1d5db",
+                    cursor: "nwse-resize",
+                    boxShadow: "inset 0 1px 0 rgba(255,255,255,0.6)",
+                  }}
+                />
               </div>
             )}
           </section>
@@ -2412,6 +2511,7 @@ function WorkerColumn({ snapshot }: { snapshot: SessionSnapshot | null }) {
 
 function CoordinatorColumn({ snapshot, width }: ColumnProps) {
   const decisions = snapshot?.coord_decisions ?? [];
+  const subtaskOrder = new Map((snapshot?.subtasks ?? []).map((s, i) => [String(s.id), i + 1]));
   return (
     <div
       style={{
@@ -2490,13 +2590,36 @@ function CoordinatorColumn({ snapshot, width }: ColumnProps) {
               key={index}
               style={{
                 marginBottom: "14px",
-                padding: "14px 16px",
+                padding: "14px 16px 14px 56px",
                 borderRadius: "16px",
                 border: "1px solid #e4e4e7",
                 background: "#ffffff",
                 boxShadow: colors.shadow,
+                position: "relative",
               }}
             >
+              {subtaskOrder.has(String(subtaskId)) && (
+                <span style={{
+                  position: "absolute",
+                  top: "14px",
+                  left: "14px",
+                  width: "28px",
+                  height: "28px",
+                  borderRadius: "50%",
+                  background: "#111827",
+                  color: "#ffffff",
+                  fontSize: "11px",
+                  fontWeight: 800,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  boxShadow: "0 8px 18px rgba(0,0,0,0.18)",
+                  textTransform: "uppercase",
+                  letterSpacing: "0.03em",
+                }}>
+                  T{subtaskOrder.get(String(subtaskId))}
+                </span>
+              )}
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "10px" }}>
                 <div style={{ display: "flex", alignItems: "center", gap: "10px", color: "#111827", fontWeight: 700, fontSize: "13px" }}>
                   <span style={{
