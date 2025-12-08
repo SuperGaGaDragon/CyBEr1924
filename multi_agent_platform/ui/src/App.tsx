@@ -2363,6 +2363,8 @@ function CoordinatorColumn({ snapshot, width }: ColumnProps) {
         display: "flex",
         flexDirection: "column",
         background: "#ffffff",
+        overflow: "hidden",
+        minHeight: 0,
       }}
     >
       <h4 style={{

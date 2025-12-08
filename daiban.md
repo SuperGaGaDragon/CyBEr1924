@@ -43,7 +43,7 @@ stage3
 
 stage4
 
-- [ ] 三个板块(plan/worker/reviewer)都要可以分别scroll down（上下滑动）。（但不允许整体的左右和上下滑动）
+- [x] 三个板块(plan/worker/reviewer)都要可以分别scroll down（上下滑动）。（但不允许整体的左右和上下滑动）
 
 - [ ] Worker的板块也要通过t1 t2这样的左上角黑色圆圈排序
 
