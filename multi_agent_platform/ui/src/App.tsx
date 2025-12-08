@@ -2287,8 +2287,10 @@ function PlanColumn({ snapshot }: { snapshot: SessionSnapshot | null }) {
 }
 
 function WorkerColumn({ snapshot }: { snapshot: SessionSnapshot | null }) {
+  const [descending, setDescending] = useState(true);
   const outputs = [...(snapshot?.worker_outputs ?? [])].sort((a, b) => {
-    return new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime();
+    const diff = new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime();
+    return descending ? -diff : diff;
   });
 
   const subtaskMap = new Map((snapshot?.subtasks ?? []).map((s) => [s.id, s.title]));
@@ -2302,14 +2304,45 @@ function WorkerColumn({ snapshot }: { snapshot: SessionSnapshot | null }) {
       padding: "20px",
       overflow: "hidden",
     }}>
-      <h4 style={{
-        margin: "0 0 12px 0",
-        fontSize: "15px",
-        fontWeight: 700,
-        color: "#000000",
-      }}>
-        Worker
-      </h4>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "12px" }}>
+        <h4 style={{
+          margin: 0,
+          fontSize: "15px",
+          fontWeight: 700,
+          color: "#000000",
+        }}>
+          Worker
+        </h4>
+        <button
+          onClick={() => setDescending((prev) => !prev)}
+          title={descending ? "最新在前" : "最旧在前"}
+          style={{
+            width: "34px",
+            height: "34px",
+            borderRadius: "10px",
+            border: "1px solid #d1d5db",
+            background: "#ffffff",
+            cursor: "pointer",
+            boxShadow: "0 6px 18px rgba(0,0,0,0.08)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            fontSize: "14px",
+            fontWeight: 700,
+            color: "#111827",
+            transition: "all 0.15s ease",
+          }}
+          onMouseOver={(e) => {
+            e.currentTarget.style.background = "#f3f4f6";
+          }}
+          onMouseOut={(e) => {
+            e.currentTarget.style.background = "#ffffff";
+          }}
+          aria-label="Toggle worker task order"
+        >
+          ⇅
+        </button>
+      </div>
       <div style={{ overflowY: "auto", flex: 1, paddingRight: "6px", display: "flex", flexDirection: "column", gap: "10px" }}>
         {outputs.length === 0 && (
           <div style={{
@@ -2332,7 +2365,7 @@ function WorkerColumn({ snapshot }: { snapshot: SessionSnapshot | null }) {
               background: "#ffffff",
               border: "1px solid #e5e7eb",
               borderRadius: "12px",
-              padding: "12px 14px",
+              padding: "12px 14px 12px 52px",
               boxShadow: "0 8px 20px rgba(0,0,0,0.05)",
               display: "flex",
               flexDirection: "column",
@@ -2342,8 +2375,8 @@ function WorkerColumn({ snapshot }: { snapshot: SessionSnapshot | null }) {
               {order && (
                 <span style={{
                   position: "absolute",
-                  top: "10px",
-                  left: "10px",
+                  top: "12px",
+                  left: "12px",
                   width: "26px",
                   height: "26px",
                   borderRadius: "50%",
