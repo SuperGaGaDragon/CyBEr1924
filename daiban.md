@@ -93,12 +93,13 @@ stage3
 - [x] 请求处理：REQUEST_PLAN_UPDATE 触发 planner 重跑/更新 plan+subtasks，并给 orchestrator 回执；REQUEST_CONTENT_CHANGE 触发标记 needs_redo + TRIGGER_REDO 调用 worker/reviewer。
 
   stage 4
-- [ ] 前端反馈：plan/content 请求时展示 sending/redo 占位，planner/worker/reviewer 结果刷新后收起；Reviewer 列同步显示 redo/accept 状态。
+- [x] 前端反馈：plan/content 请求时展示 sending/redo 占位，planner/worker/reviewer 结果刷新后收起；Reviewer 列同步显示 redo/accept 状态。
 
   stage 5
-- [ ]  验证：手动走 plan 改动与 content 改动各一条；自动测试覆盖两条路径（plan 更新写入 plan/subtasks，content 触发 redo 输出与 reviewer 状态）。
+- [x] 验证：手动走 plan 改动与 content 改动各一条；自动测试覆盖两条路径（plan 更新写入 plan/subtasks，content 触发 redo 输出与 reviewer 状态）。已补 smoke test `test_orchestrator_intent_paths.py` 覆盖 plan 更新和 content redo。
 
-stage 6 
+  stage 6 
+  - [ ] 收尾与稳态：补日志/监控（intent kind、redo 结果）、兜底错误提示（planner/worker 异常时友好回执），并清理占位 stub 标记便于后续替换真实实现。
 - [ ]  检查是否存在可能的404，500等问题
 
 

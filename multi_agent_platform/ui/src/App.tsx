@@ -2654,6 +2654,35 @@ function WorkerColumn({ snapshot }: { snapshot: SessionSnapshot | null }) {
 function CoordinatorColumn({ snapshot, width }: ColumnProps) {
   const decisions = snapshot?.coord_decisions ?? [];
   const subtaskOrder = new Map((snapshot?.subtasks ?? []).map((s, i) => [String(s.id), i + 1]));
+
+  // Derive reviewer-like statuses from subtasks when no explicit decision exists.
+  const existingIds = new Set(
+    decisions
+      .map((d) => {
+        const sid =
+          typeof d.subtask_id === "string" || typeof d.subtask_id === "number"
+            ? d.subtask_id
+            : (d as any).id;
+        return sid == null ? null : String(sid);
+      })
+      .filter(Boolean) as string[]
+  );
+
+  const derivedDecisions =
+    snapshot?.subtasks?.map((sub) => {
+      if (!sub || (sub.id != null && existingIds.has(String(sub.id)))) return null;
+      const status = sub.needs_redo ? "redo" : sub.status === "done" ? "accept" : "pending";
+      return {
+        subtask_id: sub.id,
+        decision: status,
+        reason: sub.notes || "",
+        timestamp: (sub as any).updated_at || (sub as any).ts || null,
+        source: "orchestrator",
+      };
+    }).filter(Boolean) ?? [];
+
+  const allDecisions = [...decisions, ...derivedDecisions];
+
   return (
     <div
       style={{
@@ -2690,7 +2719,7 @@ function CoordinatorColumn({ snapshot, width }: ColumnProps) {
             Reviewer decisions will appear here.
           </div>
         )}
-        {snapshot && decisions.length === 0 && (
+        {snapshot && allDecisions.length === 0 && (
           <div style={{
             color: "#4b5563",
             fontSize: "14px",
@@ -2703,7 +2732,7 @@ function CoordinatorColumn({ snapshot, width }: ColumnProps) {
             No reviewer decisions yet.
           </div>
         )}
-        {decisions.map((decision, index) => {
+        {allDecisions.map((decision, index) => {
           const statusRaw = typeof decision.decision === "string" ? decision.decision : "";
           const status = statusRaw ? statusRaw.toLowerCase() : "pending";
           const subtaskId =
