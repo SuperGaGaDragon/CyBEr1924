@@ -228,13 +228,21 @@ def get_session_snapshot(
     if not user_owns_session(current_user.id, session_id):
         raise HTTPException(status_code=404, detail="Session not found")
 
+    # Always keep a DB fallback to avoid 404 when state files are missing
+    snapshot_from_db = load_snapshot(session_id)
+    if snapshot_from_db is None:
+        raise HTTPException(status_code=404, detail="Session not found")
+
     try:
         state = orch.load_orchestrator_state(session_id)
+        snapshot = build_session_snapshot(artifact_store, state, message_bus)
+        snapshot.message = "Session snapshot loaded"
+        return SessionSnapshotModel(**snapshot.to_dict())
     except FileNotFoundError:
-        raise HTTPException(status_code=404, detail="Session not found")
-    snapshot = build_session_snapshot(artifact_store, state, message_bus)
-    snapshot.message = "Session snapshot loaded"
-    return SessionSnapshotModel(**snapshot.to_dict())
+        # State files were cleaned up or missing; fall back to the persisted snapshot
+        snap_dict = snapshot_from_db.model_dump()
+        snap_dict["message"] = snap_dict.get("message") or "Session snapshot loaded (from DB cache)"
+        return SessionSnapshotModel(**snap_dict)
 
 
 @app.post("/sessions/{session_id}/command", response_model=SessionSnapshotModel)
