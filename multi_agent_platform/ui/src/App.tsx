@@ -2100,12 +2100,12 @@ function CoordinatorColumn({ snapshot, width }: ColumnProps) {
         )}
         {snapshot && decisions.length === 0 && (
           <div style={{
-            color: "#555",
+            color: "#4b5563",
             fontSize: "14px",
             padding: "12px",
             borderRadius: "12px",
-            background: "linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)",
-            border: "1px dashed #d4d4d8",
+            background: "linear-gradient(135deg, #f7f7f7 0%, #ededed 100%)",
+            border: "1px dashed #d1d5db",
             textAlign: "center",
           }}>
             No reviewer decisions yet.
@@ -2128,10 +2128,10 @@ function CoordinatorColumn({ snapshot, width }: ColumnProps) {
                 : "";
           const ts = (decision as any).timestamp ?? (decision as any).ts ?? null;
           const palette: Record<string, { bg: string; fg: string; shadow: string }> = {
-            accept: { bg: "rgba(16, 185, 129, 0.14)", fg: "#0f766e", shadow: "0 10px 24px rgba(16,185,129,0.18)" },
-            redo: { bg: "rgba(248, 113, 113, 0.14)", fg: "#b91c1c", shadow: "0 10px 24px rgba(248,113,113,0.18)" },
-            changes_requested: { bg: "rgba(234, 179, 8, 0.14)", fg: "#92400e", shadow: "0 10px 24px rgba(234,179,8,0.18)" },
-            pending: { bg: "rgba(107, 114, 128, 0.12)", fg: "#374151", shadow: "0 10px 24px rgba(107,114,128,0.14)" },
+            accept: { bg: "rgba(16, 185, 129, 0.12)", fg: "#0f766e", shadow: "0 10px 24px rgba(16,185,129,0.18)" },
+            redo: { bg: "rgba(248, 113, 113, 0.12)", fg: "#b91c1c", shadow: "0 10px 24px rgba(248,113,113,0.18)" },
+            changes_requested: { bg: "#f5f5f5", fg: "#1f2937", shadow: "0 10px 24px rgba(0,0,0,0.06)" },
+            pending: { bg: "#f5f5f5", fg: "#1f2937", shadow: "0 10px 24px rgba(0,0,0,0.06)" },
           };
           const colors = palette[status] ?? palette.pending;
 
@@ -2155,6 +2155,7 @@ function CoordinatorColumn({ snapshot, width }: ColumnProps) {
                     background: "#f4f4f5",
                     border: "1px solid #e4e4e7",
                     letterSpacing: "0.02em",
+                    color: "#111827",
                   }}>
                     Task {subtaskId}
                   </span>
@@ -2172,7 +2173,7 @@ function CoordinatorColumn({ snapshot, width }: ColumnProps) {
                   </span>
                 </div>
                 {ts && (
-                  <span style={{ fontSize: "12px", color: "#6b7280" }}>
+                  <span style={{ fontSize: "12px", color: "#52525b" }}>
                     {new Date(ts).toLocaleString()}
                   </span>
                 )}
