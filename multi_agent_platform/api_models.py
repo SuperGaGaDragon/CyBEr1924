@@ -86,6 +86,12 @@ class SessionSnapshotModel(BaseModel):
     state: Dict[str, Any]
 
 
+class EventsResponseModel(BaseModel):
+    progress_events: List[SubtaskProgressEventModel] = Field(default_factory=list)
+    worker_outputs: List[Dict[str, Any]] = Field(default_factory=list)
+    since: Optional[datetime] = None
+
+
 class RegisterRequest(BaseModel):
     email: str
     password: str

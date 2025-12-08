@@ -85,10 +85,10 @@ def _append_progress_event(
     stage: str,
     payload: Optional[Dict[str, Any]] = None,
     ts: Optional[datetime] = None,
-) -> None:
+) -> Dict[str, Any] | None:
     """Record a subtask progress event on state; no-op if state/subtask missing."""
     if state is None or not subtask_id:
-        return
+        return None
     event = {
         "agent": agent,
         "subtask_id": subtask_id,
@@ -101,7 +101,8 @@ def _append_progress_event(
         state.progress_events.append(event)
     except Exception:
         # Defensive: avoid breaking flows if state storage is unexpected
-        return
+        return None
+    return event
 
 
 def run_worker_for_subtask(plan: Plan, subtask: Subtask, instructions: str | None) -> str:
@@ -599,6 +600,52 @@ class Orchestrator:
         )
         thread.start()
 
+    def _record_progress_event(
+        self,
+        session_id: str,
+        state: OrchestratorState | None,
+        *,
+        agent: str,
+        subtask_id: str | None,
+        stage: str,
+        payload: Optional[Dict[str, Any]] = None,
+        ts: Optional[datetime] = None,
+    ) -> None:
+        """Append a progress event, persist state, and log to progress_events.jsonl."""
+        event = _append_progress_event(state, agent=agent, subtask_id=subtask_id, stage=stage, payload=payload, ts=ts)
+        if state is None or event is None:
+            return
+
+        # Persist orchestrator state so polling sees the update immediately.
+        try:
+            self.save_orchestrator_state(state)
+        except Exception:
+            pass
+
+        # Write a progress_event log entry for timeline reconstruction.
+        try:
+            log_path = self.store.logs_dir(session_id) / "progress_events.jsonl"
+            log_path.parent.mkdir(parents=True, exist_ok=True)
+            ts_val = event.get("ts")
+            if isinstance(ts_val, datetime):
+                ts_val = ts_val.isoformat()
+            payload_obj = event.get("payload") or {}
+            record = {
+                "session_id": session_id,
+                "agent": event.get("agent"),
+                "subtask_id": event.get("subtask_id"),
+                "stage": event.get("stage"),
+                "status": event.get("status"),
+                "payload": payload_obj,
+                "ts": ts_val,
+            }
+            with log_path.open("a", encoding="utf-8") as f:
+                f.write(json.dumps(record, ensure_ascii=False))
+                f.write("\n")
+        except Exception:
+            # Logging is best-effort; do not block orchestration.
+            pass
+
     def save_orchestrator_state(self, state: OrchestratorState) -> None:
         """Save orchestrator state to orchestrator_state.json."""
         path = self._state_path(state.session_id)
@@ -693,7 +740,8 @@ class Orchestrator:
 
         while True:
             subtask.status = "in_progress"
-            _append_progress_event(
+            self._record_progress_event(
+                session_id,
                 state,
                 agent="worker",
                 subtask_id=subtask.id,
@@ -737,10 +785,13 @@ class Orchestrator:
                             timestamp=datetime.utcnow(),
                         )
                     )
+                    # Persist worker output immediately for polling clients.
+                    self.save_orchestrator_state(state)
                 except Exception:
                     # Keep orchestration running even if the in-memory cache fails
                     pass
-            _append_progress_event(
+            self._record_progress_event(
+                session_id,
                 state,
                 agent="worker",
                 subtask_id=subtask.id,
@@ -750,7 +801,8 @@ class Orchestrator:
 
             # 交互模式：让用户审核
             if interactive and user_feedback_callback:
-                _append_progress_event(
+                self._record_progress_event(
+                    session_id,
                     state,
                     agent="reviewer",
                     subtask_id=subtask.id,
@@ -787,7 +839,8 @@ class Orchestrator:
                     )
             else:
                 # 自动模式：AI 审核
-                _append_progress_event(
+                self._record_progress_event(
+                    session_id,
                     state,
                     agent="reviewer",
                     subtask_id=subtask.id,
@@ -801,7 +854,8 @@ class Orchestrator:
                 reason = "\\n".join(lines[1:]) if len(lines) > 1 else ""
                 user_feedback_text = None
 
-            _append_progress_event(
+            self._record_progress_event(
+                session_id,
                 state,
                 agent="reviewer",
                 subtask_id=subtask.id,
@@ -1305,6 +1359,18 @@ class Orchestrator:
         cmd_lower = normalized.lower()
         bare_cmd = cmd_lower.lstrip("/")
 
+        # Prevent re-entrant execution while a background run is active.
+        if state.status == "running" and bare_cmd in {"next", "all"}:
+            self._persist_plan_state(session_id, plan, state)
+            return self._render_session_snapshot(
+                session_id,
+                normalized,
+                plan,
+                state,
+                message="已有执行在进行中，请稍候再试",
+                ok=False,
+            )
+
         # Block plan edits after plan is locked
         if state.plan_locked and bare_cmd in PLAN_EDITING_KINDS:
             state.add_orchestrator_message(
@@ -1369,7 +1435,8 @@ class Orchestrator:
 
                 print(f"\n▶ 正在执行: {subtask.id} - {subtask.title}")
                 subtask.status = "in_progress"
-                _append_progress_event(
+                self._record_progress_event(
+                    session_id,
                     state,
                     agent="worker",
                     subtask_id=subtask.id,
@@ -1384,7 +1451,8 @@ class Orchestrator:
                     kind="markdown",
                     description=f"子任务 {subtask.id} 的执行结果",
                 )
-                _append_progress_event(
+                self._record_progress_event(
+                    session_id,
                     state,
                     agent="worker",
                     subtask_id=subtask.id,
@@ -1395,7 +1463,8 @@ class Orchestrator:
                 interactive_coordinator.enter_review_mode(
                     session_id, subtask, worker_output, ref_work
                 )
-                _append_progress_event(
+                self._record_progress_event(
+                    session_id,
                     state,
                     agent="reviewer",
                     subtask_id=subtask.id,
