@@ -2,13 +2,15 @@ from __future__ import annotations
 
 import json
 from dataclasses import dataclass
+import os
 from pathlib import Path
-from typing import Tuple, Optional, Dict, Any
+from typing import Tuple, Optional, Dict, Any, List
 from datetime import datetime
 
 from .agent_runner import Agent
 from .message_bus import MessageBus
 from .orchestrator_intent_agent import run_orchestrator_intent_agent
+from .planner_agent import PlannerResult, run_planner_agent
 from .prompt_registry import (
     COORDINATOR_CHAT_PROMPT,
     COORDINATOR_PROMPT,
@@ -17,7 +19,14 @@ from .prompt_registry import (
     build_coordinator_review_prompt,
     build_worker_prompt,
 )
+from .plan_model import Plan, Subtask
 from .session_state import OrchestratorState, PlannerChatMessage, build_session_snapshot
+
+USE_REAL_PLANNER = os.getenv("USE_REAL_PLANNER", "false").lower() in (
+    "1",
+    "true",
+    "yes",
+)
 
 PLAN_EDITING_KINDS = {
     "set_current_subtask",
@@ -212,31 +221,98 @@ def run_orchestrator_turn(
 def generate_stub_plan_from_planning_input(plan: Plan, user_text: str) -> Plan:
     """
     Populate/update a placeholder plan and subtasks based on planning input.
-    This will be replaced by a real planner in a later step.
+    v0.2: on every planning input, append a visible subtask so structure changes are observable.
     """
     text = (user_text or "").strip()
     if not text:
         return plan
 
-    snippet = text[:40]
-
-    if not plan.title:
-        plan.title = f"规划草稿：{snippet}"
-
+    # Seed a basic plan and initial subtasks if empty
     if not plan.subtasks:
+        plan.title = plan.title or "写一个长篇小说"
+        plan.notes = (plan.notes or "stub planner").strip()
         plan.subtasks = [
-            Subtask(id="t1", title="Outline Step 1（占位）：梳理关键主题"),
-            Subtask(id="t2", title="Outline Step 2（占位）：起草结构要点"),
+            Subtask(id="t1", title="确定小说的主题和整体思想", status="pending"),
+            Subtask(id="t2", title="设计主要人物角色和基本设定", status="pending"),
         ]
-    else:
-        # Light-touch update to reflect latest intent in notes/titles
-        first = plan.subtasks[0]
-        if not first.title:
-            first.title = "Outline Step 1（占位）：梳理关键主题"
-        if not first.notes:
-            first.notes = f"最新规划输入: {snippet}"
+
+    # Update plan notes with user input
+    notes_prefix = plan.notes or ""
+    plan.notes = f"{notes_prefix}\n[用户补充] {text}".strip()
+
+    # Append a new subtask reflecting the latest instruction
+    next_id_num = len(plan.subtasks) + 1
+    new_subtask = Subtask(
+        id=f"t{next_id_num}",
+        title=f"根据补充要求：{text}",
+        status="pending",
+        notes="来自规划对话的最新需求",
+    )
+    plan.subtasks.append(new_subtask)
 
     return plan
+
+
+def _apply_planner_result_to_state(
+    state: OrchestratorState,
+    result: PlannerResult,
+    fallback_user_text: str,
+) -> None:
+    """Merge PlannerResult back into state.plan / state.subtasks."""
+
+    plan_dict = result.plan or {}
+    subtasks_dicts = result.subtasks or []
+
+    # ---- Plan ----
+    plan_id = plan_dict.get("plan_id") or (state.plan.plan_id if state.plan else f"plan-{state.session_id}")
+    title = plan_dict.get("title") or (state.plan.title if state.plan else "Writing Project")
+    description = plan_dict.get("description") or (getattr(state.plan, "description", "") if state.plan else "")
+    notes = plan_dict.get("notes") or (getattr(state.plan, "notes", "") if state.plan else "")
+
+    state.plan = Plan(
+        plan_id=plan_id,
+        title=title,
+        description=description,
+        notes=notes,
+    )
+
+    # ---- Subtasks ----
+    new_subtasks: List[Subtask] = []
+    for idx, raw in enumerate(subtasks_dicts, start=1):
+        sub_id = raw.get("subtask_id") or f"t{idx}"
+        title = raw.get("title") or f"Subtask {idx}"
+        status = raw.get("status") or "PENDING"
+        notes = raw.get("notes") or ""
+
+        new_subtasks.append(
+            Subtask(
+                id=sub_id if hasattr(Subtask, "id") else sub_id,
+                title=title,
+                status=status.lower() if isinstance(status, str) else status,
+                notes=notes,
+                needs_redo=False,
+                output="",
+            )
+        )
+
+    if not new_subtasks:
+        # Fallback, ensure at least two tasks
+        new_subtasks = [
+            Subtask(
+                id="t1",
+                title=f"Outline: {fallback_user_text}",
+                status="pending",
+                notes="auto-generated fallback",
+            ),
+            Subtask(
+                id="t2",
+                title="Write the first section draft",
+                status="pending",
+                notes="auto-generated fallback",
+            ),
+        ]
+
+    state.subtasks = new_subtasks
 
 from .plan_model import Plan, Subtask
 from .session_store import ArtifactStore, ArtifactRef
@@ -675,7 +751,44 @@ class Orchestrator:
                 ts=datetime.utcnow(),
             )
         )
-        generate_stub_plan_from_planning_input(plan, text)
+        if USE_REAL_PLANNER:
+            if state.plan is not None:
+                try:
+                    plan_dict = state.plan.to_dict()
+                except AttributeError:
+                    plan_dict = {
+                        "plan_id": state.plan.plan_id,
+                        "title": state.plan.title,
+                        "description": getattr(state.plan, "description", ""),
+                        "notes": getattr(state.plan, "notes", ""),
+                    }
+            else:
+                plan_dict = None
+
+            subtasks_dicts: List[Dict[str, Any]] = []
+            for s in state.subtasks or []:
+                try:
+                    subtasks_dicts.append(s.to_dict())
+                except AttributeError:
+                    subtasks_dicts.append(
+                        {
+                            "subtask_id": getattr(s, "id", None) or getattr(s, "subtask_id", None),
+                            "title": s.title,
+                            "description": getattr(s, "description", ""),
+                            "status": getattr(s, "status", "pending"),
+                            "notes": getattr(s, "notes", ""),
+                        }
+                    )
+
+            result = run_planner_agent(
+                planner_chat=[msg.dict() if hasattr(msg, "dict") else msg for msg in state.planner_chat],
+                plan=plan_dict,
+                subtasks=subtasks_dicts,
+                latest_user_input=text,
+            )
+            _apply_planner_result_to_state(state, result, fallback_user_text=text)
+        else:
+            generate_stub_plan_from_planning_input(plan, text)
         return self.answer_user_question(session_id, plan, user_text)
 
     def save_state(self, session_id: str, plan: Plan) -> Path:

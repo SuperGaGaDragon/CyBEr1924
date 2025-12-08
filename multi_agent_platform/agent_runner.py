@@ -1,7 +1,7 @@
 from __future__ import annotations
 from dataclasses import dataclass
 import json
-from typing import Dict, Any, Sequence
+from typing import Dict, Any, Sequence, List
 
 from openai import OpenAI
 import os
@@ -63,8 +63,10 @@ class Agent:
 
 
 def call_llm_json(
-    system_prompt: str,
-    user_prompt: str,
+    system_prompt: str | None = None,
+    user_prompt: str | None = None,
+    messages: List[Dict[str, str]] | None = None,
+    response_schema: Dict[str, Any] | None = None,
     model: str = "gpt-4.1-mini",
 ) -> Dict[str, Any]:
     """
@@ -83,14 +85,17 @@ def call_llm_json(
     base_url = os.getenv("OPENAI_BASE_URL")
     client = OpenAI(api_key=api_key, base_url=base_url) if base_url else OpenAI(api_key=api_key)
 
-    messages = [
-        {"role": "system", "content": system_prompt},
-        {"role": "user", "content": user_prompt},
-    ]
+    if messages is None:
+        if system_prompt is None or user_prompt is None:
+            raise ValueError("Either messages or both system_prompt and user_prompt must be provided.")
+        messages = [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": user_prompt},
+        ]
 
     response = client.chat.completions.create(
         model=model,
-        response_format={"type": "json_object"},
+        response_format={"type": "json_object", "schema": response_schema} if response_schema else {"type": "json_object"},
         messages=messages,
     )
     content = response.choices[0].message.content

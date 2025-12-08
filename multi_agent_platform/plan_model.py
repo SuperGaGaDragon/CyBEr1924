@@ -18,6 +18,7 @@ class Subtask:
     id: str
     title: str
     status: str = "pending"
+    description: str = ""
     notes: str = ""
     output: str = ""
     needs_redo: bool = False
@@ -26,6 +27,7 @@ class Subtask:
         return {
             "id": self.id,
             "title": self.title,
+            "description": self.description,
             "status": self.status,
             "notes": self.notes,
             "output": self.output,
@@ -37,6 +39,7 @@ class Subtask:
         return cls(
             id=data["id"],
             title=data["title"],
+            description=data.get("description", ""),
             status=data.get("status", "pending"),
             notes=data.get("notes", ""),
             output=data.get("output", ""),
@@ -54,6 +57,7 @@ class Plan:
     """
     plan_id: str
     title: str
+    description: str = ""
     notes: str = ""
     subtasks: List[Subtask] = field(default_factory=list)
 
@@ -61,6 +65,7 @@ class Plan:
         return {
             "plan_id": self.plan_id,
             "title": self.title,
+            "description": self.description,
             "notes": self.notes,
             "subtasks": [s.to_dict() for s in self.subtasks],
         }
@@ -74,6 +79,7 @@ class Plan:
         return cls(
             plan_id=data["plan_id"],
             title=data["title"],
+            description=data.get("description", ""),
             notes=data.get("notes", ""),
             subtasks=subtasks,
         )
