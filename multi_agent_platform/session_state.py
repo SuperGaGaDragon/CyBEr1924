@@ -82,6 +82,21 @@ class OrchestratorState:
         """Convert to JSON string."""
         return json.dumps(self.to_dict(), ensure_ascii=False, indent=2)
 
+    def add_orchestrator_message(
+        self,
+        role: str,
+        content: str,
+        ts: Optional[datetime] = None,
+    ) -> None:
+        """Record a user/orchestrator message for future orchestration flows."""
+        if role not in ("user", "orchestrator"):
+            return
+        if ts is None:
+            ts = datetime.utcnow()
+        self.orchestrator_messages.append(
+            OrchestratorMessage(role=role, content=content, ts=ts)
+        )
+
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "OrchestratorState":
         """Create from dictionary."""

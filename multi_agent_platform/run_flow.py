@@ -4,6 +4,7 @@ import json
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Tuple, Optional, Dict, Any
+from datetime import datetime
 
 from .agent_runner import Agent
 from .message_bus import MessageBus
@@ -17,8 +18,74 @@ from .prompt_registry import (
 )
 from .session_state import (
     OrchestratorState,
+    OrchestratorEvent,
     build_session_snapshot,
 )
+
+def run_orchestrator_turn(
+    state: OrchestratorState,
+    user_text: str,
+    ts: Optional[datetime] = None,
+) -> None:
+    """
+    Unified orchestrator hook.
+
+    Current behavior:
+      - No LLM calls, no plan changes, no redo triggers.
+      - Performs a coarse intent guess and records an internal orch_event for future orchestration.
+    """
+    text = (user_text or "").strip()
+    if not text:
+        return
+
+    if ts is None:
+        ts = datetime.utcnow()
+
+    lower = text.lower()
+
+    plan_keywords = [
+        "outline", "structure", "chapter", "chapters", "section", "sections",
+        "plan", "大纲", "结构", "章节", "目录", "多加一章", "删掉一章",
+    ]
+    content_keywords = [
+        "rewrite", "rewriting", "tone", "style", "make it funnier",
+        "改内容", "重写", "风格", "语气", "搞笑一点", "严肃一点", "润色", "改这段",
+    ]
+
+    intent = "other"
+    to_role = "worker"
+
+    if any(k in lower for k in plan_keywords):
+        intent = "plan_change"
+        to_role = "planner"
+    elif any(k in lower for k in content_keywords):
+        intent = "content_change"
+        to_role = "reviewer"
+
+    event = OrchestratorEvent(
+        from_role="orchestrator",
+        to_role=to_role,
+        kind="USER_MESSAGE",
+        payload={
+            "raw_text": text,
+            "intent": intent,
+        },
+        ts=ts,
+    )
+    state.orch_events.append(event)
+
+    if intent == "plan_change":
+        summary_text = "Orchestrator (internal): detected this as a possible plan change request."
+    elif intent == "content_change":
+        summary_text = "Orchestrator (internal): detected this as a possible content change request."
+    else:
+        summary_text = "Orchestrator (internal): intent unclear or general question; no action taken yet."
+
+    state.add_orchestrator_message(
+        role="orchestrator",
+        content=summary_text,
+        ts=ts,
+    )
 
 from .plan_model import Plan, Subtask
 from .session_store import ArtifactStore, ArtifactRef
@@ -610,6 +677,8 @@ class Orchestrator:
 
         # Interactive review branch
         if interactive_coordinator and interactive_coordinator.is_reviewing():
+            state.add_orchestrator_message(role="user", content=normalized)
+            run_orchestrator_turn(state, normalized)
             plan, message = interactive_coordinator.process_user_input(
                 session_id, plan, normalized
             )
@@ -885,6 +954,8 @@ class Orchestrator:
                     message="请提供问答内容",
                     ok=False,
                 )
+            state.add_orchestrator_message(role="user", content=question)
+            run_orchestrator_turn(state, question)
             answer = self.answer_user_question(session_id, plan, question)
             self._persist_plan_state(session_id, plan, state)
             return self._render_session_snapshot(
@@ -897,6 +968,8 @@ class Orchestrator:
 
         # Natural language / fallback handling
         if interactive_coordinator:
+            state.add_orchestrator_message(role="user", content=normalized)
+            run_orchestrator_turn(state, normalized)
             plan, message = interactive_coordinator.process_user_input(
                 session_id, plan, normalized
             )
@@ -911,6 +984,8 @@ class Orchestrator:
                 context=interactive_coordinator.get_context(),
             )
         else:
+            state.add_orchestrator_message(role="user", content=normalized)
+            run_orchestrator_turn(state, normalized)
             answer = self.answer_user_question(session_id, plan, normalized)
             self._persist_plan_state(session_id, plan, state)
             return self._render_session_snapshot(
