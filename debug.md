@@ -28,9 +28,13 @@ Phase 2：Timeline/Output 互斥切换
   - 未实际操作验证，请按步骤检查。  
 
 Phase 3：Reviewer 排序按钮  
-- [ ] 3.1 复用 Worker 排序逻辑（升降序 toggle）。  
-- [ ] 3.2 UI：放在 Reviewer 右上，与 view toggle 同区域，确保 z-index 足够，点击不被遮挡。  
-- [ ] 3.3 验证计划：排序切换生效，列表顺序变化可见。  
+- [✅] 3.1 复用 Worker 排序逻辑（升降序 toggle）。  
+  - Reviewer 列新增 descending state，按 timestamp/ts 排序，默认最新在前，切换逆序（multi_agent_platform/ui/src/App.tsx:3010-3052,3144-3184）。  
+- [✅] 3.2 UI：放在 Reviewer 右上，与 view toggle 同区域，确保 z-index 足够，点击不被遮挡。  
+  - 右上角添加与 Worker 相同样式的排序按钮，紧挨 Timeline/Output 组（multi_agent_platform/ui/src/App.tsx:3069-3136）。  
+- [✅] 3.3 验证计划：排序切换生效，列表顺序变化可见。  
+  - 手动步骤：切到 Reviewer Output 模式，点击排序按钮，观察决策卡片时间顺序前后切换；在 Timeline 模式不影响进度渲染。  
+  - 预期：默认最新在前；切换后按时间升序。未实际操作验证，请执行上述步骤确认。  
 
 Phase 4：输出展示优化  
 - [ ] 4.1 输出截断：output 模式下默认显示前 ~300 词/字符 preview，保留进度标签。  

@@ -3011,6 +3011,7 @@ function CoordinatorColumn({ snapshot, width, progress = [], progressSeenCount =
   const baseDecisions: any[] = snapshot?.coord_decisions ?? [];
   const subtaskOrder = new Map((snapshot?.subtasks ?? []).map((s, i) => [String(s.id), i + 1]));
   const activeViewMode: ViewMode = viewMode ?? "timeline";
+  const [descending, setDescending] = useState(true);
 
   // Derive reviewer-like statuses from subtasks when no explicit decision exists.
   const existingIds = new Set(
@@ -3041,6 +3042,14 @@ function CoordinatorColumn({ snapshot, width, progress = [], progressSeenCount =
       .filter(Boolean) as any[] ?? [];
 
   const decisions = [...baseDecisions, ...derivedDecisions];
+  const sortedDecisions = [...decisions].sort((a, b) => {
+    const taRaw = (a as any)?.timestamp ?? (a as any)?.ts ?? null;
+    const tbRaw = (b as any)?.timestamp ?? (b as any)?.ts ?? null;
+    const ta = taRaw ? new Date(taRaw).getTime() : 0;
+    const tb = tbRaw ? new Date(tbRaw).getTime() : 0;
+    const diff = ta - tb;
+    return descending ? -diff : diff;
+  });
 
   return (
     <div
@@ -3092,6 +3101,39 @@ function CoordinatorColumn({ snapshot, width, progress = [], progressSeenCount =
               );
             })}
           </div>
+          <button
+            onClick={() => setDescending((prev) => !prev)}
+            title={descending ? "最新在前" : "最旧在前"}
+            aria-pressed={descending}
+            style={{
+              width: "38px",
+              height: "38px",
+              borderRadius: "12px",
+              border: "1px solid #d1d5db",
+              background: descending ? "linear-gradient(135deg, #0f172a 0%, #1f2937 100%)" : "#ffffff",
+              cursor: "pointer",
+              boxShadow: descending ? "0 12px 26px rgba(0,0,0,0.14)" : "0 6px 18px rgba(0,0,0,0.08)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              transition: "all 0.2s ease",
+              zIndex: 5,
+            }}
+            onMouseOver={(e) => {
+              e.currentTarget.style.borderColor = "#0f172a";
+              e.currentTarget.style.boxShadow = "0 12px 30px rgba(0,0,0,0.16)";
+            }}
+            onMouseOut={(e) => {
+              e.currentTarget.style.borderColor = "#d1d5db";
+              e.currentTarget.style.boxShadow = descending ? "0 12px 26px rgba(0,0,0,0.14)" : "0 6px 18px rgba(0,0,0,0.08)";
+            }}
+            aria-label="Toggle reviewer decision order"
+          >
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M8 5.5L12 2L16 5.5H13.5V14.5H10.5V5.5H8Z" fill={descending ? "#ffffff" : "#111827"} />
+              <path d="M16 18.5L12 22L8 18.5H10.5V9.5H13.5V18.5H16Z" fill={descending ? "#ffffff" : "#111827"} />
+            </svg>
+          </button>
         </div>
       </div>
       {activeViewMode === "timeline" ? (
@@ -3141,7 +3183,7 @@ function CoordinatorColumn({ snapshot, width, progress = [], progressSeenCount =
               No reviewer decisions yet.
             </div>
           )}
-          {decisions.map((decision, index) => {
+          {sortedDecisions.map((decision, index) => {
             const statusRaw = typeof decision?.decision === "string" ? decision.decision : "";
             const status = statusRaw ? statusRaw.toLowerCase() : "pending";
             const subtaskId =
