@@ -257,7 +257,7 @@ function App() {
     })();
   }, [auth.isLoggedIn, auth.accessToken]);
 
-  async function handleLogin(e: React.FormEvent) {
+  async function handleLogin(e: FormEvent) {
     e.preventDefault();
     setAuth((prev) => ({ ...prev, authError: null }));
 
@@ -293,7 +293,7 @@ function App() {
     }
   }
 
-  async function handleRegister(e: React.FormEvent) {
+  async function handleRegister(e: FormEvent) {
     e.preventDefault();
     setAuth((prev) => ({ ...prev, authError: null }));
 
@@ -322,7 +322,7 @@ function App() {
     }
   }
 
-  async function handleVerify(e: React.FormEvent) {
+  async function handleVerify(e: FormEvent) {
     e.preventDefault();
     setAuth((prev) => ({ ...prev, authError: null }));
 
@@ -430,24 +430,6 @@ function App() {
         ...prev,
         loading: false,
         error: err.message ?? "Plan edit command failed",
-      }));
-    }
-  }
-
-  async function handleAsk(question: string) {
-    if (!state.activeSessionId || !question.trim()) return;
-    setState((prev) => ({ ...prev, loading: true, error: null }));
-    try {
-      const snapshot = await sendCommand(state.activeSessionId, "ask", {
-        question,
-      });
-      setState((prev) => ({ ...prev, loading: false, snapshot }));
-    } catch (err: any) {
-      if (handleAuthError(err)) return;
-      setState((prev) => ({
-        ...prev,
-        loading: false,
-        error: err.message ?? "Ask failed",
       }));
     }
   }
@@ -1434,7 +1416,7 @@ function App() {
             onMouseOver={(e) => e.currentTarget.style.background = "#e0e0e0"}
             onMouseOut={(e) => e.currentTarget.style.background = "transparent"}
           />
-          <CoordinatorColumn snapshot={snapshot} onAsk={handleAsk} width={coordinatorWidth} />
+          <CoordinatorColumn snapshot={snapshot} width={coordinatorWidth} />
         </section>
       </main>
 
@@ -2080,21 +2062,8 @@ function WorkerColumn({ snapshot, width }: ColumnProps) {
   );
 }
 
-function CoordinatorColumn({
-  snapshot,
-  onAsk,
-  width,
-}: ColumnProps & { onAsk: (question: string) => void }) {
-  const [input, setInput] = useState("");
-
-  function handleSubmit(event: FormEvent) {
-    event.preventDefault();
-    const question = input.trim();
-    if (!question) return;
-    onAsk(question);
-    setInput("");
-  }
-
+function CoordinatorColumn({ snapshot, width }: ColumnProps) {
+  const decisions = snapshot?.coord_decisions ?? [];
   return (
     <div
       style={{
@@ -2124,170 +2093,121 @@ function CoordinatorColumn({
           marginBottom: "16px",
         }}
       >
-        {!snapshot && <div style={{ color: "#666666", fontSize: "14px" }}>Chat with the Reviewer here.</div>}
-        {snapshot &&
-          snapshot.chat_history.map((message, index) => {
-            const payload: any = message.payload ?? {};
-            const payloadType = (message as any).payload_type as string | undefined;
-            const decisionRaw = typeof payload.decision === "string" ? payload.decision : undefined;
-            const decision = decisionRaw ? decisionRaw.toLowerCase() : undefined;
-            const subtaskId =
-              typeof payload.subtask_id === "string"
-                ? payload.subtask_id
-                : typeof payload.id === "string"
-                  ? payload.id
-                  : undefined;
-            const reason =
-              typeof payload.reason === "string"
-                ? payload.reason
-                : typeof payload.comment === "string"
-                  ? payload.comment
-                  : undefined;
-            const isReview = Boolean(decision || reason || subtaskId || payloadType === "COORD_DECISION");
-            const isUser = message.role === "user";
+        {!snapshot && (
+          <div style={{ color: "#666666", fontSize: "14px" }}>
+            Reviewer decisions will appear here.
+          </div>
+        )}
+        {snapshot && decisions.length === 0 && (
+          <div style={{
+            color: "#555",
+            fontSize: "14px",
+            padding: "12px",
+            borderRadius: "12px",
+            background: "linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)",
+            border: "1px dashed #d4d4d8",
+            textAlign: "center",
+          }}>
+            No reviewer decisions yet.
+          </div>
+        )}
+        {decisions.map((decision, index) => {
+          const statusRaw = typeof decision.decision === "string" ? decision.decision : "";
+          const status = statusRaw ? statusRaw.toLowerCase() : "pending";
+          const subtaskId =
+            typeof decision.subtask_id === "string" || typeof decision.subtask_id === "number"
+              ? decision.subtask_id
+              : typeof (decision as any).id === "string" || typeof (decision as any).id === "number"
+                ? (decision as any).id
+                : "—";
+          const reason =
+            typeof decision.reason === "string"
+              ? decision.reason
+              : typeof (decision as any).comment === "string"
+                ? (decision as any).comment
+                : "";
+          const ts = (decision as any).timestamp ?? (decision as any).ts ?? null;
+          const palette: Record<string, { bg: string; fg: string; shadow: string }> = {
+            accept: { bg: "rgba(16, 185, 129, 0.14)", fg: "#0f766e", shadow: "0 10px 24px rgba(16,185,129,0.18)" },
+            redo: { bg: "rgba(248, 113, 113, 0.14)", fg: "#b91c1c", shadow: "0 10px 24px rgba(248,113,113,0.18)" },
+            changes_requested: { bg: "rgba(234, 179, 8, 0.14)", fg: "#92400e", shadow: "0 10px 24px rgba(234,179,8,0.18)" },
+            pending: { bg: "rgba(107, 114, 128, 0.12)", fg: "#374151", shadow: "0 10px 24px rgba(107,114,128,0.14)" },
+          };
+          const colors = palette[status] ?? palette.pending;
 
-            if (isReview) {
-              const status = decision ?? "pending";
-              const statusColor =
-                status === "accept"
-                  ? "#16a34a"
-                  : status === "redo"
-                    ? "#dc2626"
-                    : "#6b7280";
-              const statusBg =
-                status === "accept"
-                  ? "rgba(22,163,74,0.12)"
-                  : status === "redo"
-                    ? "rgba(220,38,38,0.12)"
-                    : "rgba(107,114,128,0.12)";
-
-              return (
-                <div
-                  key={index}
-                  style={{
-                    marginBottom: "12px",
-                    padding: "12px 14px",
-                    borderRadius: "12px",
-                    border: "1px solid #e0e0e0",
-                    background: "#ffffff",
-                    boxShadow: "0 6px 18px rgba(0,0,0,0.04)",
-                  }}
-                >
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "6px" }}>
-                    <div style={{ fontSize: "12px", fontWeight: 700, color: "#111827" }}>
-                      Task {subtaskId ?? "—"}
-                    </div>
-                    <div
-                      style={{
-                        padding: "4px 10px",
-                        borderRadius: "999px",
-                        background: statusBg,
-                        color: statusColor,
-                        fontSize: "11px",
-                        fontWeight: 700,
-                        letterSpacing: "0.03em",
-                        textTransform: "uppercase",
-                      }}
-                    >
-                      {status}
-                    </div>
-                  </div>
-                  <div style={{ fontSize: "12px", color: "#374151", lineHeight: "1.5", whiteSpace: "pre-wrap" }}>
-                    {reason ?? JSON.stringify(payload, null, 2)}
-                  </div>
+          return (
+            <div
+              key={index}
+              style={{
+                marginBottom: "14px",
+                padding: "14px 16px",
+                borderRadius: "16px",
+                border: "1px solid #e4e4e7",
+                background: "#ffffff",
+                boxShadow: colors.shadow,
+              }}
+            >
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "10px" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: "10px", color: "#111827", fontWeight: 700, fontSize: "13px" }}>
+                  <span style={{
+                    padding: "6px 12px",
+                    borderRadius: "999px",
+                    background: "#f4f4f5",
+                    border: "1px solid #e4e4e7",
+                    letterSpacing: "0.02em",
+                  }}>
+                    Task {subtaskId}
+                  </span>
+                  <span style={{
+                    padding: "6px 12px",
+                    borderRadius: "999px",
+                    background: colors.bg,
+                    color: colors.fg,
+                    fontSize: "12px",
+                    fontWeight: 800,
+                    textTransform: "uppercase",
+                    letterSpacing: "0.05em",
+                  }}>
+                    {statusRaw || "Pending"}
+                  </span>
                 </div>
-              );
-            }
-
-            const response =
-              typeof payload.response === "string"
-                ? payload.response
-                : null;
-            const text =
-              typeof payload.text === "string"
-                ? payload.text
-                : null;
-            const fallback =
-              typeof message.payload === "object"
-                ? JSON.stringify(message.payload)
-                : String(message.payload ?? "");
-            const content = response ?? text ?? fallback;
-
-            return (
-              <div key={index} style={{ marginBottom: "16px" }}>
-                <div style={{
-                  fontSize: "10px",
-                  color: "#666666",
-                  marginBottom: "6px",
-                  textTransform: "uppercase",
-                  letterSpacing: "0.5px",
-                  fontWeight: "600",
-                }}>
-                  {message.role ?? payloadType ?? "message"}
-                </div>
-                <div style={{
-                  background: isUser ? "#000000" : "#ffffff",
-                  color: isUser ? "#ffffff" : "#000000",
-                  padding: "12px 14px",
-                  borderRadius: "10px",
-                  fontSize: "13px",
-                  lineHeight: "1.6",
-                  border: isUser ? "none" : "1px solid #e0e0e0",
-                  whiteSpace: "pre-wrap",
-                }}>
-                  {content}
-                </div>
+                {ts && (
+                  <span style={{ fontSize: "12px", color: "#6b7280" }}>
+                    {new Date(ts).toLocaleString()}
+                  </span>
+                )}
               </div>
-            );
-          })}
+              <div style={{
+                fontSize: "13px",
+                color: "#1f2937",
+                lineHeight: "1.7",
+                whiteSpace: "pre-wrap",
+              }}>
+                {reason || "No additional notes provided."}
+              </div>
+              {decision.source && (
+                <div style={{
+                  marginTop: "10px",
+                  fontSize: "12px",
+                  color: "#6b7280",
+                  display: "flex",
+                  gap: "8px",
+                  alignItems: "center",
+                }}>
+                  <span style={{
+                    width: "6px",
+                    height: "6px",
+                    borderRadius: "999px",
+                    background: "#9ca3af",
+                    display: "inline-block",
+                  }} />
+                  <span>by {decision.source}</span>
+                </div>
+              )}
+            </div>
+          );
+        })}
       </div>
-      <form
-        onSubmit={handleSubmit}
-        style={{ display: "flex", gap: "8px" }}
-      >
-        <input
-          type="text"
-          placeholder="Ask the reviewer…"
-          value={input}
-          onChange={(event) => setInput(event.target.value)}
-          style={{
-            flex: 1,
-            padding: "12px 16px",
-            fontSize: "14px",
-            border: "1px solid #e0e0e0",
-            borderRadius: "8px",
-            outline: "none",
-            transition: "all 0.2s ease",
-            background: "#ffffff",
-            color: "#000000",
-          }}
-          onFocus={(e) => e.currentTarget.style.borderColor = "#000000"}
-          onBlur={(e) => e.currentTarget.style.borderColor = "#e0e0e0"}
-        />
-        <button
-          type="submit"
-          disabled={!snapshot}
-          style={{
-            padding: "12px 24px",
-            background: snapshot ? "#000000" : "#e0e0e0",
-            color: snapshot ? "#ffffff" : "#999999",
-            border: "none",
-            borderRadius: "8px",
-            fontSize: "14px",
-            fontWeight: "600",
-            cursor: snapshot ? "pointer" : "not-allowed",
-            transition: "all 0.2s ease",
-          }}
-          onMouseOver={(e) => {
-            if (snapshot) e.currentTarget.style.background = "#333333";
-          }}
-          onMouseOut={(e) => {
-            if (snapshot) e.currentTarget.style.background = "#000000";
-          }}
-        >
-          Ask
-        </button>
-      </form>
     </div>
   );
 }
