@@ -58,6 +58,15 @@ class OrchestratorState:
     orch_events: List[OrchestratorEvent] = field(default_factory=list)
     planner_chat: List[PlannerChatMessage] = field(default_factory=list)
 
+    @property
+    def session_mode(self) -> str:
+        """
+        Derived session mode:
+          - planning: plan not locked
+          - execution: plan locked
+        """
+        return "execution" if self.plan_locked else "planning"
+
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary for JSON serialization."""
         d = asdict(self)
@@ -196,6 +205,7 @@ class SessionSnapshot:
     coord_decisions: List[Dict[str, Any]]
     chat_history: List[Dict[str, Any]]
     plan_locked: bool = False
+    session_mode: str = "planning"
     orchestrator_messages: List[Dict[str, Any]] = field(default_factory=list)
     orch_events: List[Dict[str, Any]] = field(default_factory=list)
     planner_chat: List[Dict[str, Any]] = field(default_factory=list)
@@ -219,6 +229,7 @@ class SessionSnapshot:
             "coord_decisions": self.coord_decisions,
             "chat_history": self.chat_history,
             "plan_locked": self.plan_locked,
+            "session_mode": self.session_mode,
             "orchestrator_messages": self.orchestrator_messages,
             "orch_events": self.orch_events,
             "planner_chat": self.planner_chat,
@@ -352,6 +363,7 @@ def build_session_snapshot(
     ]
 
     state_dict = orchestrator_state.to_dict()
+    state_dict["session_mode"] = orchestrator_state.session_mode
 
     orchestrator_messages = [
         msg.dict() if hasattr(msg, "dict") else msg
@@ -377,6 +389,7 @@ def build_session_snapshot(
         coord_decisions=coord_list,
         chat_history=chat_history,
         plan_locked=orchestrator_state.plan_locked,
+        session_mode=orchestrator_state.session_mode,
         orchestrator_messages=orchestrator_messages,
         orch_events=orch_events,
         planner_chat=planner_chat,

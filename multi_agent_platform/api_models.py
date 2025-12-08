@@ -64,6 +64,7 @@ class SessionSnapshotModel(BaseModel):
     coord_decisions: List[Dict[str, Any]]
     chat_history: List[Dict[str, Any]]
     plan_locked: bool = False
+    session_mode: Literal["planning", "execution"] = "planning"
     orchestrator_messages: List[OrchestratorMessageModel] = Field(default_factory=list)
     orch_events: List[OrchestratorEventModel] = Field(default_factory=list)
     planner_chat: List[PlannerChatMessageModel] = Field(default_factory=list)

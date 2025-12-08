@@ -88,6 +88,36 @@ def run_orchestrator_turn(
         ts=ts,
     )
 
+
+def generate_stub_plan_from_planning_input(plan: Plan, user_text: str) -> Plan:
+    """
+    Populate/update a placeholder plan and subtasks based on planning input.
+    This will be replaced by a real planner in a later step.
+    """
+    text = (user_text or "").strip()
+    if not text:
+        return plan
+
+    snippet = text[:40]
+
+    if not plan.title:
+        plan.title = f"规划草稿：{snippet}"
+
+    if not plan.subtasks:
+        plan.subtasks = [
+            Subtask(id="t1", title="Outline Step 1（占位）：梳理关键主题"),
+            Subtask(id="t2", title="Outline Step 2（占位）：起草结构要点"),
+        ]
+    else:
+        # Light-touch update to reflect latest intent in notes/titles
+        first = plan.subtasks[0]
+        if not first.title:
+            first.title = "Outline Step 1（占位）：梳理关键主题"
+        if not first.notes:
+            first.notes = f"最新规划输入: {snippet}"
+
+    return plan
+
 from .plan_model import Plan, Subtask
 from .session_store import ArtifactStore, ArtifactRef
 
@@ -511,6 +541,8 @@ class Orchestrator:
         """
         Entry point for planning-phase user messages. Currently delegates to existing answer logic.
         """
+        if state.plan_locked:
+            return self.answer_user_question(session_id, plan, user_text)
         text = (user_text or "").strip()
         if text:
             state.planner_chat.append(
@@ -523,6 +555,7 @@ class Orchestrator:
                 ts=datetime.utcnow(),
             )
         )
+        generate_stub_plan_from_planning_input(plan, text)
         return self.answer_user_question(session_id, plan, user_text)
 
     def save_state(self, session_id: str, plan: Plan) -> Path:

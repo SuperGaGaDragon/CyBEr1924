@@ -69,6 +69,7 @@ export type SessionSnapshot = {
   coord_decisions: Record<string, any>[];
   chat_history: ChatMessage[];
   plan_locked: boolean;
+  session_mode: "planning" | "execution";
   orchestrator_messages: OrchestratorMessage[];
   orch_events: OrchestratorEvent[];
   planner_chat: PlannerChatMessage[];
