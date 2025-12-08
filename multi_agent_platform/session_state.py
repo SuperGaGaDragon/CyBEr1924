@@ -380,7 +380,16 @@ def build_session_snapshot(
 
     # Use serialized versions from state_dict to avoid datetime leakage
     orchestrator_messages = state_dict.get("orchestrator_messages", [])
-    orch_events = state_dict.get("orch_events", [])
+    raw_events = state_dict.get("orch_events", [])
+    # Filter out malformed orch_events to avoid downstream validation errors
+    orch_events = []
+    for ev in raw_events:
+        if not isinstance(ev, dict):
+            continue
+        if not all(k in ev for k in ("from_role", "to_role", "kind")):
+            continue
+        ts_val = ev.get("ts")
+        orch_events.append({**ev, "ts": ts_val})
     planner_chat = state_dict.get("planner_chat", [])
 
     return SessionSnapshot(

@@ -1,12 +1,14 @@
 # multi_agent_platform/db_session_store.py
 
+from fastapi.encoders import jsonable_encoder
+
 from .db import SessionLocal, DbSession, DbUserSession
 from ..api_models import SessionSnapshotModel
 
 
 def save_snapshot(session_id: str, snapshot: SessionSnapshotModel) -> None:
     """保存或更新一条 session 记录到数据库。"""
-    data = snapshot.model_dump()  # 如果你还是 Pydantic v1，就改成 snapshot.dict()
+    data = jsonable_encoder(snapshot)  # ensure datetimes are serialized
     with SessionLocal() as db:
         db_obj = db.get(DbSession, session_id)
         if db_obj is None:
