@@ -184,8 +184,8 @@ stage 4
 - Planner 必须 real 模式调试大纲
   - [x] 确认运行环境的 env：设置 `USE_REAL_PLANNER=true`，并确保 `OPENAI_API_KEY` / `OPENAI_BASE_URL` 生效（无 key 会走 stub）。
   - [x] 后端启动/部署流程补充 env 校验：缺失时启动即抛错或显式警告阻止 fallback stub。
-  - [] 本地快速验证：执行一次 planning 对话，观察 planner_chat 长度递增且 plan/subtasks 被重写（不再追加 stub）。
-  - [] 如有需要，补一条集成测试覆盖 `USE_REAL_PLANNER=true` 下 planner 更新 plan/subtasks。
+  - [x] 本地快速验证：执行一次 planning 对话，观察 planner_chat 长度递增且 plan/subtasks 被重写（不再追加 stub）。
+  - [x] 如有需要，补一条集成测试覆盖 `USE_REAL_PLANNER=true` 下 planner 更新 plan/subtasks。
 
 
 ### 小说专用模式设计
