@@ -554,6 +554,7 @@ function App() {
   });
 
   const [sidebarWidth, setSidebarWidth] = useState(320);
+  const [orchChatOpen, setOrchChatOpen] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState<{
     show: boolean;
     sessionId: string | null;
@@ -1919,27 +1920,75 @@ function App() {
           </section>
         ) : (
           <section id="main-content" style={{ flex: 1, display: "flex", overflow: "hidden", position: "relative" }}>
-            <div style={{ flex: 1, display: "flex", overflow: "hidden" }}>
-              {snapshot && (
-                <ExecutionView
-                  session={snapshot}
-                  onSendExecutionMessage={sendExecutionMessage}
-                />
-              )}
-              <div
+            <div style={{ display: "grid", gridTemplateColumns: "32% 36% 32%", width: "100%", height: "100%", overflow: "hidden" }}>
+              <PlanColumn snapshot={snapshot} />
+              <WorkerColumn snapshot={snapshot} />
+              <CoordinatorColumn snapshot={snapshot} width={100} />
+            </div>
+            <div style={{ position: "fixed", right: "24px", bottom: "24px", zIndex: 50 }}>
+              <button
+                onClick={() => setOrchChatOpen(true)}
                 style={{
-                  width: "32%",
-                  borderLeft: "1px solid #e5e7eb",
-                  background: "#ffffff",
-                  display: "flex",
-                  flexDirection: "column",
-                  overflowY: "auto",
-                  minHeight: 0,
+                  padding: "14px 18px",
+                  borderRadius: "999px",
+                  border: "none",
+                  background: "#000000",
+                  color: "#ffffff",
+                  fontWeight: 700,
+                  cursor: "pointer",
+                  boxShadow: "0 12px 30px rgba(0,0,0,0.25)",
                 }}
               >
-                <CoordinatorColumn snapshot={snapshot} width={100} />
-              </div>
+                Chat with Orchestrator
+              </button>
             </div>
+
+            {orchChatOpen && snapshot && (
+              <div
+                style={{
+                  position: "fixed",
+                  right: "24px",
+                  bottom: "90px",
+                  width: "360px",
+                  height: "420px",
+                  background: "#ffffff",
+                  borderRadius: "16px",
+                  boxShadow: "0 20px 60px rgba(0,0,0,0.35)",
+                  border: "1px solid #e5e7eb",
+                  overflow: "hidden",
+                  display: "flex",
+                  flexDirection: "column",
+                  zIndex: 60,
+                }}
+              >
+                <div style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  padding: "10px 14px",
+                  borderBottom: "1px solid #e5e7eb",
+                  background: "#f9fafb",
+                }}>
+                  <div style={{ fontWeight: 700, fontSize: "13px" }}>Orchestrator</div>
+                  <button
+                    onClick={() => setOrchChatOpen(false)}
+                    style={{
+                      border: "none",
+                      background: "transparent",
+                      cursor: "pointer",
+                      fontSize: "16px",
+                      color: "#6b7280",
+                    }}
+                    aria-label="Close orchestrator chat"
+                  >
+                    ×
+                  </button>
+                </div>
+                <div style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column" }}>
+                  <ExecutionView session={snapshot} onSendExecutionMessage={sendExecutionMessage} />
+                </div>
+              </div>
+            )}
           </section>
         )}
       </main>
@@ -2070,6 +2119,166 @@ function App() {
 }
 
 type ColumnProps = { snapshot: SessionSnapshot | null; width: number };
+
+function PlanColumn({ snapshot }: { snapshot: SessionSnapshot | null }) {
+  const planTitle = snapshot?.plan?.title || snapshot?.topic || "Plan";
+  const subtasks = snapshot?.subtasks ?? [];
+
+  return (
+    <div style={{
+      borderRight: "1px solid #e5e7eb",
+      background: "#ffffff",
+      display: "flex",
+      flexDirection: "column",
+      padding: "20px",
+      overflow: "hidden",
+    }}>
+      <h4 style={{
+        margin: "0 0 12px 0",
+        fontSize: "15px",
+        fontWeight: 700,
+        color: "#000000",
+      }}>
+        Plan (read-only)
+      </h4>
+      <div style={{
+        padding: "12px 14px",
+        borderRadius: "10px",
+        border: "1px solid #e5e7eb",
+        background: "#f9fafb",
+        marginBottom: "12px",
+        fontWeight: 600,
+        fontSize: "14px",
+        color: "#111827",
+      }}>
+        {planTitle}
+      </div>
+      <div style={{ overflowY: "auto", flex: 1, paddingRight: "6px" }}>
+        {subtasks.length === 0 && (
+          <div style={{ color: "#6b7280", fontSize: "14px" }}>
+            No subtasks available.
+          </div>
+        )}
+        <ol style={{ listStyle: "none", padding: 0, margin: 0, display: "flex", flexDirection: "column", gap: "10px" }}>
+          {subtasks.map((task, idx) => (
+            <li key={task.id} style={{
+              padding: "12px 12px",
+              borderRadius: "10px",
+              border: "1px solid #e5e7eb",
+              background: "#ffffff",
+              display: "flex",
+              flexDirection: "column",
+              gap: "6px",
+              boxShadow: "0 4px 12px rgba(0,0,0,0.04)",
+            }}>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: "8px", minWidth: 0 }}>
+                  <span style={{
+                    padding: "4px 8px",
+                    borderRadius: "6px",
+                    background: "#f3f4f6",
+                    color: "#111827",
+                    fontSize: "11px",
+                    fontWeight: 700,
+                  }}>
+                    #{idx + 1}
+                  </span>
+                  <div style={{ fontWeight: 600, color: "#111827", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                    {task.title}
+                  </div>
+                </div>
+                <span style={{
+                  padding: "4px 8px",
+                  borderRadius: "999px",
+                  background: "#eef2ff",
+                  color: "#4338ca",
+                  fontSize: "11px",
+                  fontWeight: 700,
+                  textTransform: "uppercase",
+                  letterSpacing: "0.5px",
+                }}>
+                  {task.status}
+                </span>
+              </div>
+              {task.notes && (
+                <div style={{ fontSize: "13px", color: "#4b5563", lineHeight: 1.5 }}>
+                  {task.notes}
+                </div>
+              )}
+            </li>
+          ))}
+        </ol>
+      </div>
+    </div>
+  );
+}
+
+function WorkerColumn({ snapshot }: { snapshot: SessionSnapshot | null }) {
+  const outputs = [...(snapshot?.worker_outputs ?? [])].sort((a, b) => {
+    return new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime();
+  });
+
+  const subtaskMap = new Map((snapshot?.subtasks ?? []).map((s) => [s.id, s.title]));
+  return (
+    <div style={{
+      borderRight: "1px solid #e5e7eb",
+      background: "#f9fafb",
+      display: "flex",
+      flexDirection: "column",
+      padding: "20px",
+      overflow: "hidden",
+    }}>
+      <h4 style={{
+        margin: "0 0 12px 0",
+        fontSize: "15px",
+        fontWeight: 700,
+        color: "#000000",
+      }}>
+        Worker
+      </h4>
+      <div style={{ overflowY: "auto", flex: 1, paddingRight: "6px", display: "flex", flexDirection: "column", gap: "10px" }}>
+        {outputs.length === 0 && (
+          <div style={{
+            color: "#4b5563",
+            fontSize: "14px",
+            padding: "12px",
+            borderRadius: "12px",
+            background: "#ffffff",
+            border: "1px dashed #d1d5db",
+          }}>
+            No worker output yet.
+          </div>
+        )}
+        {outputs.map((out, idx) => {
+          const title = subtaskMap.get(out.subtask_id) ?? `Task ${out.subtask_id}`;
+          const content = out.preview || out.content || "No content.";
+          return (
+            <div key={idx} style={{
+              background: "#ffffff",
+              border: "1px solid #e5e7eb",
+              borderRadius: "12px",
+              padding: "12px 14px",
+              boxShadow: "0 8px 20px rgba(0,0,0,0.05)",
+              display: "flex",
+              flexDirection: "column",
+              gap: "8px",
+            }}>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "8px" }}>
+                <div style={{ fontWeight: 700, color: "#111827", fontSize: "13px" }}>{title}</div>
+                <span style={{ fontSize: "11px", color: "#6b7280" }}>
+                  {new Date(out.timestamp).toLocaleString()}
+                </span>
+              </div>
+              <div style={{ fontSize: "13px", color: "#1f2937", lineHeight: 1.5, whiteSpace: "pre-wrap" }}>
+                {content}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
 
 function CoordinatorColumn({ snapshot, width }: ColumnProps) {
   const decisions = snapshot?.coord_decisions ?? [];
