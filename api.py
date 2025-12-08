@@ -285,6 +285,41 @@ def post_command(
         raise HTTPException(status_code=500, detail=str(exc))
 
 
+@app.delete("/sessions/{session_id}")
+def delete_session(
+    session_id: str,
+    current_user = Depends(get_current_user),
+) -> Dict[str, str]:
+    """Delete a session (both file system and database)."""
+    if not user_owns_session(current_user.id, session_id):
+        raise HTTPException(status_code=404, detail="Session not found")
+
+    try:
+        # Delete session directory from file system
+        import shutil
+        session_dir = artifact_store.session_dir(session_id)
+        if session_dir.exists():
+            shutil.rmtree(session_dir)
+
+        # Delete session from database
+        from multi_agent_platform.db.db import get_db_connection
+        conn = get_db_connection()
+        cursor = conn.cursor()
+
+        # Delete from user_sessions first (foreign key)
+        cursor.execute("DELETE FROM user_sessions WHERE session_id = ?", (session_id,))
+
+        # Delete from sessions
+        cursor.execute("DELETE FROM sessions WHERE session_id = ?", (session_id,))
+
+        conn.commit()
+        conn.close()
+
+        return {"message": f"Session {session_id} deleted successfully"}
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Failed to delete session: {str(exc)}")
+
+
 # ===== Authentication Endpoints =====
 
 @app.post("/auth/register", response_model=AuthResponse)

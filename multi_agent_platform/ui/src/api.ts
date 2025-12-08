@@ -142,3 +142,9 @@ export async function login(email: string, password: string): Promise<AuthRespon
     body: JSON.stringify({ email, password }),
   });
 }
+
+export async function deleteSession(id: string): Promise<{ message: string }> {
+  return request<{ message: string }>(`/sessions/${id}`, {
+    method: "DELETE",
+  });
+}

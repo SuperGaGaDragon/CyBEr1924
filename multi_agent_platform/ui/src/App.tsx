@@ -9,6 +9,7 @@ import {
   register,
   verifyEmail,
   setAccessToken,
+  deleteSession,
 } from "./api";
 import "./App.css";
 
@@ -88,6 +89,12 @@ function App() {
   const [sidebarWidth, setSidebarWidth] = useState(280);
   const [plannerWidth, setPlannerWidth] = useState(33.33);
   const [workerWidth, setWorkerWidth] = useState(33.33);
+
+  const [deleteConfirm, setDeleteConfirm] = useState<{
+    show: boolean;
+    sessionId: string | null;
+    sessionTopic: string | null;
+  }>({ show: false, sessionId: null, sessionTopic: null });
 
   const isDraggingSidebar = useRef(false);
   const isDraggingPlanner = useRef(false);
@@ -391,6 +398,62 @@ function App() {
         error: err.message ?? "Ask failed",
       }));
     }
+  }
+
+  function handleDeleteClick(sessionId: string, sessionTopic: string | null) {
+    setDeleteConfirm({
+      show: true,
+      sessionId,
+      sessionTopic,
+    });
+  }
+
+  async function handleDeleteConfirm() {
+    if (!deleteConfirm.sessionId) return;
+
+    setState((prev) => ({ ...prev, loading: true, error: null }));
+    try {
+      await deleteSession(deleteConfirm.sessionId);
+
+      // Refresh sessions list
+      const sessions = await listSessions();
+
+      // If we deleted the active session, clear it
+      let newActiveSessionId = state.activeSessionId;
+      let newSnapshot = state.snapshot;
+
+      if (state.activeSessionId === deleteConfirm.sessionId) {
+        newActiveSessionId = null;
+        newSnapshot = null;
+        localStorage.removeItem(SESSION_TOKEN_KEY);
+
+        // Update URL
+        const url = new URL(window.location.href);
+        url.pathname = "/";
+        window.history.pushState(null, "", url.toString());
+      }
+
+      setState((prev) => ({
+        ...prev,
+        loading: false,
+        sessions,
+        activeSessionId: newActiveSessionId,
+        snapshot: newSnapshot,
+      }));
+
+      setDeleteConfirm({ show: false, sessionId: null, sessionTopic: null });
+    } catch (err: any) {
+      setState((prev) => ({
+        ...prev,
+        loading: false,
+        error: err.message ?? "Failed to delete session",
+      }));
+      setDeleteConfirm({ show: false, sessionId: null, sessionTopic: null });
+    }
+  }
+
+  function handleDeleteCancel() {
+    setDeleteConfirm({ show: false, sessionId: null, sessionTopic: null });
   }
 
   function handleLogout() {
@@ -1060,16 +1123,18 @@ function App() {
           {sessions.map((session) => (
             <li
               key={session.session_id}
-              onClick={() => handleSelectSession(session.session_id)}
               style={{
                 padding: "12px 14px",
                 marginBottom: "6px",
-                cursor: "pointer",
                 borderRadius: "8px",
                 background: activeSessionId === session.session_id ? "#000000" : "#ffffff",
                 color: activeSessionId === session.session_id ? "#ffffff" : "#000000",
                 border: "1px solid #e0e0e0",
                 transition: "all 0.2s ease",
+                position: "relative",
+                display: "flex",
+                alignItems: "center",
+                gap: "10px",
               }}
               onMouseOver={(e) => {
                 if (activeSessionId !== session.session_id) {
@@ -1082,10 +1147,52 @@ function App() {
                 }
               }}
             >
-              <div style={{ fontWeight: 600, fontSize: "14px", marginBottom: "4px" }}>{session.topic ?? "Untitled"}</div>
-              <div style={{ fontSize: 11, opacity: 0.6 }}>
-                {session.last_updated}
+              <div
+                onClick={() => handleSelectSession(session.session_id)}
+                style={{
+                  flex: 1,
+                  cursor: "pointer",
+                }}
+              >
+                <div style={{ fontWeight: 600, fontSize: "14px", marginBottom: "4px" }}>{session.topic ?? "Untitled"}</div>
+                <div style={{ fontSize: 11, opacity: 0.6 }}>
+                  {session.last_updated}
+                </div>
               </div>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleDeleteClick(session.session_id, session.topic);
+                }}
+                style={{
+                  width: "28px",
+                  height: "28px",
+                  borderRadius: "6px",
+                  border: "1px solid " + (activeSessionId === session.session_id ? "#ffffff40" : "#e0e0e0"),
+                  background: "transparent",
+                  color: activeSessionId === session.session_id ? "#ffffff" : "#666666",
+                  cursor: "pointer",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  fontSize: "16px",
+                  transition: "all 0.2s ease",
+                  flexShrink: 0,
+                }}
+                onMouseOver={(e) => {
+                  e.currentTarget.style.background = "#ff4444";
+                  e.currentTarget.style.color = "#ffffff";
+                  e.currentTarget.style.borderColor = "#ff4444";
+                }}
+                onMouseOut={(e) => {
+                  e.currentTarget.style.background = "transparent";
+                  e.currentTarget.style.color = activeSessionId === session.session_id ? "#ffffff" : "#666666";
+                  e.currentTarget.style.borderColor = activeSessionId === session.session_id ? "#ffffff40" : "#e0e0e0";
+                }}
+                title="Delete session"
+              >
+                ×
+              </button>
             </li>
           ))}
         </ul>
@@ -1224,6 +1331,127 @@ function App() {
           <CoordinatorColumn snapshot={snapshot} onAsk={handleAsk} width={coordinatorWidth} />
         </section>
       </main>
+
+      {/* Delete Confirmation Modal */}
+      {deleteConfirm.show && (
+        <div
+          style={{
+            position: "fixed",
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: "rgba(0, 0, 0, 0.6)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            zIndex: 1000,
+            backdropFilter: "blur(4px)",
+          }}
+          onClick={handleDeleteCancel}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              background: "#ffffff",
+              borderRadius: "16px",
+              padding: "32px",
+              maxWidth: "440px",
+              width: "90%",
+              boxShadow: "0 20px 60px rgba(0, 0, 0, 0.3)",
+            }}
+          >
+            <div style={{
+              fontSize: "24px",
+              fontWeight: "700",
+              color: "#000000",
+              marginBottom: "12px",
+            }}>
+              Delete Session?
+            </div>
+            <div style={{
+              fontSize: "15px",
+              color: "#666666",
+              lineHeight: "1.6",
+              marginBottom: "8px",
+            }}>
+              Are you sure you want to delete this session?
+            </div>
+            <div style={{
+              fontSize: "14px",
+              fontWeight: "600",
+              color: "#000000",
+              padding: "12px 16px",
+              background: "#f5f5f5",
+              borderRadius: "8px",
+              marginBottom: "8px",
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+              whiteSpace: "nowrap",
+            }}>
+              {deleteConfirm.sessionTopic || "Untitled"}
+            </div>
+            <div style={{
+              fontSize: "13px",
+              color: "#ff4444",
+              marginBottom: "24px",
+              fontWeight: "600",
+            }}>
+              ⚠ This action cannot be undone.
+            </div>
+            <div style={{
+              display: "flex",
+              gap: "12px",
+              justifyContent: "flex-end",
+            }}>
+              <button
+                onClick={handleDeleteCancel}
+                style={{
+                  padding: "12px 24px",
+                  background: "#ffffff",
+                  color: "#000000",
+                  border: "1px solid #e0e0e0",
+                  borderRadius: "10px",
+                  fontSize: "14px",
+                  fontWeight: "600",
+                  cursor: "pointer",
+                  transition: "all 0.2s ease",
+                }}
+                onMouseOver={(e) => {
+                  e.currentTarget.style.background = "#f5f5f5";
+                }}
+                onMouseOut={(e) => {
+                  e.currentTarget.style.background = "#ffffff";
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleDeleteConfirm}
+                style={{
+                  padding: "12px 24px",
+                  background: "#ff4444",
+                  color: "#ffffff",
+                  border: "none",
+                  borderRadius: "10px",
+                  fontSize: "14px",
+                  fontWeight: "600",
+                  cursor: "pointer",
+                  transition: "all 0.2s ease",
+                }}
+                onMouseOver={(e) => {
+                  e.currentTarget.style.background = "#cc0000";
+                }}
+                onMouseOut={(e) => {
+                  e.currentTarget.style.background = "#ff4444";
+                }}
+              >
+                Delete Forever
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -1238,6 +1466,20 @@ type PlannerColumnProps = ColumnProps & {
 };
 
 function PlannerColumn({ snapshot, onPlanCommand, width }: PlannerColumnProps) {
+  const [expandedSubtaskId, setExpandedSubtaskId] = useState<string | null>(null);
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = () => {
+      if (expandedSubtaskId) {
+        setExpandedSubtaskId(null);
+      }
+    };
+
+    document.addEventListener('click', handleClickOutside);
+    return () => document.removeEventListener('click', handleClickOutside);
+  }, [expandedSubtaskId]);
+
   const promptForSubtask = (
     defaultTitle = "",
     defaultNotes = "",
@@ -1433,98 +1675,161 @@ function PlannerColumn({ snapshot, onPlanCommand, width }: PlannerColumnProps) {
                   <div
                     style={{
                       display: "flex",
-                      flexWrap: "wrap",
+                      alignItems: "center",
                       gap: "6px",
+                      position: "relative",
                     }}
                   >
-                    <button
-                      onClick={handleSetCurrent}
-                      style={{
-                        padding: "6px 12px",
-                        background: "#ffffff",
-                        color: "#000000",
-                        border: "1px solid #e0e0e0",
-                        borderRadius: "6px",
-                        fontSize: "11px",
-                        fontWeight: "600",
-                        cursor: "pointer",
-                        transition: "all 0.2s ease",
-                      }}
-                      onMouseOver={(e) => {
-                        e.currentTarget.style.background = "#000000";
-                        e.currentTarget.style.color = "#ffffff";
-                      }}
-                      onMouseOut={(e) => {
-                        e.currentTarget.style.background = "#ffffff";
-                        e.currentTarget.style.color = "#000000";
-                      }}
-                    >Set current</button>
-                    <button
-                      onClick={handleUpdate}
-                      style={{
-                        padding: "6px 12px",
-                        background: "#ffffff",
-                        color: "#000000",
-                        border: "1px solid #e0e0e0",
-                        borderRadius: "6px",
-                        fontSize: "11px",
-                        fontWeight: "600",
-                        cursor: "pointer",
-                        transition: "all 0.2s ease",
-                      }}
-                      onMouseOver={(e) => {
-                        e.currentTarget.style.background = "#000000";
-                        e.currentTarget.style.color = "#ffffff";
-                      }}
-                      onMouseOut={(e) => {
-                        e.currentTarget.style.background = "#ffffff";
-                        e.currentTarget.style.color = "#000000";
-                      }}
-                    >Update</button>
-                    <button
-                      onClick={handleInsertBelow}
-                      style={{
-                        padding: "6px 12px",
-                        background: "#ffffff",
-                        color: "#000000",
-                        border: "1px solid #e0e0e0",
-                        borderRadius: "6px",
-                        fontSize: "11px",
-                        fontWeight: "600",
-                        cursor: "pointer",
-                        transition: "all 0.2s ease",
-                      }}
-                      onMouseOver={(e) => {
-                        e.currentTarget.style.background = "#000000";
-                        e.currentTarget.style.color = "#ffffff";
-                      }}
-                      onMouseOut={(e) => {
-                        e.currentTarget.style.background = "#ffffff";
-                        e.currentTarget.style.color = "#000000";
-                      }}
-                    >Insert below</button>
-                    <button
-                      onClick={handleSkip}
-                      style={{
-                        padding: "6px 12px",
-                        background: "#ffffff",
-                        color: "#000000",
-                        border: "1px solid #e0e0e0",
-                        borderRadius: "6px",
-                        fontSize: "11px",
-                        fontWeight: "600",
-                        cursor: "pointer",
-                        transition: "all 0.2s ease",
-                      }}
-                      onMouseOver={(e) => {
-                        e.currentTarget.style.background = "#000000";
-                        e.currentTarget.style.color = "#ffffff";
-                      }}
-                      onMouseOut={(e) => {
-                        e.currentTarget.style.background = "#ffffff";
-                        e.currentTarget.style.color = "#000000";
-                      }}
-                    >Skip</button>
+                    {/* Advanced Settings Button */}
+                    <div style={{ position: "relative" }}>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setExpandedSubtaskId(expandedSubtaskId === subtask.id ? null : subtask.id);
+                        }}
+                        style={{
+                          width: "28px",
+                          height: "28px",
+                          borderRadius: "6px",
+                          border: "1px solid #e0e0e0",
+                          background: expandedSubtaskId === subtask.id ? "#000000" : "#ffffff",
+                          color: expandedSubtaskId === subtask.id ? "#ffffff" : "#666666",
+                          cursor: "pointer",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          fontSize: "14px",
+                          transition: "all 0.2s ease",
+                          position: "relative",
+                        }}
+                        onMouseOver={(e) => {
+                          if (expandedSubtaskId !== subtask.id) {
+                            e.currentTarget.style.background = "#f5f5f5";
+                          }
+                        }}
+                        onMouseOut={(e) => {
+                          if (expandedSubtaskId !== subtask.id) {
+                            e.currentTarget.style.background = "#ffffff";
+                          }
+                        }}
+                        title="Advanced Settings"
+                      >
+                        <svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg">
+                          <path d="M7 4.5C7.27614 4.5 7.5 4.27614 7.5 4C7.5 3.72386 7.27614 3.5 7 3.5C6.72386 3.5 6.5 3.72386 6.5 4C6.5 4.27614 6.72386 4.5 7 4.5Z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                          <path d="M7 7.5C7.27614 7.5 7.5 7.27614 7.5 7C7.5 6.72386 7.27614 6.5 7 6.5C6.72386 6.5 6.5 6.72386 6.5 7C6.5 7.27614 6.72386 7.5 7 7.5Z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                          <path d="M7 10.5C7.27614 10.5 7.5 10.2761 7.5 10C7.5 9.72386 7.27614 9.5 7 9.5C6.72386 9.5 6.5 9.72386 6.5 10C6.5 10.2761 6.72386 10.5 7 10.5Z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                        </svg>
+                      </button>
+
+                      {/* Dropdown Menu */}
+                      {expandedSubtaskId === subtask.id && (
+                        <div
+                          style={{
+                            position: "absolute",
+                            top: "calc(100% + 4px)",
+                            left: 0,
+                            background: "#000000",
+                            borderRadius: "8px",
+                            padding: "6px",
+                            boxShadow: "0 4px 12px rgba(0, 0, 0, 0.15)",
+                            zIndex: 100,
+                            minWidth: "140px",
+                            display: "flex",
+                            flexDirection: "column",
+                            gap: "4px",
+                          }}
+                        >
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleSetCurrent();
+                              setExpandedSubtaskId(null);
+                            }}
+                            style={{
+                              padding: "8px 12px",
+                              background: "transparent",
+                              color: "#ffffff",
+                              border: "none",
+                              borderRadius: "6px",
+                              fontSize: "12px",
+                              fontWeight: "500",
+                              cursor: "pointer",
+                              transition: "all 0.2s ease",
+                              textAlign: "left",
+                              whiteSpace: "nowrap",
+                            }}
+                            onMouseOver={(e) => e.currentTarget.style.background = "#333333"}
+                            onMouseOut={(e) => e.currentTarget.style.background = "transparent"}
+                          >Set current</button>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleUpdate();
+                              setExpandedSubtaskId(null);
+                            }}
+                            style={{
+                              padding: "8px 12px",
+                              background: "transparent",
+                              color: "#ffffff",
+                              border: "none",
+                              borderRadius: "6px",
+                              fontSize: "12px",
+                              fontWeight: "500",
+                              cursor: "pointer",
+                              transition: "all 0.2s ease",
+                              textAlign: "left",
+                              whiteSpace: "nowrap",
+                            }}
+                            onMouseOver={(e) => e.currentTarget.style.background = "#333333"}
+                            onMouseOut={(e) => e.currentTarget.style.background = "transparent"}
+                          >Update</button>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleInsertBelow();
+                              setExpandedSubtaskId(null);
+                            }}
+                            style={{
+                              padding: "8px 12px",
+                              background: "transparent",
+                              color: "#ffffff",
+                              border: "none",
+                              borderRadius: "6px",
+                              fontSize: "12px",
+                              fontWeight: "500",
+                              cursor: "pointer",
+                              transition: "all 0.2s ease",
+                              textAlign: "left",
+                              whiteSpace: "nowrap",
+                            }}
+                            onMouseOver={(e) => e.currentTarget.style.background = "#333333"}
+                            onMouseOut={(e) => e.currentTarget.style.background = "transparent"}
+                          >Insert below</button>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleSkip();
+                              setExpandedSubtaskId(null);
+                            }}
+                            style={{
+                              padding: "8px 12px",
+                              background: "transparent",
+                              color: "#ffffff",
+                              border: "none",
+                              borderRadius: "6px",
+                              fontSize: "12px",
+                              fontWeight: "500",
+                              cursor: "pointer",
+                              transition: "all 0.2s ease",
+                              textAlign: "left",
+                              whiteSpace: "nowrap",
+                            }}
+                            onMouseOver={(e) => e.currentTarget.style.background = "#333333"}
+                            onMouseOut={(e) => e.currentTarget.style.background = "transparent"}
+                          >Skip</button>
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </li>
               );
