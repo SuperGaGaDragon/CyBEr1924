@@ -1,58 +1,60 @@
 import "./AboutPage.css";
+import developer1 from "./assets/developer1.png";
+import developer2 from "./assets/developer2.png";
 
 const capabilities = [
-  "Generate large essays, research papers, and structured reports",
-  "Write long novels（multi-chapter, multi-scene）with consistent arcs",
-  "Maintain style, tone, logic, and narrative coherence",
+  "Generate long-form essays, research papers, and structured reports",
+  "Write multi-chapter novels with consistent arcs and tone",
+  "Maintain style, logic, and narrative coherence across hundreds of pages",
   "Execute multi-stage projects with transparent intermediate reasoning",
   "Visualize agent conversations during planning and execution",
-  "Let humans intervene, revise, redirect, and approve each step",
+  "Invite humans to intervene, revise, redirect, and approve each step",
   "Guarantee quality and block hallucinated jumps through strict review",
 ];
 
 const painPoints = [
   "Single-pass writing drifts quickly and skips structure",
-  "Big tasks（20-page essay、长篇小说、课程笔记）难以落地",
-  "Users want to adjust structure, but the model replaces content blindly",
-  "Generation often jumps步骤、跳章节，质量无法统一",
-  "Internal reasoning is invisible，用户无法监督",
+  "Large tasks (20-page essays, long novels, course notes) fall apart mid-run",
+  "Users want structure changes; models swap content blindly instead",
+  "Steps and chapters get skipped, creating incoherent jumps",
+  "Quality is uneven and the internal reasoning is invisible",
 ];
 
 const roles = [
   {
     title: "Planner — Task Architect",
-    summary: "把模糊目标变成可执行路线图，输出 worker 可直接执行的步骤。",
+    summary: "Turns fuzzy goals into executable roadmaps for the Worker.",
     bullets: [
-      "多轮对话确认需求、格式、风格",
-      "拆出章节 / 场景 / 论点 / 小节",
-      "用户确认后冻结结构，后续经由 Coordinator 调整",
+      "Multi-turn clarification of goals, format, and style",
+      "Outputs chapters, scenes, arguments, and sections",
+      "Structure locks after user confirmation; later tweaks flow via Coordinator",
     ],
   },
   {
     title: "Worker — Execution Engine",
-    summary: "完全遵循计划，分段写作与填充内容，不直接对话用户。",
+    summary: "Writes by following the plan, one subtask at a time.",
     bullets: [
-      "每次只写一个 subtask，可多轮 partial → complete",
-      "把草稿写入当前 artifact",
-      "不改计划，只负责高质量输出",
+      "Partial → partial → complete drafting loops",
+      "Commits drafts into artifacts for traceability",
+      "Never changes the plan; only produces high-quality text",
     ],
   },
   {
-    title: "Coordinator — 项目经理",
-    summary: "用户代言人 & 调度中枢，决定推进顺序、重写、暂停与改动需求。",
+    title: "Coordinator — Project Manager",
+    summary: "User’s proxy and traffic controller; decides rewrite, pause, or proceed.",
     bullets: [
-      "收集用户反馈并回传给 Planner / Worker",
-      "调度任务，保持风格与目标一致",
-      "不直接生成内容，只做管理与桥接",
+      "Collects user feedback and relays to Planner/Worker",
+      "Keeps style and goals consistent across tasks",
+      "Never writes content; only manages and bridges",
     ],
   },
   {
-    title: "Reviewer — 质量闸口",
-    summary: "独立质量监督员，只有 reviewer 同意，流程才前进。",
+    title: "Reviewer — Quality Gate",
+    summary: "Independent QA gate; progress only continues on agreement.",
     bullets: [
-      "检查逻辑、风格、质量一致性",
-      "disagree 时返回 comment，阻止进入下一步",
-      "agree 后才允许推进后续任务",
+      "Checks logic, style, and consistency",
+      "Disagree → block and comment; agree → allow next step",
+      "Prevents hidden jumps or silent quality loss",
     ],
   },
 ];
@@ -61,25 +63,25 @@ const useCases = [
   {
     title: "Academic Essays",
     items: [
-      "Argumentative / comparative / literary critique",
-      "Research mini-paper & structured long essay（10–25 pages）",
-      "APA / MLA / Chicago 格式",
+      "Argumentative, comparative, literary critique",
+      "Research mini-papers and structured long essays (10–25 pages)",
+      "APA / MLA / Chicago formatting",
     ],
   },
   {
     title: "Novels / Fiction",
     items: [
-      "多章节长篇故事与场景化写作",
-      "世界观构建、人物成长线、多视角叙事",
-      "长篇连载小说（数十万字）",
+      "Multi-chapter long-form stories and scene-based writing",
+      "Worldbuilding, character arcs, multi-POV narratives",
+      "Serial fiction at hundreds of thousands of words",
     ],
   },
   {
     title: "Technical / Business",
     items: [
-      "产品、技术与市场文档",
-      "课题规划、科研报告、复杂 essay",
-      "大型信息汇总与知识结构化",
+      "Product, technical, and market documentation",
+      "Project proposals, research reports, complex essays",
+      "Large-scale information synthesis and knowledge structuring",
     ],
   },
 ];
@@ -106,8 +108,9 @@ export default function AboutPage() {
           <div className="hero-kicker">Multi-Agent Intelligent Writing & Project Orchestration Platform</div>
           <h1>About CyBEr1924</h1>
           <p className="hero-lead">
-            CyBEr1924 是一个“可解释、可监督、可迭代”的多智能体写作与任务协作平台。
-            它把长任务拆解、审查、重写的流程透明化，让学生、作家、研究人员、开发者都能安全驱动大型写作与多阶段项目。
+            CyBEr1924 is a transparent, supervised, multi-agent writing and orchestration platform.
+            It makes every step of long tasks visible—planning, drafting, reviewing, and revising—so writers,
+            students, researchers, and builders can run ambitious projects with confidence.
           </p>
           <div className="hero-grid">
             <div className="hero-card">
@@ -119,8 +122,8 @@ export default function AboutPage() {
             </div>
             <div className="hero-card">
               <p>
-                Unlike single-pass LLM writing, CyBEr1924 keeps tone、style、逻辑、一致性 across long horizons by
-                keeping every intermediate step visible、可审查、可重来，避免“hallucinated jumps”。
+                Unlike single-pass LLM writing, CyBEr1924 keeps tone, style, logic, and coherence intact across long horizons
+                by exposing every intermediate step. Nothing is hidden; every decision is reviewable and redo-able—no hallucinated jumps.
               </p>
             </div>
           </div>
@@ -139,8 +142,8 @@ export default function AboutPage() {
           <div className="section-title">Problems we solve</div>
           <div className="section-grid">
             <div className="text-block">
-              <p>传统单轮生成容易跑偏、跳章节、失控；大任务缺少可监督的中间过程。</p>
-              <p>CyBEr1924 用多轮、可见、可审查的 orchestrator 流程让长任务变得可控、可监督、可重来。</p>
+              <p>Single-pass generation drifts, skips chapters, and hides the middle steps. Large projects collapse without supervision.</p>
+              <p>CyBEr1924 uses a multi-turn, visible, reviewable orchestration loop to keep long tasks controlled, auditable, and restartable.</p>
             </div>
             <ul className="list">
               {painPoints.map((item) => (
@@ -170,10 +173,10 @@ export default function AboutPage() {
         <section className="section">
           <div className="section-title">Orchestrator loop</div>
           <div className="loop">
-            <div className="loop-step">User → Planner →（confirm）→ Worker → Reviewer → Coordinator → Worker → Reviewer → ...</div>
+            <div className="loop-step">User → Planner → (confirm) → Worker → Reviewer → Coordinator → Worker → Reviewer → ...</div>
             <div className="loop-meta">
-              <div className="pill-ghost">每一步都有日志、snapshot、artifacts，可追溯可回滚。</div>
-              <div className="pill-ghost">透明展示所有 agent 对话，方便监督与改写。</div>
+              <div className="pill-ghost">Every step is logged with snapshots and artifacts—traceable and rewindable.</div>
+              <div className="pill-ghost">All agent conversations are transparent, making supervision and edits easy.</div>
             </div>
           </div>
         </section>
@@ -182,8 +185,8 @@ export default function AboutPage() {
           <div className="section-title">Updated process placeholder</div>
           <div className="text-block">
             <p>
-              把你的“红色词修正流程”发给我，我会在一分钟内把它写成正式流程文字版 + 箭头式 flow chart，
-              还会给出面向开发者的页面版本与文档版本，随时可合入前端。
+              Share your latest process notes and we will fold them into a clear text flow + arrow-style chart,
+              along with a developer-facing version and a documentation-ready description.
             </p>
           </div>
         </section>
@@ -207,11 +210,36 @@ export default function AboutPage() {
         <section className="section">
           <div className="section-title">Quality and human steering</div>
           <ul className="list two-col">
-            <li className="list-item">Clear structure（Planner）+ progressive drafting（Worker）确保每一步有据可依。</li>
-            <li className="list-item">严格 reviewer gate，disagree 即重写，agree 才能推进。</li>
-            <li className="list-item">Coordinator 代表用户做决策：暂停、继续、改写、重排顺序。</li>
-            <li className="list-item">所有中间 reasoning 可视化，避免隐形跳跃，提升可信度。</li>
+            <li className="list-item">Clear structure (Planner) + progressive drafting (Worker) keep every step grounded.</li>
+            <li className="list-item">Strict reviewer gate: disagree → rewrite; agree → move forward.</li>
+            <li className="list-item">Coordinator represents the user: pause, continue, rewrite, or resequence.</li>
+            <li className="list-item">All intermediate reasoning is visible—no hidden jumps, higher trust.</li>
           </ul>
+        </section>
+
+        <section className="section developers">
+          <div className="section-title">Developers</div>
+          <div className="dev-meta">This website is developed by two high school students.</div>
+          <div className="dev-grid">
+            <div className="dev-card">
+              <div className="dev-avatar">
+                <img src={developer1} alt="Quanhao Li" />
+              </div>
+              <div className="dev-info">
+                <div className="dev-name">Quanhao Li</div>
+                <div className="dev-role">Co-developer</div>
+              </div>
+            </div>
+            <div className="dev-card">
+              <div className="dev-avatar">
+                <img src={developer2} alt="Qianyu Chen" />
+              </div>
+              <div className="dev-info">
+                <div className="dev-name">Qianyu Chen</div>
+                <div className="dev-role">Co-developer</div>
+              </div>
+            </div>
+          </div>
         </section>
       </div>
     </div>
