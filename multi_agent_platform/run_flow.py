@@ -19,6 +19,13 @@ from .prompt_registry import (
 )
 from .session_state import OrchestratorState, PlannerChatMessage, build_session_snapshot
 
+PLAN_EDITING_KINDS = {
+    "set_current_subtask",
+    "update_subtask",
+    "insert_subtask",
+    "append_subtask",
+    "skip_subtask",
+}
 
 def run_worker_for_subtask(plan: Plan, subtask: Subtask, instructions: str | None) -> str:
     """Placeholder worker rewrite using instructions."""
@@ -866,6 +873,25 @@ class Orchestrator:
 
         cmd_lower = normalized.lower()
         bare_cmd = cmd_lower.lstrip("/")
+
+        # Block plan edits after plan is locked
+        if state.plan_locked and bare_cmd in PLAN_EDITING_KINDS:
+            state.add_orchestrator_message(
+                "orchestrator",
+                (
+                    "The plan is locked. Direct plan editing commands are disabled in execution phase. "
+                    "Please describe the change you want in natural language, and I will update the plan for you."
+                ),
+            )
+            self._persist_plan_state(session_id, plan, state)
+            return self._render_session_snapshot(
+                session_id,
+                normalized,
+                plan,
+                state,
+                message="Plan editing is disabled after lock.",
+                ok=False,
+            )
 
         if bare_cmd == "plan":
             message = "当前计划"

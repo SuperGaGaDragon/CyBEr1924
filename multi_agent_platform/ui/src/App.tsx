@@ -238,6 +238,242 @@ function ExecutionView({ session, onSendExecutionMessage }: ExecutionViewProps) 
   );
 }
 
+type PlanPanelProps = {
+  snapshot: SessionSnapshot;
+  onPlanCommand: (
+    command: PlanEditCommand,
+    payload?: Record<string, unknown>,
+  ) => Promise<void>;
+};
+
+function PlanAdvancedPanel({ snapshot, onPlanCommand }: PlanPanelProps) {
+  const planLocked = snapshot.plan_locked;
+
+  const promptForSubtask = (
+    defaultTitle = "",
+    defaultNotes = "",
+  ): { title: string; notes?: string } | null => {
+    const rawTitle = window.prompt("Subtask title", defaultTitle);
+    if (rawTitle === null) return null;
+    const title = rawTitle.trim();
+    if (!title) return null;
+    const rawNotes = window.prompt("Description (optional)", defaultNotes);
+    const notes =
+      rawNotes === null || !rawNotes.trim() ? undefined : rawNotes.trim();
+    return { title, notes };
+  };
+
+  const handleAppend = () => {
+    const details = promptForSubtask();
+    if (!details) return;
+    const payload: Record<string, unknown> = { title: details.title };
+    if (details.notes) payload.notes = details.notes;
+    void onPlanCommand("append_subtask", payload);
+  };
+
+  return (
+    <div style={{ height: "100%", overflow: "auto", padding: "20px" }}>
+      <h4 style={{
+        margin: "0 0 16px 0",
+        fontSize: "14px",
+        fontWeight: 700,
+        letterSpacing: "0.6px",
+        textTransform: "uppercase",
+        color: "#111827",
+      }}>
+        Advanced Settings
+      </h4>
+      {planLocked && (
+        <div style={{
+          padding: "10px 12px",
+          borderRadius: "8px",
+          background: "#fef3c7",
+          border: "1px solid #fcd34d",
+          color: "#92400e",
+          fontSize: "12px",
+          marginBottom: "12px",
+        }}>
+          Plan is locked; edits will be blocked.
+        </div>
+      )}
+      <div style={{
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "space-between",
+        gap: "10px",
+        marginBottom: "14px",
+      }}>
+        <div style={{ fontWeight: 600, fontSize: "13px", color: "#111827" }}>
+          {snapshot.plan?.title || snapshot.topic}
+        </div>
+        <button
+          onClick={handleAppend}
+          disabled={planLocked}
+          style={{
+            padding: "8px 12px",
+            background: planLocked ? "#e5e7eb" : "#111827",
+            color: planLocked ? "#6b7280" : "#ffffff",
+            border: "none",
+            borderRadius: "6px",
+            fontSize: "12px",
+            fontWeight: 600,
+            cursor: planLocked ? "not-allowed" : "pointer",
+          }}
+        >
+          ＋ Add
+        </button>
+      </div>
+      <ol style={{ paddingLeft: 0, margin: 0, listStyle: "none", display: "flex", flexDirection: "column", gap: "10px" }}>
+        {snapshot.subtasks.map((subtask, idx) => {
+          const isCurrent = snapshot.current_subtask_id === subtask.id;
+
+          const handleSetCurrent = () => {
+            void onPlanCommand("set_current_subtask", { subtask_id: subtask.id });
+          };
+          const handleUpdate = () => {
+            const titleInput = window.prompt("Edit title", subtask.title);
+            if (titleInput === null) return;
+            const notesInput = window.prompt("Edit description (optional)", subtask.notes ?? "");
+            const patch: Record<string, unknown> = {};
+            const trimmedTitle = titleInput.trim();
+            if (trimmedTitle) {
+              patch.title = trimmedTitle;
+            }
+            if (notesInput !== null) {
+              patch.notes = notesInput.trim();
+            }
+            if (!Object.keys(patch).length) return;
+            void onPlanCommand("update_subtask", { subtask_id: subtask.id, patch });
+          };
+          const handleInsertBelow = () => {
+            const details = promptForSubtask();
+            if (!details) return;
+            const payload: Record<string, unknown> = {
+              title: details.title,
+              after_id: subtask.id,
+            };
+            if (details.notes) payload.notes = details.notes;
+            void onPlanCommand("insert_subtask", payload);
+          };
+          const handleSkip = () => {
+            const confirmSkip = window.confirm(`Skip "${subtask.title}"?`);
+            if (!confirmSkip) return;
+            const reasonInput = window.prompt("Reason (optional)");
+            const payload: Record<string, unknown> = {
+              subtask_id: subtask.id,
+            };
+            if (reasonInput !== null && reasonInput.trim()) {
+              payload.reason = reasonInput.trim();
+            }
+            void onPlanCommand("skip_subtask", payload);
+          };
+
+          return (
+            <li
+              key={subtask.id}
+              style={{
+                padding: "12px 12px",
+                borderRadius: "10px",
+                border: isCurrent ? "2px solid #111827" : "1px solid #e5e7eb",
+                background: "#ffffff",
+                boxShadow: isCurrent ? "0 8px 20px rgba(0,0,0,0.06)" : "none",
+                display: "flex",
+                flexDirection: "column",
+                gap: "8px",
+              }}
+            >
+              <div style={{ display: "flex", alignItems: "center", gap: "10px", justifyContent: "space-between" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: "8px", minWidth: 0 }}>
+                  <span style={{
+                    padding: "4px 8px",
+                    borderRadius: "6px",
+                    background: "#f3f4f6",
+                    color: "#111827",
+                    fontSize: "11px",
+                    fontWeight: 700,
+                  }}>
+                    #{idx + 1}
+                  </span>
+                  <div style={{ minWidth: 0 }}>
+                    <div style={{
+                      fontWeight: 600,
+                      color: "#111827",
+                      fontSize: "13px",
+                      overflow: "hidden",
+                      textOverflow: "ellipsis",
+                      whiteSpace: "nowrap",
+                    }}>
+                      {subtask.title}
+                    </div>
+                    <div style={{ fontSize: "11px", color: "#6b7280", textTransform: "uppercase", letterSpacing: "0.5px" }}>
+                      {subtask.status}
+                    </div>
+                  </div>
+                </div>
+                {subtask.status === "in_progress" && (
+                  <span style={{
+                    padding: "4px 8px",
+                    borderRadius: "999px",
+                    background: "#eef2ff",
+                    color: "#4338ca",
+                    fontSize: "11px",
+                    fontWeight: 700,
+                    letterSpacing: "0.5px",
+                  }}>
+                    current
+                  </span>
+                )}
+              </div>
+
+              <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
+                <button
+                  onClick={handleSetCurrent}
+                  disabled={planLocked}
+                  style={buttonStyle(planLocked)}
+                >
+                  Set current
+                </button>
+                <button
+                  onClick={handleUpdate}
+                  disabled={planLocked}
+                  style={buttonStyle(planLocked)}
+                >
+                  Update
+                </button>
+                <button
+                  onClick={handleInsertBelow}
+                  disabled={planLocked}
+                  style={buttonStyle(planLocked)}
+                >
+                  Insert below
+                </button>
+                <button
+                  onClick={handleSkip}
+                  disabled={planLocked}
+                  style={buttonStyle(planLocked)}
+                >
+                  Skip
+                </button>
+              </div>
+            </li>
+          );
+        })}
+      </ol>
+    </div>
+  );
+}
+
+const buttonStyle = (disabled: boolean) => ({
+  padding: "8px 10px",
+  borderRadius: "8px",
+  border: "1px solid #e5e7eb",
+  background: disabled ? "#f3f4f6" : "#ffffff",
+  color: disabled ? "#9ca3af" : "#111827",
+  fontSize: "12px",
+  fontWeight: 600,
+  cursor: disabled ? "not-allowed" : "pointer",
+});
+
 const SESSION_TOKEN_KEY = "cyber1924_last_session_id";
 const LOGIN_REQUIRED_MESSAGE = "登录状态已过期，请重新登录";
 
@@ -283,6 +519,13 @@ type AuthState = {
   showVerification: boolean;
   showRegister: boolean;
 };
+
+type PlanEditCommand =
+  | "set_current_subtask"
+  | "update_subtask"
+  | "insert_subtask"
+  | "append_subtask"
+  | "skip_subtask";
 
 function App() {
   const isAboutPage = window.location.pathname.startsWith("/about");
@@ -636,6 +879,26 @@ function App() {
         ...prev,
         loading: false,
         error: err.message ?? "Send message failed",
+      }));
+    }
+  }
+
+  async function handlePlanCommand(
+    command: PlanEditCommand,
+    payload: Record<string, unknown> = {},
+  ) {
+    const sessionId = state.activeSessionId;
+    if (!sessionId) return;
+    setState((prev) => ({ ...prev, loading: true, error: null }));
+    try {
+      const snapshot = await sendCommand(sessionId, command, payload);
+      setState((prev) => ({ ...prev, loading: false, snapshot }));
+    } catch (err: any) {
+      if (handleAuthError(err)) return;
+      setState((prev) => ({
+        ...prev,
+        loading: false,
+        error: err.message ?? "Plan edit command failed",
       }));
     }
   }
@@ -1600,11 +1863,19 @@ function App() {
 
         {snapshot && snapshot.session_mode === "planning" ? (
           <section id="main-content" style={{ flex: 1, display: "flex", overflow: "hidden", position: "relative" }}>
-            <PlanningView
-              session={snapshot}
-              onSendPlanningMessage={sendPlanningMessage}
-              onConfirmPlan={confirmCurrentPlan}
-            />
+            <div style={{ flex: 2, minWidth: 0, borderRight: "1px solid #e5e7eb" }}>
+              <PlanningView
+                session={snapshot}
+                onSendPlanningMessage={sendPlanningMessage}
+                onConfirmPlan={confirmCurrentPlan}
+              />
+            </div>
+            <div style={{ flex: 1, minWidth: 0, background: "#ffffff" }}>
+              <PlanAdvancedPanel
+                snapshot={snapshot}
+                onPlanCommand={handlePlanCommand}
+              />
+            </div>
           </section>
         ) : (
           <section id="main-content" style={{ flex: 1, display: "flex", overflow: "hidden", position: "relative" }}>
