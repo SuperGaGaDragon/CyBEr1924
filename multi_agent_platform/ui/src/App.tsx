@@ -825,6 +825,23 @@ function App() {
       }));
     } catch (err: any) {
       if (handleAuthError(err)) return;
+      if (err instanceof ApiError && err.status === 404) {
+        localStorage.removeItem(SESSION_TOKEN_KEY);
+        setState((prev) => ({
+          ...prev,
+          loading: false,
+          activeSessionId: null,
+          snapshot: null,
+          error: "Session not found; please pick or create a new one.",
+        }));
+        try {
+          const sessions = await listSessions();
+          setState((prev) => ({ ...prev, sessions }));
+        } catch {
+          /* ignore secondary errors */
+        }
+        return;
+      }
       setState((prev) => ({
         ...prev,
         loading: false,
@@ -841,6 +858,23 @@ function App() {
       setState((prev) => ({ ...prev, loading: false, snapshot }));
     } catch (err: any) {
       if (handleAuthError(err)) return;
+      if (err instanceof ApiError && err.status === 404) {
+        localStorage.removeItem(SESSION_TOKEN_KEY);
+        setState((prev) => ({
+          ...prev,
+          loading: false,
+          activeSessionId: null,
+          snapshot: null,
+          error: "Session not found; please re-open or create a session.",
+        }));
+        try {
+          const sessions = await listSessions();
+          setState((prev) => ({ ...prev, sessions }));
+        } catch {
+          /* ignore */
+        }
+        return;
+      }
       setState((prev) => ({
         ...prev,
         loading: false,
@@ -858,6 +892,23 @@ function App() {
       setState((prev) => ({ ...prev, loading: false, snapshot }));
     } catch (err: any) {
       if (handleAuthError(err)) return;
+      if (err instanceof ApiError && err.status === 404) {
+        localStorage.removeItem(SESSION_TOKEN_KEY);
+        setState((prev) => ({
+          ...prev,
+          loading: false,
+          activeSessionId: null,
+          snapshot: null,
+          error: "Session not found; please re-open or create a session.",
+        }));
+        try {
+          const sessions = await listSessions();
+          setState((prev) => ({ ...prev, sessions }));
+        } catch {
+          /* ignore */
+        }
+        return;
+      }
       setState((prev) => ({
         ...prev,
         loading: false,
@@ -875,6 +926,23 @@ function App() {
       setState((prev) => ({ ...prev, loading: false, snapshot }));
     } catch (err: any) {
       if (handleAuthError(err)) return;
+      if (err instanceof ApiError && err.status === 404) {
+        localStorage.removeItem(SESSION_TOKEN_KEY);
+        setState((prev) => ({
+          ...prev,
+          loading: false,
+          activeSessionId: null,
+          snapshot: null,
+          error: "Session not found; please re-open or create a session.",
+        }));
+        try {
+          const sessions = await listSessions();
+          setState((prev) => ({ ...prev, sessions }));
+        } catch {
+          /* ignore */
+        }
+        return;
+      }
       setState((prev) => ({
         ...prev,
         loading: false,
@@ -895,6 +963,23 @@ function App() {
       setState((prev) => ({ ...prev, loading: false, snapshot }));
     } catch (err: any) {
       if (handleAuthError(err)) return;
+      if (err instanceof ApiError && err.status === 404) {
+        localStorage.removeItem(SESSION_TOKEN_KEY);
+        setState((prev) => ({
+          ...prev,
+          loading: false,
+          activeSessionId: null,
+          snapshot: null,
+          error: "Session not found; please re-open or create a session.",
+        }));
+        try {
+          const sessions = await listSessions();
+          setState((prev) => ({ ...prev, sessions }));
+        } catch {
+          /* ignore */
+        }
+        return;
+      }
       setState((prev) => ({
         ...prev,
         loading: false,
