@@ -1,4 +1,4 @@
-import { type FormEvent, useEffect, useState, useRef } from "react";
+import { type FormEvent, useEffect, useState, useRef, useMemo } from "react";
 import type { SessionSummary, SessionSnapshot } from "./api";
 import {
   listSessions,
@@ -582,6 +582,71 @@ type PlanEditCommand =
   | "insert_subtask"
   | "append_subtask"
   | "skip_subtask";
+
+type ProgressItem = {
+  subtaskId: string;
+  title: string;
+  agent: "worker" | "reviewer";
+  status: "in_progress" | "completed";
+  startedAt?: string;
+  finishedAt?: string;
+  order: number;
+};
+
+function deriveProgressByAgent(snapshot: SessionSnapshot | null): Record<"worker" | "reviewer", ProgressItem[]> {
+  if (!snapshot) {
+    return { worker: [], reviewer: [] };
+  }
+
+  const titleMap = new Map((snapshot.subtasks ?? []).map((s) => [String(s.id), s.title]));
+  const events = [...(snapshot.progress_events ?? [])].sort((a, b) => {
+    const ta = a?.ts ? new Date(a.ts).getTime() : 0;
+    const tb = b?.ts ? new Date(b.ts).getTime() : 0;
+    return ta - tb;
+  });
+
+  const buckets: Record<"worker" | "reviewer", Map<string, ProgressItem>> = {
+    worker: new Map(),
+    reviewer: new Map(),
+  };
+  const orders: Record<"worker" | "reviewer", number> = { worker: 0, reviewer: 0 };
+
+  for (const ev of events) {
+    const agent = ev?.agent;
+    if (agent !== "worker" && agent !== "reviewer") continue;
+    const subtaskIdRaw = ev.subtask_id;
+    if (!subtaskIdRaw) continue;
+    const subtaskId = String(subtaskIdRaw);
+    const bucket = buckets[agent];
+    let current = bucket.get(subtaskId);
+    if (!current) {
+      orders[agent] += 1;
+      current = {
+        subtaskId,
+        title: titleMap.get(subtaskId) ?? `Subtask ${subtaskId}`,
+        agent,
+        status: ev.status ?? (ev.stage === "finish" ? "completed" : "in_progress"),
+        order: orders[agent],
+      };
+    }
+
+    if (ev.stage === "start") {
+      current.startedAt = current.startedAt ?? ev.ts;
+      current.status = ev.status ?? "in_progress";
+    } else if (ev.stage === "finish") {
+      current.finishedAt = ev.ts ?? current.finishedAt;
+      current.startedAt = current.startedAt ?? ev.ts;
+      current.status = ev.status ?? "completed";
+    }
+
+    bucket.set(subtaskId, current);
+  }
+
+  return {
+    worker: Array.from(buckets.worker.values()).sort((a, b) => a.order - b.order),
+    reviewer: Array.from(buckets.reviewer.values()).sort((a, b) => a.order - b.order),
+  };
+}
 
 function App() {
   const isAboutPage = window.location.pathname.startsWith("/about");
@@ -1233,6 +1298,7 @@ function App() {
   }, [auth.isLoggedIn, auth.accessToken]);
 
   const { sessions, snapshot, loading, error, activeSessionId } = state;
+  const progressByAgent = useMemo(() => deriveProgressByAgent(snapshot), [snapshot]);
   const aboutButton = (
     <button
       onClick={() => window.location.assign("/about")}
@@ -2108,8 +2174,8 @@ function App() {
               }}
             >
               <PlanColumn snapshot={snapshot} />
-              <WorkerColumn snapshot={snapshot} />
-              <CoordinatorColumn snapshot={snapshot} width={100} />
+              <WorkerColumn snapshot={snapshot} progress={progressByAgent.worker} />
+              <CoordinatorColumn snapshot={snapshot} width={100} progress={progressByAgent.reviewer} />
 
               <div
                 onMouseDown={() => {
@@ -2427,7 +2493,115 @@ function App() {
   );
 }
 
-type ColumnProps = { snapshot: SessionSnapshot | null; width: number };
+type ColumnProps = { snapshot: SessionSnapshot | null; width: number; progress?: ProgressItem[] };
+
+function ProgressStrip({ items, label }: { items: ProgressItem[]; label: string }) {
+  const palette: Record<ProgressItem["status"], { bg: string; fg: string; badge: string }> = {
+    in_progress: { bg: "#f4f4f5", fg: "#111827", badge: "#f97316" },
+    completed: { bg: "#ecfdf3", fg: "#065f46", badge: "#10b981" },
+  };
+
+  const formatted = (ts?: string) => {
+    if (!ts) return "—";
+    const date = new Date(ts);
+    if (Number.isNaN(date.getTime())) return "—";
+    return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+  };
+
+  return (
+    <div style={{
+      marginBottom: "12px",
+      display: "flex",
+      flexDirection: "column",
+      gap: "10px",
+    }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+        <span style={{ fontSize: "12px", fontWeight: 700, letterSpacing: "0.04em", textTransform: "uppercase", color: "#4b5563" }}>
+          Live subtasks · {label}
+        </span>
+        <span style={{ fontSize: "12px", color: "#6b7280" }}>{items.length || 0}</span>
+      </div>
+      <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
+        {items.length === 0 ? (
+          <div style={{
+            padding: "10px 12px",
+            borderRadius: "10px",
+            background: "#f8fafc",
+            border: "1px dashed #e5e7eb",
+            color: "#6b7280",
+            fontSize: "12px",
+          }}>
+            No active subtasks yet.
+          </div>
+        ) : items.map((item) => {
+          const colors = palette[item.status] ?? palette.in_progress;
+          return (
+            <div key={`${item.agent}-${item.subtaskId}`} style={{
+              minWidth: "140px",
+              padding: "12px",
+              borderRadius: "12px",
+              border: "1px solid #e5e7eb",
+              background: colors.bg,
+              color: colors.fg,
+              display: "grid",
+              gridTemplateColumns: "auto 1fr",
+              columnGap: "10px",
+              rowGap: "6px",
+              alignItems: "center",
+              boxShadow: "0 6px 16px rgba(0,0,0,0.06)",
+            }}>
+              <span style={{
+                width: "28px",
+                height: "28px",
+                borderRadius: "50%",
+                background: "#111827",
+                color: "#ffffff",
+                display: "inline-flex",
+                alignItems: "center",
+                justifyContent: "center",
+                fontSize: "11px",
+                fontWeight: 800,
+                letterSpacing: "0.04em",
+                textTransform: "uppercase",
+              }}>
+                T{item.order}
+              </span>
+              <div style={{ minWidth: 0 }}>
+                <div style={{
+                  fontWeight: 700,
+                  fontSize: "13px",
+                  color: colors.fg,
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
+                  whiteSpace: "nowrap",
+                }}>
+                  {item.title}
+                </div>
+                <div style={{ fontSize: "11px", color: "#6b7280", marginTop: "2px" }}>
+                  {item.status === "in_progress" ? `Started ${formatted(item.startedAt)}` : `Done ${formatted(item.finishedAt)}`}
+                </div>
+              </div>
+              <span style={{
+                gridColumn: "1 / span 2",
+                justifySelf: "flex-start",
+                padding: "4px 8px",
+                borderRadius: "999px",
+                background: colors.badge,
+                color: "#ffffff",
+                fontSize: "11px",
+                fontWeight: 700,
+                letterSpacing: "0.04em",
+                textTransform: "uppercase",
+              }}>
+                {item.status === "in_progress" ? "In progress" : "Completed"}
+              </span>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
 
 function PlanColumn({ snapshot }: { snapshot: SessionSnapshot | null }) {
   const planTitle = snapshot?.plan?.title || snapshot?.topic || "Plan";
@@ -2523,7 +2697,7 @@ function PlanColumn({ snapshot }: { snapshot: SessionSnapshot | null }) {
   );
 }
 
-function WorkerColumn({ snapshot }: { snapshot: SessionSnapshot | null }) {
+function WorkerColumn({ snapshot, progress }: { snapshot: SessionSnapshot | null; progress: ProgressItem[] }) {
   const [descending, setDescending] = useState(true);
   const outputs = [...(snapshot?.worker_outputs ?? [])].sort((a, b) => {
     const diff = new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime();
@@ -2584,6 +2758,7 @@ function WorkerColumn({ snapshot }: { snapshot: SessionSnapshot | null }) {
           </svg>
         </button>
       </div>
+      <ProgressStrip items={progress} label="Worker" />
       <div style={{ overflowY: "auto", flex: 1, paddingRight: "6px", display: "flex", flexDirection: "column", gap: "10px" }}>
         {outputs.length === 0 && (
           <div style={{
@@ -2651,7 +2826,7 @@ function WorkerColumn({ snapshot }: { snapshot: SessionSnapshot | null }) {
   );
 }
 
-function CoordinatorColumn({ snapshot, width }: ColumnProps) {
+function CoordinatorColumn({ snapshot, width, progress = [] }: ColumnProps) {
   const baseDecisions: any[] = snapshot?.coord_decisions ?? [];
   const subtaskOrder = new Map((snapshot?.subtasks ?? []).map((s, i) => [String(s.id), i + 1]));
 
@@ -2705,6 +2880,7 @@ function CoordinatorColumn({ snapshot, width }: ColumnProps) {
         textTransform: "uppercase",
         letterSpacing: "0.5px"
       }}>Reviewer</h4>
+      <ProgressStrip items={progress} label="Reviewer" />
       <div
         style={{
           flex: 1,

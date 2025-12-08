@@ -109,7 +109,7 @@ stage3
 
 -----
 
-###工作进程透明化
+##工作进程透明化
 
 目标：
 - worker和reviewer，每开始一个subtask，就显示一个subtask的方格。每做完个subtask就显示一个subtask。不要等到全部做完才显示。
@@ -121,7 +121,7 @@ stage 2
 - [x] 后端落地事件流：worker/reviewer 在开始执行时立刻写 start 事件，完成时写 finish 事件；确保 orchestrator/plan redo 时也能按 subtask 划分事件。
 
 stage 3 
-- [ ] 前端状态建模：引入 per-agent subtask list state，start 事件立即生成方格占位，finish 事件更新状态/时间/序号；支持 session 恢复时的初始化。
+- [x] 前端状态建模：引入 per-agent subtask list state，start 事件立即生成方格占位，finish 事件更新状态/时间/序号；支持 session 恢复时的初始化。
 
 stage 4
 - [ ] UI 呈现：为 worker/reviewer 区域添加方格列表（进行中/已完成样式区分），进行中的展示 spinner/“In progress”，完成的展示摘要/时间戳；禁止等待全量完成才渲染。
@@ -135,7 +135,29 @@ stage 6
 stage 7
 - [ ] 审查，确保不会出现404，500等bug
 -----
+## 字数无法显示的问题排查
 
+问题：当前worker生成正文的时候字数被截断。解决问题。
+
+stage 1
+- [ ] 定义问题原因（写在这后面）：
+- [ ] 给出解决方案
+- [ ] 给出解决总目标（写在这后面）：
+
+解决方案
+stage 1
+
+stage 2
+
+stage 3
+
+stage 4
+
+stage 5
+
+
+
+-----
 ### 小说专用模式设计
 
 - stage 1
@@ -178,4 +200,7 @@ stage 7
 5、您希望文笔类似什么风格
 请输入（请描述风格，推荐您输入一个您希望我模仿的作家）
 
-全部answer后，自动在对话框生成
+全部answer后，自动在对话框生成一段涵盖刚才所有信息的话发给gpt。 
+
+stage 3 
+- [ ] 要求planner的agent的plan涉及到正文的内容，给worker的description中必须涵盖写完所有内容。
