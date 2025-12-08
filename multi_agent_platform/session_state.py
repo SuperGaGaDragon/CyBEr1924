@@ -343,6 +343,8 @@ class SessionSnapshot:
     subtasks: List[Dict[str, Any]]
     current_subtask_id: Optional[str]
     orchestrator_state: Dict[str, Any]
+    is_running: bool = False
+    last_progress_event_ts: Optional[str] = None
     worker_outputs: List[Dict[str, Any]]
     coord_decisions: List[Dict[str, Any]]
     chat_history: List[Dict[str, Any]]
@@ -366,6 +368,8 @@ class SessionSnapshot:
             "plan": self.plan,
             "subtasks": self.subtasks,
             "current_subtask_id": self.current_subtask_id,
+            "is_running": self.is_running,
+            "last_progress_event_ts": self.last_progress_event_ts,
             "state": self.state or self.orchestrator_state,
             "orchestrator_state": self.orchestrator_state,
             "worker_outputs": self.worker_outputs,
@@ -566,27 +570,69 @@ def build_session_snapshot(
     orchestrator_messages = state_dict.get("orchestrator_messages", [])
     raw_events = state_dict.get("orch_events", [])
     progress_events_raw = state_dict.get("progress_events", [])
+    progress_log_path = message_bus.store.logs_dir(session_id) / "progress_events.jsonl"
+    progress_events_log = _read_log_entries(progress_log_path)
     progress_events: List[Dict[str, Any]] = []
-    for ev in progress_events_raw:
+    last_progress_event_ts: Optional[str] = None
+    last_progress_event_dt: Optional[datetime] = None
+
+    def _normalize_progress_event(ev: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         if not isinstance(ev, dict):
-            continue
+            return None
         agent = ev.get("agent")
         subtask_id = ev.get("subtask_id")
         if not agent or not subtask_id:
-            continue
-        stage = ev.get("stage") or "start"
+            return None
+        stage = ev.get("stage") or ev.get("event") or "start"
         status = ev.get("status") or PROGRESS_STAGE_STATUS_MAP.get(stage, "in_progress")
-        progress_events.append(
-            {
-                **ev,
-                "agent": agent,
-                "subtask_id": subtask_id,
-                "stage": stage,
-                "status": status,
-                "ts": ev.get("ts"),
-                "payload": ev.get("payload") or {},
-            }
+        ts_val = ev.get("ts")
+        if isinstance(ts_val, datetime):
+            ts_val = ts_val.isoformat()
+        return {
+            **ev,
+            "agent": agent,
+            "subtask_id": subtask_id,
+            "stage": stage,
+            "status": status,
+            "ts": ts_val,
+            "payload": ev.get("payload") or {},
+        }
+
+    combined_progress_sources = []
+    combined_progress_sources.extend(progress_events_raw or [])
+    combined_progress_sources.extend(progress_events_log or [])
+
+    seen_keys = set()
+    for ev in combined_progress_sources:
+        normalized = _normalize_progress_event(ev)
+        if not normalized:
+            continue
+        key = (
+            normalized.get("agent"),
+            normalized.get("subtask_id"),
+            normalized.get("stage"),
+            normalized.get("ts"),
         )
+        if key in seen_keys:
+            continue
+        seen_keys.add(key)
+        progress_events.append(normalized)
+
+        ts_val = normalized.get("ts")
+        ts_dt = None
+        if isinstance(ts_val, str):
+            try:
+                ts_dt = datetime.fromisoformat(ts_val)
+            except Exception:
+                ts_dt = None
+        if ts_dt:
+            if last_progress_event_dt is None or ts_dt > last_progress_event_dt:
+                last_progress_event_dt = ts_dt
+                last_progress_event_ts = ts_dt.isoformat()
+        elif ts_val and last_progress_event_ts is None:
+            last_progress_event_ts = str(ts_val)
+
+    progress_events.sort(key=lambda ev: ev.get("ts") or "")
     # Filter out malformed orch_events to avoid downstream validation errors
     orch_events = []
     for ev in raw_events:
@@ -604,6 +650,8 @@ def build_session_snapshot(
         plan=plan.to_dict(),
         subtasks=subtasks,
         current_subtask_id=orchestrator_state.current_subtask_id,
+        is_running=orchestrator_state.status == "running",
+        last_progress_event_ts=last_progress_event_ts,
         orchestrator_state=state_dict,
         worker_outputs=worker_list,
         coord_decisions=coord_list,

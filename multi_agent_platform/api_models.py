@@ -68,6 +68,8 @@ class SessionSnapshotModel(BaseModel):
     plan: Dict[str, Any]
     subtasks: List[Dict[str, Any]]
     current_subtask_id: Optional[str]
+    is_running: bool = False
+    last_progress_event_ts: Optional[datetime] = None
     orchestrator_state: Dict[str, Any]
     worker_outputs: List[Dict[str, Any]]
     coord_decisions: List[Dict[str, Any]]
