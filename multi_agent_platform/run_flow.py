@@ -257,19 +257,20 @@ def _apply_planner_result_to_state(
     state: OrchestratorState,
     result: PlannerResult,
     fallback_user_text: str,
-) -> None:
-    """Merge PlannerResult back into state.plan / state.subtasks."""
+    existing_plan: Plan | None,
+) -> Plan:
+    """Merge PlannerResult into a Plan object (state does not store plan directly)."""
 
     plan_dict = result.plan or {}
     subtasks_dicts = result.subtasks or []
 
     # ---- Plan ----
-    plan_id = plan_dict.get("plan_id") or (state.plan.plan_id if state.plan else f"plan-{state.session_id}")
-    title = plan_dict.get("title") or (state.plan.title if state.plan else "Writing Project")
-    description = plan_dict.get("description") or (getattr(state.plan, "description", "") if state.plan else "")
-    notes = plan_dict.get("notes") or (getattr(state.plan, "notes", "") if state.plan else "")
+    plan_id = plan_dict.get("plan_id") or (existing_plan.plan_id if existing_plan else f"plan-{state.session_id}")
+    title = plan_dict.get("title") or (existing_plan.title if existing_plan else "Writing Project")
+    description = plan_dict.get("description") or (getattr(existing_plan, "description", "") if existing_plan else "")
+    notes = plan_dict.get("notes") or (getattr(existing_plan, "notes", "") if existing_plan else "")
 
-    state.plan = Plan(
+    new_plan = Plan(
         plan_id=plan_id,
         title=title,
         description=description,
@@ -279,19 +280,21 @@ def _apply_planner_result_to_state(
     # ---- Subtasks ----
     new_subtasks: List[Subtask] = []
     for idx, raw in enumerate(subtasks_dicts, start=1):
-        sub_id = raw.get("subtask_id") or f"t{idx}"
+        sub_id = raw.get("subtask_id") or raw.get("id") or f"t{idx}"
         title = raw.get("title") or f"Subtask {idx}"
-        status = raw.get("status") or "PENDING"
+        status = raw.get("status") or "pending"
         notes = raw.get("notes") or ""
+        desc = raw.get("description", "")
 
         new_subtasks.append(
             Subtask(
-                id=sub_id if hasattr(Subtask, "id") else sub_id,
+                id=sub_id,
                 title=title,
-                status=status.lower() if isinstance(status, str) else status,
+                status=str(status).lower(),
                 notes=notes,
-                needs_redo=False,
                 output="",
+                needs_redo=False,
+                description=desc,
             )
         )
 
@@ -301,18 +304,21 @@ def _apply_planner_result_to_state(
             Subtask(
                 id="t1",
                 title=f"Outline: {fallback_user_text}",
+                description="Create a high-level outline based on the latest user input.",
                 status="pending",
                 notes="auto-generated fallback",
             ),
             Subtask(
                 id="t2",
                 title="Write the first section draft",
+                description="Draft the opening section based on the outline.",
                 status="pending",
                 notes="auto-generated fallback",
             ),
         ]
 
-    state.subtasks = new_subtasks
+    new_plan.subtasks = new_subtasks
+    return new_plan
 
 from .plan_model import Plan, Subtask
 from .session_store import ArtifactStore, ArtifactRef
@@ -733,12 +739,12 @@ class Orchestrator:
         plan: Plan,
         state: OrchestratorState,
         user_text: str,
-    ) -> str:
+    ) -> tuple[Plan, str]:
         """
         Entry point for planning-phase user messages. Currently delegates to existing answer logic.
         """
         if state.plan_locked:
-            return self.answer_user_question(session_id, plan, user_text)
+            return plan, self.answer_user_question(session_id, plan, user_text)
         text = (user_text or "").strip()
         if text:
             state.planner_chat.append(
@@ -752,21 +758,10 @@ class Orchestrator:
             )
         )
         if USE_REAL_PLANNER:
-            if state.plan is not None:
-                try:
-                    plan_dict = state.plan.to_dict()
-                except AttributeError:
-                    plan_dict = {
-                        "plan_id": state.plan.plan_id,
-                        "title": state.plan.title,
-                        "description": getattr(state.plan, "description", ""),
-                        "notes": getattr(state.plan, "notes", ""),
-                    }
-            else:
-                plan_dict = None
+            plan_dict = plan.to_dict() if hasattr(plan, "to_dict") else None
 
             subtasks_dicts: List[Dict[str, Any]] = []
-            for s in state.subtasks or []:
+            for s in plan.subtasks or []:
                 try:
                     subtasks_dicts.append(s.to_dict())
                 except AttributeError:
@@ -786,10 +781,11 @@ class Orchestrator:
                 subtasks=subtasks_dicts,
                 latest_user_input=text,
             )
-            _apply_planner_result_to_state(state, result, fallback_user_text=text)
+            plan = _apply_planner_result_to_state(state, result, fallback_user_text=text, existing_plan=plan)
         else:
-            generate_stub_plan_from_planning_input(plan, text)
-        return self.answer_user_question(session_id, plan, user_text)
+            plan = generate_stub_plan_from_planning_input(plan, text)
+        answer = self.answer_user_question(session_id, plan, user_text)
+        return plan, answer
 
     def save_state(self, session_id: str, plan: Plan) -> Path:
         """
@@ -1282,7 +1278,7 @@ class Orchestrator:
             state.add_orchestrator_message(role="user", content=question)
             run_orchestrator_turn(state, question)
             if not state.plan_locked:
-                answer = self.handle_planning_turn(session_id, plan, state, question)
+                plan, answer = self.handle_planning_turn(session_id, plan, state, question)
             else:
                 answer = self.answer_user_question(session_id, plan, question)
                 consume_orchestrator_events(state, plan)

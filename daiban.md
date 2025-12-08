@@ -21,6 +21,3 @@
 - [ ] ⏳ （可选）orch_events / coord_decisions 调试视图
 
 
-****重要*****
-debug。当前 https://cyber1924-production.up.railway.app/sessions/sess-20251208-072105-52439d41/command 出现
-{"detail":"Method Not Allowed"}
