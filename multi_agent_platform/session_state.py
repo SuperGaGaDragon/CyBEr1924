@@ -9,13 +9,35 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field, asdict
 from pathlib import Path
-from typing import Optional, Dict, Any, List
+from typing import Optional, Dict, Any, List, Literal
+from datetime import datetime
 import json
+from pydantic import BaseModel
 
 from .message_bus import MessageBus
 from .plan_model import Plan
 from .session_store import ArtifactStore
 from src.protocol import PayloadType
+
+
+class OrchestratorMessage(BaseModel):
+    role: Literal["user", "orchestrator"]
+    content: str
+    ts: datetime
+
+
+class OrchestratorEvent(BaseModel):
+    from_role: Literal["orchestrator"]
+    to_role: Literal["planner", "reviewer", "worker"]
+    kind: str  # "REQUEST_REDO", "REQUEST_PLAN_UPDATE", ...
+    payload: Dict[str, Any] = {}
+    ts: datetime
+
+
+class PlannerChatMessage(BaseModel):
+    role: Literal["user", "planner"]
+    content: str
+    ts: datetime
 
 
 @dataclass
@@ -31,6 +53,10 @@ class OrchestratorState:
     status: str  # "idle" | "running" | "completed" | "error"
     current_subtask_id: Optional[str] = None
     extra: Dict[str, Any] = field(default_factory=dict)
+    plan_locked: bool = False
+    orchestrator_messages: List[OrchestratorMessage] = field(default_factory=list)
+    orch_events: List[OrchestratorEvent] = field(default_factory=list)
+    planner_chat: List[PlannerChatMessage] = field(default_factory=list)
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary for JSON serialization."""
@@ -38,6 +64,18 @@ class OrchestratorState:
         # Ensure extra is always a dict
         if d.get("extra") is None:
             d["extra"] = {}
+        d["orchestrator_messages"] = [
+            msg.dict() if isinstance(msg, OrchestratorMessage) else msg
+            for msg in self.orchestrator_messages
+        ]
+        d["orch_events"] = [
+            event.dict() if isinstance(event, OrchestratorEvent) else event
+            for event in self.orch_events
+        ]
+        d["planner_chat"] = [
+            msg.dict() if isinstance(msg, PlannerChatMessage) else msg
+            for msg in self.planner_chat
+        ]
         return d
 
     def to_json(self) -> str:
@@ -47,12 +85,35 @@ class OrchestratorState:
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "OrchestratorState":
         """Create from dictionary."""
+        orchestrator_messages_data = data.get("orchestrator_messages") or []
+        orch_events_data = data.get("orch_events") or []
+        planner_chat_data = data.get("planner_chat") or []
+
+        def _load_items(items: List[Any], model_cls: type[BaseModel]) -> List[BaseModel]:
+            parsed: List[BaseModel] = []
+            for item in items:
+                if isinstance(item, model_cls):
+                    parsed.append(item)
+                    continue
+                if isinstance(item, dict):
+                    try:
+                        parsed.append(model_cls(**item))
+                    except Exception:
+                        continue
+            return parsed
+
         return cls(
             session_id=data["session_id"],
             plan_id=data["plan_id"],
             status=data.get("status", "idle"),
             current_subtask_id=data.get("current_subtask_id"),
             extra=data.get("extra") or {},
+            plan_locked=data.get("plan_locked", False),
+            orchestrator_messages=_load_items(
+                orchestrator_messages_data, OrchestratorMessage
+            ),
+            orch_events=_load_items(orch_events_data, OrchestratorEvent),
+            planner_chat=_load_items(planner_chat_data, PlannerChatMessage),
         )
 
     @classmethod
