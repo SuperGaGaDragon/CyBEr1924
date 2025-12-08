@@ -1765,7 +1765,7 @@ function App() {
   return (
     <>
       {aboutButton}
-      <div style={{ display: "flex", height: "100vh", fontFamily: "system-ui, -apple-system, sans-serif", background: "#ffffff" }}>
+      <div style={{ display: "flex", height: "100vh", fontFamily: "system-ui, -apple-system, sans-serif", background: "#ffffff", overflow: "hidden" }}>
       <aside
         style={{
           width: sidebarWidth,
@@ -1945,7 +1945,7 @@ function App() {
         />
       </aside>
 
-      <main style={{ flex: 1, display: "flex", flexDirection: "column", background: "#ffffff" }}>
+      <main style={{ flex: 1, display: "flex", flexDirection: "column", background: "#ffffff", minHeight: 0, overflow: "hidden" }}>
         <header
           style={{
             padding: "16px 24px",
@@ -2356,6 +2356,7 @@ function PlanColumn({ snapshot }: { snapshot: SessionSnapshot | null }) {
       display: "flex",
       flexDirection: "column",
       padding: "20px",
+      minHeight: 0,
       overflow: "hidden",
     }}>
       <h4 style={{
@@ -2454,6 +2455,7 @@ function WorkerColumn({ snapshot }: { snapshot: SessionSnapshot | null }) {
       display: "flex",
       flexDirection: "column",
       padding: "20px",
+      minHeight: 0,
       overflow: "hidden",
     }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "12px" }}>
@@ -2468,31 +2470,34 @@ function WorkerColumn({ snapshot }: { snapshot: SessionSnapshot | null }) {
         <button
           onClick={() => setDescending((prev) => !prev)}
           title={descending ? "最新在前" : "最旧在前"}
+          aria-pressed={descending}
           style={{
-            width: "34px",
-            height: "34px",
-            borderRadius: "10px",
+            width: "38px",
+            height: "38px",
+            borderRadius: "12px",
             border: "1px solid #d1d5db",
-            background: "#ffffff",
+            background: descending ? "linear-gradient(135deg, #0f172a 0%, #1f2937 100%)" : "#ffffff",
             cursor: "pointer",
-            boxShadow: "0 6px 18px rgba(0,0,0,0.08)",
+            boxShadow: descending ? "0 12px 26px rgba(0,0,0,0.14)" : "0 6px 18px rgba(0,0,0,0.08)",
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
-            fontSize: "14px",
-            fontWeight: 700,
-            color: "#111827",
-            transition: "all 0.15s ease",
+            transition: "all 0.2s ease",
           }}
           onMouseOver={(e) => {
-            e.currentTarget.style.background = "#f3f4f6";
+            e.currentTarget.style.borderColor = "#0f172a";
+            e.currentTarget.style.boxShadow = "0 12px 30px rgba(0,0,0,0.16)";
           }}
           onMouseOut={(e) => {
-            e.currentTarget.style.background = "#ffffff";
+            e.currentTarget.style.borderColor = "#d1d5db";
+            e.currentTarget.style.boxShadow = descending ? "0 12px 26px rgba(0,0,0,0.14)" : "0 6px 18px rgba(0,0,0,0.08)";
           }}
           aria-label="Toggle worker task order"
         >
-          ⇅
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M8 5.5L12 2L16 5.5H13.5V14.5H10.5V5.5H8Z" fill={descending ? "#ffffff" : "#111827"} />
+            <path d="M16 18.5L12 22L8 18.5H10.5V9.5H13.5V18.5H16Z" fill={descending ? "#ffffff" : "#111827"} />
+          </svg>
         </button>
       </div>
       <div style={{ overflowY: "auto", flex: 1, paddingRight: "6px", display: "flex", flexDirection: "column", gap: "10px" }}>
@@ -2517,7 +2522,7 @@ function WorkerColumn({ snapshot }: { snapshot: SessionSnapshot | null }) {
               background: "#ffffff",
               border: "1px solid #e5e7eb",
               borderRadius: "12px",
-              padding: "12px 14px 12px 52px",
+              padding: "12px 14px 12px 64px",
               boxShadow: "0 8px 20px rgba(0,0,0,0.05)",
               display: "flex",
               flexDirection: "column",
@@ -2643,7 +2648,7 @@ function CoordinatorColumn({ snapshot, width }: ColumnProps) {
               key={index}
               style={{
                 marginBottom: "14px",
-                padding: "14px 16px 14px 56px",
+                padding: "14px 16px 14px 64px",
                 borderRadius: "16px",
                 border: "1px solid #e4e4e7",
                 background: "#ffffff",
@@ -2654,19 +2659,19 @@ function CoordinatorColumn({ snapshot, width }: ColumnProps) {
               {subtaskOrder.has(String(subtaskId)) && (
                 <span style={{
                   position: "absolute",
-                  top: "14px",
-                  left: "14px",
-                  width: "28px",
-                  height: "28px",
+                  top: "12px",
+                  left: "12px",
+                  width: "26px",
+                  height: "26px",
                   borderRadius: "50%",
                   background: "#111827",
                   color: "#ffffff",
                   fontSize: "11px",
-                  fontWeight: 800,
+                  fontWeight: 700,
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "center",
-                  boxShadow: "0 8px 18px rgba(0,0,0,0.18)",
+                  boxShadow: "0 6px 14px rgba(0,0,0,0.18)",
                   textTransform: "uppercase",
                   letterSpacing: "0.03em",
                 }}>

@@ -41,7 +41,7 @@ stage3
 
 - [x] 允许用户调整三个板块（plan/worker/reviewer）宽度。
 
-stage4
+- [x] stage4
 
 - [x] 三个板块(plan/worker/reviewer)都要可以分别scroll down（上下滑动）。（但不允许整体的左右和上下滑动）
 
