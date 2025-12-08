@@ -32,6 +32,26 @@ class SessionSummaryModel(BaseModel):
     last_updated: Optional[datetime] = Field(default=None, description="UTC timestamp of most recent state update")
 
 
+class OrchestratorMessageModel(BaseModel):
+    role: Literal["user", "orchestrator"]
+    content: str
+    ts: datetime
+
+
+class OrchestratorEventModel(BaseModel):
+    from_role: Literal["orchestrator"]
+    to_role: Literal["planner", "reviewer", "worker"]
+    kind: str
+    payload: Dict[str, Any] = Field(default_factory=dict)
+    ts: datetime
+
+
+class PlannerChatMessageModel(BaseModel):
+    role: Literal["user", "planner"]
+    content: str
+    ts: datetime
+
+
 class SessionSnapshotModel(BaseModel):
     session_id: str
     topic: str
@@ -42,6 +62,10 @@ class SessionSnapshotModel(BaseModel):
     worker_outputs: List[Dict[str, Any]]
     coord_decisions: List[Dict[str, Any]]
     chat_history: List[Dict[str, Any]]
+    plan_locked: bool = False
+    orchestrator_messages: List[OrchestratorMessageModel] = Field(default_factory=list)
+    orch_events: List[OrchestratorEventModel] = Field(default_factory=list)
+    planner_chat: List[PlannerChatMessageModel] = Field(default_factory=list)
     message: str
     ok: bool
     command: Optional[str]

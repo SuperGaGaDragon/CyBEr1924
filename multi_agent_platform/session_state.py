@@ -180,6 +180,10 @@ class SessionSnapshot:
     worker_outputs: List[Dict[str, Any]]
     coord_decisions: List[Dict[str, Any]]
     chat_history: List[Dict[str, Any]]
+    plan_locked: bool = False
+    orchestrator_messages: List[Dict[str, Any]] = field(default_factory=list)
+    orch_events: List[Dict[str, Any]] = field(default_factory=list)
+    planner_chat: List[Dict[str, Any]] = field(default_factory=list)
     message: str = ""
     ok: bool = True
     command: str | None = None
@@ -199,6 +203,10 @@ class SessionSnapshot:
             "worker_outputs": self.worker_outputs,
             "coord_decisions": self.coord_decisions,
             "chat_history": self.chat_history,
+            "plan_locked": self.plan_locked,
+            "orchestrator_messages": self.orchestrator_messages,
+            "orch_events": self.orch_events,
+            "planner_chat": self.planner_chat,
             "message": self.message,
             "ok": self.ok,
             "command": self.command,
@@ -327,6 +335,19 @@ def build_session_snapshot(
 
     state_dict = orchestrator_state.to_dict()
 
+    orchestrator_messages = [
+        msg.dict() if hasattr(msg, "dict") else msg
+        for msg in orchestrator_state.orchestrator_messages
+    ]
+    orch_events = [
+        event.dict() if hasattr(event, "dict") else event
+        for event in orchestrator_state.orch_events
+    ]
+    planner_chat = [
+        msg.dict() if hasattr(msg, "dict") else msg
+        for msg in orchestrator_state.planner_chat
+    ]
+
     return SessionSnapshot(
         session_id=session_id,
         topic=topic,
@@ -337,5 +358,9 @@ def build_session_snapshot(
         worker_outputs=worker_list,
         coord_decisions=coord_list,
         chat_history=chat_history,
+        plan_locked=orchestrator_state.plan_locked,
+        orchestrator_messages=orchestrator_messages,
+        orch_events=orch_events,
+        planner_chat=planner_chat,
         state=state_dict,
     )

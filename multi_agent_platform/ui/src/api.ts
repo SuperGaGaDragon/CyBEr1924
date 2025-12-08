@@ -37,6 +37,26 @@ export type ChatMessage = {
   timestamp: string;
 };
 
+export type OrchestratorMessage = {
+  role: "user" | "orchestrator";
+  content: string;
+  ts: string;
+};
+
+export type OrchestratorEvent = {
+  from_role: "orchestrator";
+  to_role: "planner" | "reviewer" | "worker";
+  kind: string;
+  payload: Record<string, any>;
+  ts: string;
+};
+
+export type PlannerChatMessage = {
+  role: "user" | "planner";
+  content: string;
+  ts: string;
+};
+
 export type SessionSnapshot = {
   session_id: string;
   topic: string;
@@ -47,6 +67,10 @@ export type SessionSnapshot = {
   worker_outputs: WorkerOutput[];
   coord_decisions: Record<string, any>[];
   chat_history: ChatMessage[];
+  plan_locked: boolean;
+  orchestrator_messages: OrchestratorMessage[];
+  orch_events: OrchestratorEvent[];
+  planner_chat: PlannerChatMessage[];
   message: string;
   ok: boolean;
   command?: string | null;
