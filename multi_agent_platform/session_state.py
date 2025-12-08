@@ -311,10 +311,13 @@ def build_session_snapshot(
             PayloadType.COORD_DECISION.value,
             PayloadType.COORD_RESPONSE.value,
         ):
+            source_role = envelope.get("source")
+            if source_role in ("reviewer", "coordinator"):
+                continue
             chat_history.append(
                 {
                     "timestamp": timestamp,
-                    "source": envelope.get("source"),
+                    "source": source_role,
                     "payload_type": payload_type,
                     "payload": payload,
                 }
