@@ -5,6 +5,7 @@
 Phase 0 — 模式开关与数据流
 - [x] Step 0.1: 前端新建 Session 弹窗 + novel pill，提交时附上 `novel_mode` 开关；未勾选时保持现状（具体问卷内容见原需求草稿）。
 - [x] Step 0.2: 问卷回答打包为 `novel_profile`（篇幅/年份/题材/角色表/风格/题目），随创建或首次 planner 消息传给后端；orchestrator state.extra 持久化 `novel_mode`、`novel_profile`。
+- [ ] Step 0.3 验证本功能可以function，且不会报404，500等错误。
 
 Phase 1 — Planner 约束（仅 novel_mode）
 - [ ] Step 1.1: 覆写/扩展 planner prompt，强制前置 t1–t4（Research、人物设定、情节设计、章节分配&概要），description 注入问卷信息并要求“cover full content”；t5+ 留给正文分解。
@@ -75,6 +76,10 @@ Phase 5 — QA/兼容
 6、您想好的小说题目吗
 选项一：Not yet (which is totally NOT a problem!)
 选项二：请输入你想好的题目
+
+7、您有其他想让我们知道的关于小说的信息吗？
+选项一：没有
+选项二：请输入
 
 全部answer后，自动在对话框生成一段涵盖刚才所有信息的话发给gpt。 
 
