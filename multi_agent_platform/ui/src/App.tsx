@@ -1,5 +1,5 @@
 import { type FormEvent, useEffect, useState, useRef, useMemo, type Dispatch, type SetStateAction } from "react";
-import type { SessionSummary, SessionSnapshot } from "./api";
+import type { SessionSummary, SessionSnapshot, Subtask } from "./api";
 import {
   listSessions,
   createSession,
@@ -1121,6 +1121,19 @@ function deriveProgressByAgent(snapshot: SessionSnapshot | null): Record<"worker
   };
 }
 
+const buildSubtasksFromPlan = (planData: Record<string, any> | null | undefined): Subtask[] => {
+  const subtasksArray = planData?.subtasks;
+  const entries = Array.isArray(subtasksArray) ? subtasksArray : [];
+  return entries.map((entry: Record<string, any>, idx: number) => ({
+    id: String(entry.id),
+    title: entry.title ?? "",
+    status: entry.status ?? "pending",
+    notes: entry.notes ?? "",
+    index: idx + 1,
+    needs_redo: entry.needs_redo,
+  }));
+};
+
 function mergeSnapshotWithEvents(
   snapshot: SessionSnapshot,
   events: { progress_events?: any[]; worker_outputs?: any[] },
@@ -1148,8 +1161,31 @@ function mergeSnapshotWithEvents(
     mergedOutputs.push(wo);
   }
 
+  let updatedPlan = snapshot.plan;
+  let updatedSubtasks = snapshot.subtasks ?? [];
+  const planUpdates = (events.progress_events ?? [])
+    .map((ev) => ({
+      ts: ev?.ts,
+      plan: ev?.payload?.plan_snapshot,
+    }))
+    .filter((entry) => entry.plan);
+  if (planUpdates.length > 0) {
+    planUpdates.sort((a, b) => {
+      const ta = a.ts ? new Date(a.ts).getTime() : 0;
+      const tb = b.ts ? new Date(b.ts).getTime() : 0;
+      return ta - tb;
+    });
+    const latestPlan = planUpdates[planUpdates.length - 1].plan;
+    if (latestPlan) {
+      updatedPlan = latestPlan;
+      updatedSubtasks = buildSubtasksFromPlan(latestPlan);
+    }
+  }
+
   return {
     ...snapshot,
+    plan: updatedPlan,
+    subtasks: updatedSubtasks,
     progress_events: mergedProgress,
     worker_outputs: mergedOutputs,
     last_progress_event_ts: events.progress_events && events.progress_events.length

@@ -1281,6 +1281,20 @@ class Orchestrator:
 
         if added:
             self._update_novel_phase_step(state, increment=added)
+            try:
+                self._record_progress_event(
+                    session_id,
+                    state,
+                    agent="worker",
+                    subtask_id="t4",
+                    stage="finish",
+                    payload={
+                        "plan_snapshot": plan.to_dict(),
+                        "note": f"Appended {added} chapter subtasks",
+                    },
+                )
+            except Exception:
+                pass
         else:
             self._update_novel_phase_step(state, increment=0)
 
