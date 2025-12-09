@@ -93,6 +93,8 @@ def test_apply_planner_result_enforces_t1_t4_and_merges():
     ids = [s.id for s in merged.subtasks]
     assert ids[:4] == ["t1", "t2", "t3", "t4"]
     assert any("Chapter 1" in s.title for s in merged.subtasks)
+    first_chapter = merged.subtasks[4]
+    assert first_chapter.metadata.get("chapter_index") == 1
     # Ensure descriptions on seeded tasks include profile fields
     assert "Hemingway" in (merged.subtasks[0].description or "")
 
@@ -173,6 +175,7 @@ def test_stub_planner_appends_chapter_task():
     for task in appended:
         assert task.title.startswith("Chapter")
         assert CHAPTER_FULL_CONTENT in task.description
+    assert appended[0].metadata.get("chapter_index") == 1
 
 
 def test_worker_extra_context_uses_novel_summary():
@@ -219,6 +222,8 @@ def test_stub_planner_custom_batch_size():
     appended = updated.subtasks[4:]
     assert len(appended) == 2
     assert all(task.title.startswith("Chapter") for task in appended)
+    assert appended[0].metadata.get("chapter_index") == 1
+    assert appended[1].metadata.get("chapter_index") == 2
 
 
 def test_apply_planner_result_skips_invalid_chapter():

@@ -22,6 +22,7 @@ class Subtask:
     notes: str = ""
     output: str = ""
     needs_redo: bool = False
+    metadata: Dict[str, Any] = field(default_factory=dict)
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -32,6 +33,7 @@ class Subtask:
             "notes": self.notes,
             "output": self.output,
             "needs_redo": self.needs_redo,
+            "metadata": self.metadata,
         }
 
     @classmethod
@@ -44,6 +46,7 @@ class Subtask:
             notes=data.get("notes", ""),
             output=data.get("output", ""),
             needs_redo=data.get("needs_redo", False),
+            metadata=data.get("metadata") or {},
         )
 
 

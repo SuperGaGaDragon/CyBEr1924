@@ -96,6 +96,8 @@ def _normalize_chapter_subtask(raw: Dict[str, Any], index: int) -> Dict[str, Any
     normalized_title = _chapter_title(chapter_index, base_title)
     normalized_description = _chapter_description(raw.get("description") or raw.get("notes") or "")
     subtask_id = raw.get("subtask_id") or raw.get("id") or f"t{index}"
+    metadata = dict(raw.get("metadata") or {})
+    metadata["chapter_index"] = chapter_index
     return {
         "subtask_id": subtask_id,
         "id": subtask_id,
@@ -103,6 +105,7 @@ def _normalize_chapter_subtask(raw: Dict[str, Any], index: int) -> Dict[str, Any
         "description": normalized_description,
         "status": raw.get("status") or "pending",
         "notes": raw.get("notes") or "",
+        "metadata": metadata,
     }
 
 
@@ -720,6 +723,7 @@ def generate_stub_plan_from_planning_input(
             notes=normalized.get("notes", ""),
             description=normalized.get("description", ""),
             needs_redo=False,
+            metadata=normalized.get("metadata", {}),
         )
         plan.subtasks.append(new_subtask)
 
@@ -799,6 +803,9 @@ def _apply_planner_result_to_state(
             status = normalized.get("status", status)
             notes = normalized.get("notes", notes)
 
+        metadata = raw.get("metadata") or {}
+        if novel_mode and idx > 4:
+            metadata = normalized.get("metadata", metadata)
         new_subtasks.append(
             Subtask(
                 id=sub_id,
@@ -808,6 +815,7 @@ def _apply_planner_result_to_state(
                 output="",
                 needs_redo=False,
                 description=desc,
+                metadata=metadata,
             )
         )
 
