@@ -1,4 +1,4 @@
-import { type FormEvent, useEffect, useState, useRef, useMemo } from "react";
+import { type FormEvent, useEffect, useState, useRef, useMemo, type Dispatch, type SetStateAction } from "react";
 import type { SessionSummary, SessionSnapshot } from "./api";
 import {
   listSessions,
@@ -299,15 +299,35 @@ function ExecutionView({ session, onSendExecutionMessage, pendingMessage, isSend
   );
 }
 
+type CreateSessionFormState = {
+  show: boolean;
+  topic: string;
+  novelMode: boolean;
+  wizardOpen: boolean;
+  step: number;
+  length: string;
+  year: string;
+  genre: string;
+  otherGenres: string;
+  characters: { name: string; role: string }[];
+  style: string;
+  titleChoice: "not_yet" | "provided" | "";
+  titleText: string;
+  extraNotes: string;
+  error: string | null;
+};
+
 type PlanPanelProps = {
   snapshot: SessionSnapshot;
   onPlanCommand: (
     command: PlanEditCommand,
     payload?: Record<string, unknown>,
   ) => Promise<void>;
+  createSessionForm: CreateSessionFormState;
+  setCreateSessionForm: Dispatch<SetStateAction<CreateSessionFormState>>;
 };
 
-function PlanAdvancedPanel({ snapshot, onPlanCommand }: PlanPanelProps) {
+function PlanAdvancedPanel({ snapshot, onPlanCommand, createSessionForm, setCreateSessionForm }: PlanPanelProps) {
   const planLocked = snapshot.plan_locked;
 
   const promptForSubtask = (
@@ -1196,23 +1216,7 @@ function App() {
     worker: "timeline",
     reviewer: "timeline",
   });
-  const [createSessionForm, setCreateSessionForm] = useState<{
-    show: boolean;
-    topic: string;
-    novelMode: boolean;
-    wizardOpen: boolean;
-    step: number;
-    length: string;
-    year: string;
-    genre: string;
-    otherGenres: string;
-    characters: { name: string; role: string }[];
-    style: string;
-    titleChoice: "not_yet" | "provided" | "";
-    titleText: string;
-    extraNotes: string;
-    error: string | null;
-  }>({
+  const [createSessionForm, setCreateSessionForm] = useState<CreateSessionFormState>({
     show: false,
     topic: "",
     novelMode: false,
@@ -3003,6 +3007,8 @@ function App() {
               <PlanAdvancedPanel
                 snapshot={snapshot}
                 onPlanCommand={handlePlanCommand}
+                createSessionForm={createSessionForm}
+                setCreateSessionForm={setCreateSessionForm}
               />
             </div>
           </section>
@@ -3797,7 +3803,6 @@ function WorkerColumn({ snapshot, progress, progressSeenCount = 0, viewMode = "t
   }, [snapshot?.progress_events, outputs.length]);
 
   const novelSummary = (snapshot as any)?.state?.extra?.novel_summary_t1_t4 || (snapshot as any)?.orchestrator_state?.extra?.novel_summary_t1_t4;
-  const novelProfile = (snapshot as any)?.state?.extra?.novel_profile || (snapshot as any)?.orchestrator_state?.extra?.novel_profile;
 
   const escapeHtml = (str: string) =>
     String(str)
