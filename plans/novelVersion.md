@@ -22,9 +22,9 @@ Phase 3 — Reviewer 行为
 - [ ] Step 3.3 验证本功能可以function，且不会报404，500等错误。
 
 Phase 4 — 前端问卷与展示
-- [ ] Step 4.1: 问卷 6 题线性 wizard（必答才能下一题，角色表增删行），提交后自动生成英文 summary 发给 planner。
-- [ ] Step 4.2: Execution UI 显示 novel pill、章节 summary 提示、Reviewer Revised 区块；非 novel_mode 不受影响。
-- [ ] Step 4.3 验证本功能可以function，且不会报404，500等错误。
+- [x] Step 4.1: 问卷 6 题线性 wizard（必答才能下一题，角色表增删行），提交后自动生成英文 summary 发给 planner。
+- [x] Step 4.2: Execution UI 显示 novel pill、章节 summary 提示、Reviewer Revised 区块；非 novel_mode 不受影响。
+- [x] Step 4.3 验证本功能可以function，且不会报404，500等错误。
 
 Phase 5 — QA/兼容
 - [ ] Step 5.1: 测试 stub/真实 planner 下的 novel_mode 分支、关闭模式回归、t1–t4 强制/summary 注入/reviewer reset/修订保存。

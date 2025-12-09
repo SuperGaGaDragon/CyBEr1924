@@ -1021,6 +1021,31 @@ type ProgressItem = {
 
 type ViewMode = "timeline" | "output";
 
+function buildNovelProfileSummary(profile: Record<string, any> | null | undefined): string | null {
+  if (!profile) return null;
+  const len = profile.length ? `Length: ${profile.length}` : "";
+  const year = profile.year ? `Year: ${profile.year}` : "";
+  const genre = profile.genre || profile.other_genres ? `Genre: ${profile.genre || profile.other_genres}` : "";
+  const style = profile.style ? `Style: ${profile.style}` : "";
+  const title = profile.title_text ? `Title: ${profile.title_text}` : "";
+  const charsRaw = Array.isArray(profile.characters) ? profile.characters : [];
+  const chars = charsRaw
+    .map((c: any) => {
+      if (!c) return null;
+      const name = (c.name ?? "").trim();
+      const role = (c.role ?? "").trim();
+      if (!name && !role) return null;
+      return `${name}${role ? ` (${role})` : ""}`;
+    })
+    .filter(Boolean)
+    .join(", ");
+  const characters = chars ? `Characters: ${chars}` : "";
+  const extra = profile.extra_notes ? `Notes: ${profile.extra_notes}` : "";
+  const summary = [len, year, genre, style, title, characters, extra].filter(Boolean).join("; ");
+  if (!summary) return null;
+  return `Here is my novel profile for planning:\n${summary}`;
+}
+
 function deriveProgressByAgent(snapshot: SessionSnapshot | null): Record<"worker" | "reviewer", ProgressItem[]> {
   if (!snapshot) {
     return { worker: [], reviewer: [] };
@@ -1207,6 +1232,7 @@ function App() {
   const eventsPollTimer = useRef<number | null>(null);
   const isRunning = state.snapshot?.is_running ?? false;
   const commandsDisabled = isRunning || state.pollingEvents;
+  const pushNovelProfileOnce = useRef<Set<string>>(new Set());
 
   useEffect(() => {
     setViewModes({ worker: "timeline", reviewer: "timeline" });
@@ -1238,6 +1264,25 @@ function App() {
     eventsPollTimer.current = window.setTimeout(() => {
       void pollEventsOnce();
     }, delayMs);
+  };
+
+  const sendNovelProfileToPlanner = async (sessionId: string, profile: Record<string, any> | null | undefined) => {
+    if (!profile || pushNovelProfileOnce.current.has(sessionId)) return;
+    const summary = buildNovelProfileSummary(profile);
+    if (!summary) return;
+    pushNovelProfileOnce.current.add(sessionId);
+    try {
+      const snapshot = await sendCommand(sessionId, "ask", { question: summary });
+      setState((prev) => ({
+        ...prev,
+        snapshot,
+        lastEventTs: snapshot.last_progress_event_ts ?? prev.lastEventTs,
+        pollingEvents: snapshot.is_running ?? prev.pollingEvents,
+      }));
+    } catch (err: any) {
+      // non-blocking; planner chat can still proceed manually
+      console.warn("Failed to push novel profile to planner", err);
+    }
   };
 
   const pollEventsOnce = async () => {
@@ -1706,11 +1751,28 @@ function App() {
         activeSessionId: id,
         snapshot,
       }));
+      const profileFromResponse =
+        (snapshot as any)?.state?.extra?.novel_profile ||
+        (snapshot as any)?.orchestrator_state?.extra?.novel_profile ||
+        novelProfile;
+      if (createSessionForm.novelMode) {
+        await sendNovelProfileToPlanner(id, profileFromResponse as Record<string, any>);
+      }
       setCreateSessionForm({
         show: false,
         topic: "",
         novelMode: false,
-        novelProfile: "",
+        wizardOpen: false,
+        step: 1,
+        length: "",
+        year: "",
+        genre: "",
+        otherGenres: "",
+        characters: [{ name: "", role: "" }],
+        style: "",
+        titleChoice: "",
+        titleText: "",
+        extraNotes: "",
         error: null,
       });
     } catch (err: any) {
@@ -2803,6 +2865,31 @@ function App() {
             <div style={{ fontWeight: 600, fontSize: "16px", color: "#000000" }}>
               {snapshot ? snapshot.topic : "No session selected"}
             </div>
+            {snapshot?.state?.extra?.novel_mode && (
+              <div style={{ display: "inline-flex", alignItems: "center", gap: "8px", marginTop: "6px" }}>
+                <span style={{
+                  padding: "6px 10px",
+                  borderRadius: "999px",
+                  background: "#0f172a",
+                  color: "#ffffff",
+                  fontSize: "11px",
+                  fontWeight: 800,
+                  letterSpacing: "0.08em",
+                  textTransform: "uppercase",
+                }}>
+                  Novel Mode
+                </span>
+                <span style={{ fontSize: "12px", color: "#374151" }}>
+                  {[
+                    snapshot.state?.extra?.novel_profile?.length,
+                    snapshot.state?.extra?.novel_profile?.genre || snapshot.state?.extra?.novel_profile?.other_genres,
+                    snapshot.state?.extra?.novel_profile?.style,
+                  ]
+                    .filter(Boolean)
+                    .join(" · ")}
+                </span>
+              </div>
+            )}
             {loading && <span style={{ fontSize: 13, color: "#666666", marginTop: "4px", display: "block" }}>Thinking…</span>}
             {error && (
               <span style={{ fontSize: 13, color: "#000000", marginTop: "4px", display: "block" }}>
@@ -3675,6 +3762,9 @@ function WorkerColumn({ snapshot, progress, progressSeenCount = 0, viewMode = "t
     }
   }, [snapshot?.progress_events, outputs.length]);
 
+  const novelSummary = (snapshot as any)?.state?.extra?.novel_summary_t1_t4 || (snapshot as any)?.orchestrator_state?.extra?.novel_summary_t1_t4;
+  const novelProfile = (snapshot as any)?.state?.extra?.novel_profile || (snapshot as any)?.orchestrator_state?.extra?.novel_profile;
+
   const escapeHtml = (str: string) =>
     String(str)
       .replace(/&/g, "&amp;")
@@ -3862,6 +3952,23 @@ function WorkerColumn({ snapshot, progress, progressSeenCount = 0, viewMode = "t
           </button>
         </div>
       </div>
+      {novelSummary && (
+        <div style={{
+          padding: "10px 12px",
+          borderRadius: "10px",
+          border: "1px solid #e5e7eb",
+          background: "#eef2ff",
+          color: "#111827",
+          fontSize: "12px",
+          lineHeight: 1.5,
+          marginBottom: "12px",
+        }}>
+          <div style={{ fontWeight: 800, fontSize: "11px", letterSpacing: "0.08em", textTransform: "uppercase", color: "#4338ca", marginBottom: "4px" }}>
+            Novel Summary (t1–t4)
+          </div>
+          <div style={{ whiteSpace: "pre-wrap" }}>{novelSummary}</div>
+        </div>
+      )}
       {activeViewMode === "timeline" ? (
         <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: "12px" }}>
           <ProgressStrip items={progress} label="Worker" sourceCount={progressSeenCount} />
@@ -3973,6 +4080,8 @@ function CoordinatorColumn({ snapshot, width, progress = [], progressSeenCount =
   const subtaskOrder = new Map((snapshot?.subtasks ?? []).map((s, i) => [String(s.id), i + 1]));
   const activeViewMode: ViewMode = viewMode ?? "timeline";
   const [descending, setDescending] = useState(true);
+  const novelSummary = (snapshot as any)?.state?.extra?.novel_summary_t1_t4 || (snapshot as any)?.orchestrator_state?.extra?.novel_summary_t1_t4;
+  const reviewerRevisions = (snapshot as any)?.state?.extra?.reviewer_revisions || (snapshot as any)?.orchestrator_state?.extra?.reviewer_revisions || {};
 
   // Derive reviewer-like statuses from subtasks when no explicit decision exists.
   const existingIds = new Set(
@@ -4097,6 +4206,23 @@ function CoordinatorColumn({ snapshot, width, progress = [], progressSeenCount =
           </button>
         </div>
       </div>
+      {novelSummary && (
+        <div style={{
+          padding: "10px 12px",
+          borderRadius: "10px",
+          border: "1px solid #e5e7eb",
+          background: "#eef2ff",
+          color: "#111827",
+          fontSize: "12px",
+          lineHeight: 1.5,
+          marginBottom: "12px",
+        }}>
+          <div style={{ fontWeight: 800, fontSize: "11px", letterSpacing: "0.08em", textTransform: "uppercase", color: "#4338ca", marginBottom: "4px" }}>
+            Novel Summary (t1–t4)
+          </div>
+          <div style={{ whiteSpace: "pre-wrap" }}>{novelSummary}</div>
+        </div>
+      )}
       {activeViewMode === "timeline" ? (
         <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: "12px" }}>
           <ProgressStrip items={progress} label="Reviewer" sourceCount={progressSeenCount} />
@@ -4126,6 +4252,29 @@ function CoordinatorColumn({ snapshot, width, progress = [], progressSeenCount =
             minHeight: 0,
           }}
         >
+          {reviewerRevisions && Object.keys(reviewerRevisions).length > 0 && (
+            <div style={{
+              marginBottom: "12px",
+              padding: "12px",
+              borderRadius: "10px",
+              border: "1px solid #e5e7eb",
+              background: "#f9fafb",
+            }}>
+              <div style={{ fontWeight: 800, fontSize: "12px", letterSpacing: "0.08em", textTransform: "uppercase", color: "#111827", marginBottom: "6px" }}>
+                Reviewer Revised Drafts
+              </div>
+              <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+                {Object.entries(reviewerRevisions).map(([subId, text]) => (
+                  <div key={subId} style={{ padding: "10px 12px", borderRadius: "10px", border: "1px solid #e5e7eb", background: "#ffffff" }}>
+                    <div style={{ fontWeight: 700, fontSize: "13px", marginBottom: "6px", color: "#111827" }}>Task {subId}</div>
+                    <div style={{ fontSize: "13px", color: "#1f2937", whiteSpace: "pre-wrap", lineHeight: 1.5 }}>
+                      {String(text)}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
           {!snapshot && (
             <div style={{ color: "#666666", fontSize: "14px" }}>
               Reviewer decisions will appear here.
