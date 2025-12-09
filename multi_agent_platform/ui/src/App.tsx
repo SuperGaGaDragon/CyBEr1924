@@ -378,424 +378,6 @@ function PlanAdvancedPanel({ snapshot, onPlanCommand, createSessionForm, setCrea
         </div>
       )}
 
-      {/* Novel Questionnaire */}
-      {createSessionForm.wizardOpen && (
-        <div
-          style={{
-            position: "fixed",
-            inset: 0,
-            background: "rgba(0,0,0,0.6)",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            zIndex: 1200,
-            backdropFilter: "blur(6px)",
-          }}
-          onClick={() => setCreateSessionForm((prev) => ({ ...prev, wizardOpen: false }))}
-        >
-          <div
-            onClick={(e) => e.stopPropagation()}
-            style={{
-              width: "100%",
-              maxWidth: "640px",
-              background: "#ffffff",
-              borderRadius: "18px",
-              boxShadow: "0 24px 60px rgba(0,0,0,0.35)",
-              padding: "26px",
-              display: "flex",
-              flexDirection: "column",
-              gap: "16px",
-              maxHeight: "88vh",
-              overflow: "hidden",
-            }}
-          >
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-              <div>
-                <div style={{ fontSize: "12px", letterSpacing: "0.08em", textTransform: "uppercase", color: "#6b7280", marginBottom: "4px" }}>
-                  Novel Mode
-                </div>
-                <div style={{ fontSize: "20px", fontWeight: 800, color: "#0b0b0b" }}>Answer to continue</div>
-              </div>
-              <button
-                onClick={() => setCreateSessionForm((prev) => ({ ...prev, wizardOpen: false }))}
-                style={{
-                  border: "none",
-                  background: "transparent",
-                  fontSize: "14px",
-                  color: "#6b7280",
-                  cursor: "pointer",
-                }}
-              >
-                ✕
-              </button>
-            </div>
-
-            <div style={{ flex: 1, overflowY: "auto", paddingRight: "4px" }}>
-              {createSessionForm.step === 1 && (
-                <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
-                  <div style={{ fontWeight: 700, fontSize: "16px" }}>1. 您的小说会是什么篇幅？</div>
-                  {[
-                    { value: "flash fiction", label: "flash fiction (<1000 words)" },
-                    { value: "short story", label: "short story (1000-7500 words)" },
-                    { value: "novelette", label: "novelette (7500-17500 words)" },
-                    { value: "novella", label: "novella (17500-40000)" },
-                    { value: "novel", label: "novel (40000+ words)" },
-                  ].map((opt) => (
-                    <label key={opt.value} style={{ display: "flex", alignItems: "center", gap: "10px", padding: "10px 12px", border: "1px solid #e5e7eb", borderRadius: "10px", cursor: "pointer" }}>
-                      <input
-                        type="radio"
-                        name="length"
-                        checked={createSessionForm.length === opt.value}
-                        onChange={() => setCreateSessionForm((prev) => ({ ...prev, length: opt.value }))}
-                      />
-                      <span>{opt.label}</span>
-                    </label>
-                  ))}
-                </div>
-              )}
-
-              {createSessionForm.step === 2 && (
-                <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
-                  <div style={{ fontWeight: 700, fontSize: "16px" }}>2. 请输入您期望的小说发生的年份</div>
-                  <label style={{ display: "flex", alignItems: "center", gap: "10px", padding: "10px 12px", border: "1px solid #e5e7eb", borderRadius: "10px", cursor: "pointer" }}>
-                    <input
-                      type="radio"
-                      name="year"
-                      checked={createSessionForm.year === "架空历史"}
-                      onChange={() => setCreateSessionForm((prev) => ({ ...prev, year: "架空历史" }))}
-                    />
-                    <span>架空历史</span>
-                  </label>
-                  <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
-                    <input
-                      type="radio"
-                      name="year"
-                      checked={createSessionForm.year !== "" && createSessionForm.year !== "架空历史"}
-                      onChange={() => setCreateSessionForm((prev) => ({ ...prev, year: prev.year === "架空历史" ? "" : prev.year }))}
-                    />
-                    <input
-                      type="text"
-                      placeholder="请输入大致年份区间（可以是未来年份）"
-                      value={createSessionForm.year !== "架空历史" ? createSessionForm.year : ""}
-                      onChange={(e) => setCreateSessionForm((prev) => ({ ...prev, year: e.target.value }))}
-                      style={{
-                        flex: 1,
-                        padding: "12px 14px",
-                        borderRadius: "10px",
-                        border: "1px solid #e5e7eb",
-                        fontSize: "14px",
-                      }}
-                    />
-                  </div>
-                </div>
-              )}
-
-              {createSessionForm.step === 3 && (
-                <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
-                  <div style={{ fontWeight: 700, fontSize: "16px" }}>3. 请输入您的希望的题材</div>
-                  {[
-                    "Literary Fiction",
-                    "Fantasy",
-                    "Sci-Fi",
-                    "Mystery / Crime",
-                    "Horror",
-                    "Romance",
-                    "Historical",
-                    "Adventure",
-                    "Thriller",
-                    "Hybrid",
-                  ].map((g) => (
-                    <label key={g} style={{ display: "flex", alignItems: "center", gap: "10px", padding: "10px 12px", border: "1px solid #e5e7eb", borderRadius: "10px", cursor: "pointer" }}>
-                      <input
-                        type="radio"
-                        name="genre"
-                        checked={createSessionForm.genre === g}
-                        onChange={() => setCreateSessionForm((prev) => ({ ...prev, genre: g }))}
-                      />
-                      <span>{g}</span>
-                    </label>
-                  ))}
-                  <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
-                    <input
-                      type="radio"
-                      name="genre"
-                      checked={!!createSessionForm.otherGenres}
-                      onChange={() => setCreateSessionForm((prev) => ({ ...prev, genre: "", otherGenres: prev.otherGenres })) }
-                    />
-                    <input
-                      type="text"
-                      placeholder="请输入您想到的其他体裁（“/”分割）"
-                      value={createSessionForm.otherGenres}
-                      onChange={(e) => setCreateSessionForm((prev) => ({ ...prev, otherGenres: e.target.value }))}
-                      style={{
-                        flex: 1,
-                        padding: "12px 14px",
-                        borderRadius: "10px",
-                        border: "1px solid #e5e7eb",
-                        fontSize: "14px",
-                      }}
-                    />
-                  </div>
-                </div>
-              )}
-
-              {createSessionForm.step === 4 && (
-                <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
-                  <div style={{ fontWeight: 700, fontSize: "16px" }}>4. 请给出您已经想到的一些角色姓名和身份</div>
-                  <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
-                    {createSessionForm.characters.map((c, idx) => (
-                      <div key={idx} style={{ display: "flex", gap: "8px", alignItems: "center" }}>
-                        <input
-                          type="text"
-                          placeholder="角色姓名"
-                          value={c.name}
-                          onChange={(e) => {
-                            const next = [...createSessionForm.characters];
-                            next[idx] = { ...next[idx], name: e.target.value };
-                            setCreateSessionForm((prev) => ({ ...prev, characters: next }));
-                          }}
-                          style={{
-                            flex: 1,
-                            padding: "12px 14px",
-                            borderRadius: "10px",
-                            border: "1px solid #e5e7eb",
-                            fontSize: "14px",
-                          }}
-                        />
-                        <span style={{ color: "#9ca3af" }}>｜</span>
-                        <input
-                          type="text"
-                          placeholder="身份信息（可选）"
-                          value={c.role}
-                          onChange={(e) => {
-                            const next = [...createSessionForm.characters];
-                            next[idx] = { ...next[idx], role: e.target.value };
-                            setCreateSessionForm((prev) => ({ ...prev, characters: next }));
-                          }}
-                          style={{
-                            flex: 1,
-                            padding: "12px 14px",
-                            borderRadius: "10px",
-                            border: "1px solid #e5e7eb",
-                            fontSize: "14px",
-                          }}
-                        />
-                        {createSessionForm.characters.length > 1 && (
-                          <button
-                            type="button"
-                            onClick={() => {
-                              const next = createSessionForm.characters.filter((_, i) => i !== idx);
-                              setCreateSessionForm((prev) => ({ ...prev, characters: next.length ? next : [{ name: "", role: "" }] }));
-                            }}
-                            style={{
-                              border: "none",
-                              background: "transparent",
-                              color: "#dc2626",
-                              fontWeight: 700,
-                              cursor: "pointer",
-                            }}
-                          >
-                            ✕
-                          </button>
-                        )}
-                      </div>
-                    ))}
-                    <button
-                      type="button"
-                      onClick={() =>
-                        setCreateSessionForm((prev) => ({
-                          ...prev,
-                          characters: [...prev.characters, { name: "", role: "" }],
-                        }))
-                      }
-                      style={{
-                        alignSelf: "flex-start",
-                        padding: "8px 10px",
-                        borderRadius: "10px",
-                        border: "1px dashed #d1d5db",
-                        background: "#f9fafb",
-                        cursor: "pointer",
-                        fontWeight: 700,
-                      }}
-                    >
-                      ＋ 新增角色
-                    </button>
-                  </div>
-                </div>
-              )}
-
-              {createSessionForm.step === 5 && (
-                <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
-                  <div style={{ fontWeight: 700, fontSize: "16px" }}>5. 您希望文笔类似什么风格</div>
-                  <textarea
-                    placeholder="请描述风格，推荐输入希望模仿的作家"
-                    value={createSessionForm.style}
-                    onChange={(e) => setCreateSessionForm((prev) => ({ ...prev, style: e.target.value }))}
-                    rows={3}
-                    style={{
-                      width: "100%",
-                      padding: "12px 14px",
-                      borderRadius: "10px",
-                      border: "1px solid #e5e7eb",
-                      background: "#f9fafb",
-                      fontSize: "14px",
-                    }}
-                  />
-                </div>
-              )}
-
-              {createSessionForm.step === 6 && (
-                <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
-                  <div style={{ fontWeight: 700, fontSize: "16px" }}>6. 您想好的小说题目吗</div>
-                  <label style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-                    <input
-                      type="radio"
-                      name="title_choice"
-                      checked={createSessionForm.titleChoice === "not_yet"}
-                      onChange={() => setCreateSessionForm((prev) => ({ ...prev, titleChoice: "not_yet", titleText: "" }))}
-                    />
-                    <span>Not yet (which is totally NOT a problem!)</span>
-                  </label>
-                  <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
-                    <input
-                      type="radio"
-                      name="title_choice"
-                      checked={createSessionForm.titleChoice === "provided"}
-                      onChange={() => setCreateSessionForm((prev) => ({ ...prev, titleChoice: "provided" }))}
-                    />
-                    <input
-                      type="text"
-                      placeholder="请输入你想好的题目"
-                      value={createSessionForm.titleText}
-                      onChange={(e) => setCreateSessionForm((prev) => ({ ...prev, titleText: e.target.value, titleChoice: "provided" }))}
-                      style={{
-                        flex: 1,
-                        padding: "12px 14px",
-                        borderRadius: "10px",
-                        border: "1px solid #e5e7eb",
-                        fontSize: "14px",
-                      }}
-                    />
-                  </div>
-                </div>
-              )}
-
-              {createSessionForm.step === 7 && (
-                <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
-                  <div style={{ fontWeight: 700, fontSize: "16px" }}>7. 您有其他想让我们知道的关于小说的信息吗？</div>
-                  <label style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-                    <input
-                      type="radio"
-                      name="extra_notes"
-                      checked={!createSessionForm.extraNotes}
-                      onChange={() => setCreateSessionForm((prev) => ({ ...prev, extraNotes: "" }))}
-                    />
-                    <span>没有</span>
-                  </label>
-                  <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
-                    <input
-                      type="radio"
-                      name="extra_notes"
-                      checked={!!createSessionForm.extraNotes}
-                      onChange={() => setCreateSessionForm((prev) => ({ ...prev, extraNotes: prev.extraNotes || "" }))}
-                    />
-                    <textarea
-                      placeholder="请输入"
-                      value={createSessionForm.extraNotes}
-                      onChange={(e) => setCreateSessionForm((prev) => ({ ...prev, extraNotes: e.target.value }))}
-                      rows={3}
-                      style={{
-                        flex: 1,
-                        padding: "12px 14px",
-                        borderRadius: "10px",
-                        border: "1px solid #e5e7eb",
-                        background: "#f9fafb",
-                        fontSize: "14px",
-                      }}
-                    />
-                  </div>
-                </div>
-              )}
-            </div>
-
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: "10px" }}>
-              <div style={{ fontSize: "12px", color: "#6b7280" }}>Step {createSessionForm.step}/7</div>
-              <div style={{ display: "flex", gap: "10px" }}>
-                <button
-                  type="button"
-                  onClick={() =>
-                    setCreateSessionForm((prev) => ({
-                      ...prev,
-                      step: Math.max(1, prev.step - 1),
-                    }))
-                  }
-                  disabled={createSessionForm.step === 1}
-                  style={{
-                    padding: "10px 14px",
-                    borderRadius: "10px",
-                    border: "1px solid #e5e7eb",
-                    background: "#ffffff",
-                    color: "#111827",
-                    fontWeight: 700,
-                    cursor: createSessionForm.step === 1 ? "not-allowed" : "pointer",
-                    opacity: createSessionForm.step === 1 ? 0.6 : 1,
-                  }}
-                >
-                  Back
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    if (createSessionForm.step === 7) {
-                      setCreateSessionForm((prev) => ({ ...prev, wizardOpen: false }));
-                      return;
-                    }
-                    const nextStep = createSessionForm.step + 1;
-                    setCreateSessionForm((prev) => ({
-                      ...prev,
-                      step: Math.min(7, nextStep),
-                    }));
-                  }}
-                  disabled={
-                    (createSessionForm.step === 1 && !createSessionForm.length) ||
-                    (createSessionForm.step === 2 && !createSessionForm.year) ||
-                    (createSessionForm.step === 3 && !createSessionForm.genre && !createSessionForm.otherGenres) ||
-                    (createSessionForm.step === 4 &&
-                      !(createSessionForm.characters || []).some((c) => c.name.trim() || c.role.trim())) ||
-                    (createSessionForm.step === 5 && !createSessionForm.style) ||
-                    (createSessionForm.step === 6 &&
-                      (!createSessionForm.titleChoice ||
-                        (createSessionForm.titleChoice === "provided" && !createSessionForm.titleText)))
-                  }
-                  style={{
-                    padding: "10px 18px",
-                    borderRadius: "10px",
-                    border: "none",
-                    background: createSessionForm.step === 7 ? "#111827" : "#000000",
-                    color: "#ffffff",
-                    fontWeight: 800,
-                    cursor: "pointer",
-                    opacity:
-                      (createSessionForm.step === 1 && !createSessionForm.length) ||
-                      (createSessionForm.step === 2 && !createSessionForm.year) ||
-                      (createSessionForm.step === 3 && !createSessionForm.genre && !createSessionForm.otherGenres) ||
-                      (createSessionForm.step === 4 &&
-                        !(createSessionForm.characters || []).some((c) => c.name.trim() || c.role.trim())) ||
-                      (createSessionForm.step === 5 && !createSessionForm.style) ||
-                      (createSessionForm.step === 6 &&
-                        (!createSessionForm.titleChoice ||
-                          (createSessionForm.titleChoice === "provided" && !createSessionForm.titleText)))
-                        ? 0.4
-                        : 1,
-                  }}
-                >
-                  {createSessionForm.step === 7 ? "Done" : "Next"}
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
       <div style={{
         display: "flex",
         alignItems: "center",
@@ -3428,6 +3010,424 @@ function App() {
         </div>
       )}
 
+      {/* Novel Questionnaire */}
+      {createSessionForm.wizardOpen && (
+        <div
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "rgba(0,0,0,0.6)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            zIndex: 1200,
+            backdropFilter: "blur(6px)",
+          }}
+          onClick={() => setCreateSessionForm((prev) => ({ ...prev, wizardOpen: false }))}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              width: "100%",
+              maxWidth: "640px",
+              background: "#ffffff",
+              borderRadius: "18px",
+              boxShadow: "0 24px 60px rgba(0,0,0,0.35)",
+              padding: "26px",
+              display: "flex",
+              flexDirection: "column",
+              gap: "16px",
+              maxHeight: "88vh",
+              overflow: "hidden",
+            }}
+          >
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <div>
+                <div style={{ fontSize: "12px", letterSpacing: "0.08em", textTransform: "uppercase", color: "#6b7280", marginBottom: "4px" }}>
+                  Novel Mode
+                </div>
+                <div style={{ fontSize: "20px", fontWeight: 800, color: "#0b0b0b" }}>Answer to continue</div>
+              </div>
+              <button
+                onClick={() => setCreateSessionForm((prev) => ({ ...prev, wizardOpen: false }))}
+                style={{
+                  border: "none",
+                  background: "transparent",
+                  fontSize: "14px",
+                  color: "#6b7280",
+                  cursor: "pointer",
+                }}
+              >
+                ✕
+              </button>
+            </div>
+
+            <div style={{ flex: 1, overflowY: "auto", paddingRight: "4px" }}>
+              {createSessionForm.step === 1 && (
+                <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+                  <div style={{ fontWeight: 700, fontSize: "16px" }}>1. 您的小说会是什么篇幅？</div>
+                  {[
+                    { value: "flash fiction", label: "flash fiction (<1000 words)" },
+                    { value: "short story", label: "short story (1000-7500 words)" },
+                    { value: "novelette", label: "novelette (7500-17500 words)" },
+                    { value: "novella", label: "novella (17500-40000)" },
+                    { value: "novel", label: "novel (40000+ words)" },
+                  ].map((opt) => (
+                    <label key={opt.value} style={{ display: "flex", alignItems: "center", gap: "10px", padding: "10px 12px", border: "1px solid #e5e7eb", borderRadius: "10px", cursor: "pointer" }}>
+                      <input
+                        type="radio"
+                        name="length"
+                        checked={createSessionForm.length === opt.value}
+                        onChange={() => setCreateSessionForm((prev) => ({ ...prev, length: opt.value }))}
+                      />
+                      <span>{opt.label}</span>
+                    </label>
+                  ))}
+                </div>
+              )}
+
+              {createSessionForm.step === 2 && (
+                <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+                  <div style={{ fontWeight: 700, fontSize: "16px" }}>2. 请输入您期望的小说发生的年份</div>
+                  <label style={{ display: "flex", alignItems: "center", gap: "10px", padding: "10px 12px", border: "1px solid #e5e7eb", borderRadius: "10px", cursor: "pointer" }}>
+                    <input
+                      type="radio"
+                      name="year"
+                      checked={createSessionForm.year === "架空历史"}
+                      onChange={() => setCreateSessionForm((prev) => ({ ...prev, year: "架空历史" }))}
+                    />
+                    <span>架空历史</span>
+                  </label>
+                  <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
+                    <input
+                      type="radio"
+                      name="year"
+                      checked={createSessionForm.year !== "" && createSessionForm.year !== "架空历史"}
+                      onChange={() => setCreateSessionForm((prev) => ({ ...prev, year: prev.year === "架空历史" ? "" : prev.year }))}
+                    />
+                    <input
+                      type="text"
+                      placeholder="请输入大致年份区间（可以是未来年份）"
+                      value={createSessionForm.year !== "架空历史" ? createSessionForm.year : ""}
+                      onChange={(e) => setCreateSessionForm((prev) => ({ ...prev, year: e.target.value }))}
+                      style={{
+                        flex: 1,
+                        padding: "12px 14px",
+                        borderRadius: "10px",
+                        border: "1px solid #e5e7eb",
+                        fontSize: "14px",
+                      }}
+                    />
+                  </div>
+                </div>
+              )}
+
+              {createSessionForm.step === 3 && (
+                <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+                  <div style={{ fontWeight: 700, fontSize: "16px" }}>3. 请输入您的希望的题材</div>
+                  {[
+                    "Literary Fiction",
+                    "Fantasy",
+                    "Sci-Fi",
+                    "Mystery / Crime",
+                    "Horror",
+                    "Romance",
+                    "Historical",
+                    "Adventure",
+                    "Thriller",
+                    "Hybrid",
+                  ].map((g) => (
+                    <label key={g} style={{ display: "flex", alignItems: "center", gap: "10px", padding: "10px 12px", border: "1px solid #e5e7eb", borderRadius: "10px", cursor: "pointer" }}>
+                      <input
+                        type="radio"
+                        name="genre"
+                        checked={createSessionForm.genre === g}
+                        onChange={() => setCreateSessionForm((prev) => ({ ...prev, genre: g }))}
+                      />
+                      <span>{g}</span>
+                    </label>
+                  ))}
+                  <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
+                    <input
+                      type="radio"
+                      name="genre"
+                      checked={!!createSessionForm.otherGenres}
+                      onChange={() => setCreateSessionForm((prev) => ({ ...prev, genre: "", otherGenres: prev.otherGenres })) }
+                    />
+                    <input
+                      type="text"
+                      placeholder="请输入您想到的其他体裁（“/”分割）"
+                      value={createSessionForm.otherGenres}
+                      onChange={(e) => setCreateSessionForm((prev) => ({ ...prev, otherGenres: e.target.value }))}
+                      style={{
+                        flex: 1,
+                        padding: "12px 14px",
+                        borderRadius: "10px",
+                        border: "1px solid #e5e7eb",
+                        fontSize: "14px",
+                      }}
+                    />
+                  </div>
+                </div>
+              )}
+
+              {createSessionForm.step === 4 && (
+                <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+                  <div style={{ fontWeight: 700, fontSize: "16px" }}>4. 请给出您已经想到的一些角色姓名和身份</div>
+                  <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+                    {createSessionForm.characters.map((c, idx) => (
+                      <div key={idx} style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+                        <input
+                          type="text"
+                          placeholder="角色姓名"
+                          value={c.name}
+                          onChange={(e) => {
+                            const next = [...createSessionForm.characters];
+                            next[idx] = { ...next[idx], name: e.target.value };
+                            setCreateSessionForm((prev) => ({ ...prev, characters: next }));
+                          }}
+                          style={{
+                            flex: 1,
+                            padding: "12px 14px",
+                            borderRadius: "10px",
+                            border: "1px solid #e5e7eb",
+                            fontSize: "14px",
+                          }}
+                        />
+                        <span style={{ color: "#9ca3af" }}>｜</span>
+                        <input
+                          type="text"
+                          placeholder="身份信息（可选）"
+                          value={c.role}
+                          onChange={(e) => {
+                            const next = [...createSessionForm.characters];
+                            next[idx] = { ...next[idx], role: e.target.value };
+                            setCreateSessionForm((prev) => ({ ...prev, characters: next }));
+                          }}
+                          style={{
+                            flex: 1,
+                            padding: "12px 14px",
+                            borderRadius: "10px",
+                            border: "1px solid #e5e7eb",
+                            fontSize: "14px",
+                          }}
+                        />
+                        {createSessionForm.characters.length > 1 && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const next = createSessionForm.characters.filter((_, i) => i !== idx);
+                              setCreateSessionForm((prev) => ({ ...prev, characters: next.length ? next : [{ name: "", role: "" }] }));
+                            }}
+                            style={{
+                              border: "none",
+                              background: "transparent",
+                              color: "#dc2626",
+                              fontWeight: 700,
+                              cursor: "pointer",
+                            }}
+                          >
+                            ✕
+                          </button>
+                        )}
+                      </div>
+                    ))}
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setCreateSessionForm((prev) => ({
+                          ...prev,
+                          characters: [...prev.characters, { name: "", role: "" }],
+                        }))
+                      }
+                      style={{
+                        alignSelf: "flex-start",
+                        padding: "8px 10px",
+                        borderRadius: "10px",
+                        border: "1px dashed #d1d5db",
+                        background: "#f9fafb",
+                        cursor: "pointer",
+                        fontWeight: 700,
+                      }}
+                    >
+                      ＋ 新增角色
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {createSessionForm.step === 5 && (
+                <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+                  <div style={{ fontWeight: 700, fontSize: "16px" }}>5. 您希望文笔类似什么风格</div>
+                  <textarea
+                    placeholder="请描述风格，推荐输入希望模仿的作家"
+                    value={createSessionForm.style}
+                    onChange={(e) => setCreateSessionForm((prev) => ({ ...prev, style: e.target.value }))}
+                    rows={3}
+                    style={{
+                      width: "100%",
+                      padding: "12px 14px",
+                      borderRadius: "10px",
+                      border: "1px solid #e5e7eb",
+                      background: "#f9fafb",
+                      fontSize: "14px",
+                    }}
+                  />
+                </div>
+              )}
+
+              {createSessionForm.step === 6 && (
+                <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+                  <div style={{ fontWeight: 700, fontSize: "16px" }}>6. 您想好的小说题目吗</div>
+                  <label style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                    <input
+                      type="radio"
+                      name="title_choice"
+                      checked={createSessionForm.titleChoice === "not_yet"}
+                      onChange={() => setCreateSessionForm((prev) => ({ ...prev, titleChoice: "not_yet", titleText: "" }))}
+                    />
+                    <span>Not yet (which is totally NOT a problem!)</span>
+                  </label>
+                  <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
+                    <input
+                      type="radio"
+                      name="title_choice"
+                      checked={createSessionForm.titleChoice === "provided"}
+                      onChange={() => setCreateSessionForm((prev) => ({ ...prev, titleChoice: "provided" }))}
+                    />
+                    <input
+                      type="text"
+                      placeholder="请输入你想好的题目"
+                      value={createSessionForm.titleText}
+                      onChange={(e) => setCreateSessionForm((prev) => ({ ...prev, titleText: e.target.value, titleChoice: "provided" }))}
+                      style={{
+                        flex: 1,
+                        padding: "12px 14px",
+                        borderRadius: "10px",
+                        border: "1px solid #e5e7eb",
+                        fontSize: "14px",
+                      }}
+                    />
+                  </div>
+                </div>
+              )}
+
+              {createSessionForm.step === 7 && (
+                <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+                  <div style={{ fontWeight: 700, fontSize: "16px" }}>7. 您有其他想让我们知道的关于小说的信息吗？</div>
+                  <label style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                    <input
+                      type="radio"
+                      name="extra_notes"
+                      checked={!createSessionForm.extraNotes}
+                      onChange={() => setCreateSessionForm((prev) => ({ ...prev, extraNotes: "" }))}
+                    />
+                    <span>没有</span>
+                  </label>
+                  <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
+                    <input
+                      type="radio"
+                      name="extra_notes"
+                      checked={!!createSessionForm.extraNotes}
+                      onChange={() => setCreateSessionForm((prev) => ({ ...prev, extraNotes: prev.extraNotes || "" }))}
+                    />
+                    <textarea
+                      placeholder="请输入"
+                      value={createSessionForm.extraNotes}
+                      onChange={(e) => setCreateSessionForm((prev) => ({ ...prev, extraNotes: e.target.value }))}
+                      rows={3}
+                      style={{
+                        flex: 1,
+                        padding: "12px 14px",
+                        borderRadius: "10px",
+                        border: "1px solid #e5e7eb",
+                        background: "#f9fafb",
+                        fontSize: "14px",
+                      }}
+                    />
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: "10px" }}>
+              <div style={{ fontSize: "12px", color: "#6b7280" }}>Step {createSessionForm.step}/7</div>
+              <div style={{ display: "flex", gap: "10px" }}>
+                <button
+                  type="button"
+                  onClick={() =>
+                    setCreateSessionForm((prev) => ({
+                      ...prev,
+                      step: Math.max(1, prev.step - 1),
+                    }))
+                  }
+                  disabled={createSessionForm.step === 1}
+                  style={{
+                    padding: "10px 14px",
+                    borderRadius: "10px",
+                    border: "1px solid #e5e7eb",
+                    background: "#ffffff",
+                    color: "#111827",
+                    fontWeight: 700,
+                    cursor: createSessionForm.step === 1 ? "not-allowed" : "pointer",
+                    opacity: createSessionForm.step === 1 ? 0.6 : 1,
+                  }}
+                >
+                  Back
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (createSessionForm.step === 7) {
+                      setCreateSessionForm((prev) => ({ ...prev, wizardOpen: false }));
+                      return;
+                    }
+                    const nextStep = createSessionForm.step + 1;
+                    setCreateSessionForm((prev) => ({
+                      ...prev,
+                      step: Math.min(7, nextStep),
+                    }));
+                  }}
+                  disabled={
+                    (createSessionForm.step === 1 && !createSessionForm.length) ||
+                    (createSessionForm.step === 2 && !createSessionForm.year) ||
+                    (createSessionForm.step === 3 && !createSessionForm.genre && !createSessionForm.otherGenres) ||
+                    (createSessionForm.step === 4 &&
+                      !(createSessionForm.characters || []).some((c) => c.name.trim() || c.role.trim())) ||
+                    (createSessionForm.step === 5 && !createSessionForm.style) ||
+                    (createSessionForm.step === 6 &&
+                      (!createSessionForm.titleChoice ||
+                        (createSessionForm.titleChoice === "provided" && !createSessionForm.titleText)))
+                  }
+                  style={{
+                    padding: "10px 18px",
+                    borderRadius: "10px",
+                    border: "none",
+                    background: createSessionForm.step === 7 ? "#111827" : "#000000",
+                    color: "#ffffff",
+                    fontWeight: 800,
+                    cursor: "pointer",
+                    opacity:
+                      (createSessionForm.step === 1 && !createSessionForm.length) ||
+                      (createSessionForm.step === 2 && !createSessionForm.year) ||
+                      (createSessionForm.step === 3 && !createSessionForm.genre && !createSessionForm.otherGenres) ||
+                      (createSessionForm.step === 4 &&
+                        !(createSessionForm.characters || []).some((c) => c.name.trim() || c.role.trim())) ||
+                      (createSessionForm.step === 5 && !createSessionForm.style) ||
+                      (createSessionForm.step === 6 &&
+                        (!createSessionForm.titleChoice ||
+                          (createSessionForm.titleChoice === "provided" && !createSessionForm.titleText)))
+                        ? 0.4
+                        : 1,
+                  }}
+                >
+                  {createSessionForm.step === 7 ? "Done" : "Next"}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
       {/* Delete Confirmation Modal */}
       {deleteConfirm.show && (
         <div
