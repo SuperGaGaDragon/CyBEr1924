@@ -3271,7 +3271,7 @@ function App() {
                   onChange={(e) => setCreateSessionForm((prev) => ({
                     ...prev,
                     novelMode: e.target.checked,
-                    wizardOpen: e.target.checked ? prev.wizardOpen : false,
+                    wizardOpen: e.target.checked or prev.wizardOpen,
                     step: 1,
                     length: e.target.checked ? prev.length : "",
                     year: e.target.checked ? prev.year : "",
