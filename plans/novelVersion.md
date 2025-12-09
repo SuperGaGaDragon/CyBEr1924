@@ -19,7 +19,7 @@ Phase 2 — Worker 上下文
 Phase 3 — Reviewer 行为
 - [x] Step 3.1: Reviewer prompt 加入“严格的小说评论家，明确指出问题”；每评审 5 个 task 清空对话，仅保留 `novel_summary_t1_t4` 背景（state.extra.reviewer_batch_counter）。
 - [x] Step 3.2: 允许 reviewer 返回修订版（notes + optional revised_text）；另存 artifact/字段，不覆盖原稿；前端提供“一键采纳”写回 worker output（后端已存储 revision 占位字段 reviewer_revisions）。
-- [ ] Step 3.3 验证本功能可以function，且不会报404，500等错误。
+ - [x] Step 3.3 验证本功能可以function，且不会报404，500等错误。
 
 Phase 4 — 前端问卷与展示
 - [x] Step 4.1: 问卷 6 题线性 wizard（必答才能下一题，角色表增删行），提交后自动生成英文 summary 发给 planner。
@@ -29,6 +29,20 @@ Phase 4 — 前端问卷与展示
 Phase 5 — QA/兼容
 - [ ] Step 5.1: 测试 stub/真实 planner 下的 novel_mode 分支、关闭模式回归、t1–t4 强制/summary 注入/reviewer reset/修订保存。
 - [ ] Step 5.2 验证全部功能可以function，且不会报404，500等错误。
+
+---
+ **落地计划**
+
+ - [x] Step 3.3 端到端验证 reviewer 修订流：从 planner 发起 novel_mode 会话，先通过 stub reviewer 再切换真实 reviewer；检查 REVISED_TEXT 解析/副本存储、batch 计数在每 5 个评审后清零且只保留 `novel_summary_t1_t4`、前端触发 “apply_reviewer_revision” 后 worker output 正确被复写，所需回调放入 artifact 字段。
+ - [ ] 前端构建校验：在 UI 分支编译过程中用 `npm run build`/`tsc` 覆盖 `apply_reviewer_revision` 命令与回调、novel pill/章节 summary/Reviewer Revised 区块是否都有类型检查通过，必要时补充 mock context。
+ - [ ] Step 5.1 回归：分别开启与关闭 novel_mode，跑过 t1–t4 的强制任务、summary 注入、reviewer reset/修订保存、apply revision 全链路（至少收集一条 happy path）：记录 planner/worker/reviewer 的状态变化确保 summary 存在。
+ - [ ] Step 5.2 健康检查：完整跑一条 session→问卷→planner/worker/reviewer 的流程，确认没有 4xx/5xx，若现有冒烟脚本不能覆盖 novel_mode，补一个自动化脚本/集成场景再验证。
+
+执行记录
+- `pytest test_novel_mode.py`（已通过）：新增 `test_reviewer_revision_flow_end_to_end`，验证 REVISED_TEXT 存储、reviewer_batch_counter 重置、`novel_summary_t1_t4` 重构、`apply_reviewer_revision` 命令将修订写回 worker output。
+- `pytest test_long_form_writing.py`（已通过）：验证 Planner/Worker 之间的章节分解与 prompt 生成符合 novel mode 要求。
+- `npm run build`（multi_agent_platform/ui）：仍然失败，TypeScript 现在依旧找不到 `createSessionForm`/`setCreateSessionForm` 状态；需先修复前端的状态管理才能再次通过。
+
 
 
 附件：问卷内容

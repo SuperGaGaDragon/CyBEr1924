@@ -1,4 +1,5 @@
 import json
+from collections import defaultdict
 
 from multi_agent_platform.run_flow import (
     Orchestrator,
@@ -7,6 +8,7 @@ from multi_agent_platform.run_flow import (
     _update_novel_summary,
     generate_stub_plan_from_planning_input,
 )
+import multi_agent_platform.run_flow as run_flow
 from multi_agent_platform.prompt_registry import build_coordinator_review_prompt
 from multi_agent_platform.plan_model import Plan, Subtask
 from multi_agent_platform.planner_agent import PlannerResult
@@ -136,3 +138,105 @@ def test_reviewer_prompt_includes_strict_critic_and_context():
     )
     assert "严格的小说评论家" in prompt
     assert "Profile: Fantasy" in prompt
+
+
+def _extract_subtask_id_from_prompt(prompt: str) -> str:
+    marker = "当前子任务（"
+    if marker not in prompt:
+        raise AssertionError("Coordinator prompt missing subtask marker")
+    return prompt.split(marker, 1)[1].split(":", 1)[0]
+
+
+def test_reviewer_revision_flow_end_to_end():
+    store = ArtifactStore()
+    bus = MessageBus(store=store)
+    orch = Orchestrator(artifact_store=store, message_bus=bus)
+
+    session_id, plan, state = orch.init_session(
+        "Novel Review Revision",
+        novel_mode=True,
+        novel_profile=_sample_profile(),
+    )
+    for idx in range(5, 9):
+        plan.subtasks.append(Subtask(id=f"t{idx}", title=f"正文第 {idx - 4} 部分"))
+
+    review_counts = defaultdict(int)
+    seen_unique = []
+    captured_contexts: dict[str, list[str | None]] = {}
+
+    def mock_coordinator_run(prompt: str) -> str:
+        subtask_id = _extract_subtask_id_from_prompt(prompt)
+        review_counts[subtask_id] += 1
+        if review_counts[subtask_id] == 1:
+            seen_unique.append(subtask_id)
+        if subtask_id == "t1" and review_counts[subtask_id] == 1:
+            return (
+                "REDO\n"
+                "请根据最新要求重写该段落。\n"
+                f"REVISED_TEXT: Revised content for {subtask_id}"
+            )
+        return "ACCEPT\n内容已经满足要求。"
+
+    orch.coordinator.run = mock_coordinator_run
+    original_build_prompt = run_flow.build_coordinator_review_prompt
+
+    def spy_build_prompt(
+        plan_obj,
+        subtask_obj,
+        worker_output,
+        *,
+        extra_context=None,
+        strict_novel_mode=False
+    ):
+        captured_contexts.setdefault(subtask_obj.id, []).append(extra_context)
+        return original_build_prompt(
+            plan_obj,
+            subtask_obj,
+            worker_output,
+            extra_context=extra_context,
+            strict_novel_mode=strict_novel_mode,
+        )
+
+    run_flow.build_coordinator_review_prompt = spy_build_prompt
+    try:
+        for _ in range(5):
+            plan = orch.run_next_pending_subtask(session_id, plan, state=state)
+
+        assert len(seen_unique) == 5
+        summary_before_reset = state.extra.get("novel_summary_t1_t4") or ""
+        assert summary_before_reset, "Expected novel_summary_t1_t4 to exist before reviewer reset"
+
+        # Trigger the reset branch on the next reviewer call so the prompt only keeps the summary.
+        state.extra["reviewer_batch_counter"] = 5
+        plan = orch.run_next_pending_subtask(session_id, plan, state=state)
+
+        assert state.extra.get("reviewer_batch_counter") == 1
+        contexts_t6 = captured_contexts.get("t6") or []
+        assert contexts_t6
+        assert contexts_t6[-1] == summary_before_reset
+    finally:
+        run_flow.build_coordinator_review_prompt = original_build_prompt
+
+    orch.save_state(session_id, plan)
+    orch.save_orchestrator_state(state)
+
+    revised_text = state.extra.get("reviewer_revisions", {}).get("t1")
+    assert revised_text == "Revised content for t1"
+
+    snapshot = orch.execute_command(
+        session_id,
+        "/apply_reviewer_revision",
+        payload={"subtask_id": "t1"},
+    )
+    assert snapshot.get("ok") is True
+
+    plan_after = orch._load_plan(session_id)
+    target = next(sub for sub in plan_after.subtasks if sub.id == "t1")
+    assert target.output == "Revised content for t1"
+    assert target.status == "done"
+    assert "[adopted reviewer revision]" in (target.notes or "")
+
+    state_after = orch.load_orchestrator_state(session_id)
+    last_output = state_after.worker_outputs[-1]
+    assert last_output.subtask_id == "t1"
+    assert last_output.artifact.kind == "markdown"
