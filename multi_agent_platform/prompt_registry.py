@@ -76,7 +76,8 @@ def build_coordinator_review_prompt(
         "{critic}{ctx}"
         "请按照约定格式输出：\n"
         "第一行：ACCEPT 或 REDO\n"
-        "第二行开始：给出原因和建议。"
+        "第二行开始：给出原因和建议。\n"
+        "如果你提供了修改后的正文，请在末尾追加一段以 `REVISED_TEXT:` 开头的修订稿（可多行）。"
     ).format(
         topic=plan.title,
         plan_text=plan_text,

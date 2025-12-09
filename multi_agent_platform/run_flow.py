@@ -78,6 +78,35 @@ def _normalize_event_kind(kind: str | None) -> str:
     return kind.upper()
 
 
+def _parse_reviewer_response(decision_text: str) -> Tuple[str, str, Optional[str]]:
+    """
+    Parse reviewer/coordinator output into (decision, reason, revised_text).
+    Recognizes an optional block starting with REVISED_TEXT: or REVISED:.
+    """
+    lines = [line.strip() for line in (decision_text or "").strip().splitlines() if line.strip()]
+    if not lines:
+        return "ACCEPT", "", None
+    decision_line = lines[0].upper()
+    decision = "ACCEPT" if "ACCEPT" in decision_line else "REDO"
+    remaining = lines[1:]
+    revised_lines: list[str] = []
+    reason_lines: list[str] = []
+    capture_revised = False
+    for line in remaining:
+        lower = line.lower()
+        if lower.startswith("revised_text:") or lower.startswith("revised:"):
+            capture_revised = True
+            revised_lines.append(line.split(":", 1)[1].strip())
+            continue
+        if capture_revised:
+            revised_lines.append(line)
+        else:
+            reason_lines.append(line)
+    revised_text = "\n".join(revised_lines).strip() or None
+    reason = "\n".join(reason_lines).strip()
+    return decision, reason, revised_text
+
+
 def _append_progress_event(
     state: OrchestratorState | None,
     agent: str,
@@ -553,11 +582,15 @@ def generate_stub_plan_from_planning_input(
 
     # Append a new subtask reflecting the latest instruction
     next_id_num = len(plan.subtasks) + 1
+    desc = ""
+    if novel_mode:
+        desc = "请写完整内容，覆盖该章节/任务的全文结果。"
     new_subtask = Subtask(
         id=f"t{next_id_num}",
         title=f"根据补充要求：{text}",
         status="pending",
         notes="来自规划对话的最新需求",
+        description=desc,
     )
     plan.subtasks.append(new_subtask)
 
@@ -623,6 +656,10 @@ def _apply_planner_result_to_state(
         status = raw.get("status") or "pending"
         notes = raw.get("notes") or ""
         desc = raw.get("description", "")
+        if novel_mode and idx > 4:
+            base_desc = (desc or "").strip()
+            filler = "请写完整内容，覆盖该章节/任务的全文结果。"
+            desc = f"{base_desc}\n{filler}".strip() if base_desc else filler
 
         new_subtasks.append(
             Subtask(
@@ -703,13 +740,22 @@ class Orchestrator:
 
     def _call_planner(self, topic: str, novel_profile: Optional[Dict[str, Any]] = None) -> str:
         context = ""
+        novel_hint = ""
         if novel_profile:
             try:
                 context = f"\\n\\nNovel mode context: {json.dumps(novel_profile, ensure_ascii=False)}"
             except Exception:
                 context = ""
+            novel_hint = (
+                "\\n\\nNovel mode is ON. You MUST output the first four subtasks exactly as:"
+                "\\n- t1 Research (include questionnaire info, cover full content)"
+                "\\n- t2 人物设定 (include questionnaire info, cover full content)"
+                "\\n- t3 情节设计 (include questionnaire info, cover full content)"
+                "\\n- t4 章节分配 & 小说概要撰写 (include questionnaire info, cover full content)"
+                "\\nAll remaining subtasks (t5+) should focus on drafting chapters/正文; keep IDs incremental."
+            )
         return self.planner.run(
-            f"请为下面的主题生成一个分步骤的计划，每个子任务一句话：\\n\\n主题：{topic}{context}"
+            f"请为下面的主题生成一个分步骤的计划，每个子任务一句话：\\n\\n主题：{topic}{context}{novel_hint}"
         )
 
     def _call_worker(self, plan: Plan, subtask: Subtask, state: OrchestratorState | None = None) -> str:
@@ -725,12 +771,31 @@ class Orchestrator:
         worker_output: str,
         state: OrchestratorState | None = None,
     ) -> str:
-        extra_ctx = _novel_extra_context(state, plan, subtask)
         strict_novel = False
         try:
             strict_novel = bool(getattr(state, "extra", {}).get("novel_mode"))
         except Exception:
             strict_novel = False
+
+        reset_reviewer_ctx = False
+        if strict_novel and state is not None:
+            try:
+                counter = state.extra.get("reviewer_batch_counter", 0)
+                if counter and counter % 5 == 0:
+                    reset_reviewer_ctx = True
+                    state.extra["reviewer_batch_counter"] = 0
+            except Exception:
+                reset_reviewer_ctx = False
+
+        if reset_reviewer_ctx:
+            summary_only = ""
+            try:
+                summary_only = state.extra.get("novel_summary_t1_t4", "") if state and state.extra else ""
+            except Exception:
+                summary_only = ""
+            extra_ctx = summary_only
+        else:
+            extra_ctx = _novel_extra_context(state, plan, subtask)
         return self.coordinator.run(
             build_coordinator_review_prompt(
                 plan,
@@ -1067,15 +1132,19 @@ class Orchestrator:
                 if user_decision is None:
                     # 用户选择让 AI 审核
                     decision_text = self._call_coordinator(plan, subtask, worker_output, state=state)
-                    lines = [line.strip() for line in decision_text.strip().splitlines() if line.strip()]
-                    first_line = (lines[0] if lines else "").upper()
-                    decision = "ACCEPT" if "ACCEPT" in first_line else "REDO"
-                    reason = "\\n".join(lines[1:]) if len(lines) > 1 else ""
+                    decision, reason, revised_text = _parse_reviewer_response(decision_text)
+                    if revised_text:
+                        reason = reason or "Reviewer provided revised text."
+                        try:
+                            state.extra.setdefault("reviewer_revisions", {})[subtask.id] = revised_text
+                        except Exception:
+                            pass
                     user_feedback_text = None
                 else:
                     decision_type, feedback = user_decision
                     decision = "ACCEPT" if decision_type == "accept" else "REDO"
                     reason = f"用户反馈: {feedback}"
+                    revised_text = None
                     user_feedback_text = feedback if decision == "REDO" else None
 
                     # 记录用户反馈
@@ -1101,10 +1170,13 @@ class Orchestrator:
                     payload={"mode": "auto", "session_id": session_id},
                 )
                 decision_text = self._call_coordinator(plan, subtask, worker_output, state=state)
-                lines = [line.strip() for line in decision_text.strip().splitlines() if line.strip()]
-                first_line = (lines[0] if lines else "").upper()
-                decision = "ACCEPT" if "ACCEPT" in first_line else "REDO"
-                reason = "\\n".join(lines[1:]) if len(lines) > 1 else ""
+                decision, reason, revised_text = _parse_reviewer_response(decision_text)
+                if revised_text:
+                    reason = reason or "Reviewer provided revised text."
+                    try:
+                        state.extra.setdefault("reviewer_revisions", {})[subtask.id] = revised_text
+                    except Exception:
+                        pass
                 user_feedback_text = None
 
             self._record_progress_event(
@@ -1904,6 +1976,62 @@ class Orchestrator:
                 plan.subtasks.append(new_subtask)
                 message = f"已追加子任务 {new_subtask.id}: {new_subtask.title}"
                 ok = True
+            self._persist_plan_state(session_id, plan, state)
+            return self._render_session_snapshot(
+                session_id,
+                normalized,
+                plan,
+                state,
+                message=message,
+                ok=ok,
+            )
+
+        if bare_cmd == "apply_reviewer_revision":
+            subtask_id = payload.get("subtask_id")
+            revisions = {}
+            try:
+                revisions = getattr(state, "extra", {}).get("reviewer_revisions", {}) or {}
+            except Exception:
+                revisions = {}
+            if not subtask_id:
+                message = "请提供 subtask_id"
+                ok = False
+            elif not revisions or str(subtask_id) not in revisions:
+                message = "未找到该子任务的 reviewer revised_text"
+                ok = False
+            else:
+                target = self._find_subtask(plan, str(subtask_id))
+                if not target:
+                    message = f"未找到子任务 {subtask_id}"
+                    ok = False
+                else:
+                    revision_text = str(revisions[str(subtask_id)])
+                    try:
+                        ref_revision = self.store.save_artifact(
+                            session_id,
+                            revision_text,
+                            kind="markdown",
+                            description=f"Reviewer revision applied for {target.id}",
+                        )
+                        target.output = revision_text
+                        target.status = "done"
+                        note_prefix = "[adopted reviewer revision]"
+                        target.notes = f"{note_prefix} {target.notes or ''}".strip()
+                        if state is not None:
+                            state.worker_outputs.append(
+                                WorkerOutputState(
+                                    subtask_id=target.id,
+                                    title=target.title,
+                                    artifact=ref_revision,
+                                    timestamp=datetime.utcnow(),
+                                )
+                            )
+                            _update_novel_summary(state, plan)
+                        message = f"已采纳 reviewer 修订并写回子任务 {target.id}"
+                        ok = True
+                    except Exception as exc:
+                        message = f"采纳失败：{exc}"
+                        ok = False
             self._persist_plan_state(session_id, plan, state)
             return self._render_session_snapshot(
                 session_id,

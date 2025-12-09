@@ -24,6 +24,7 @@ class CommandRequest(BaseModel):
         "insert_subtask",
         "append_subtask",
         "skip_subtask",
+        "apply_reviewer_revision",
     ]
     payload: Optional[Dict[str, Any]] = None
 

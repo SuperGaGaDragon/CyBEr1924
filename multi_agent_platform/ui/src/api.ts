@@ -15,7 +15,8 @@ export type Command =
   | "update_subtask"
   | "insert_subtask"
   | "append_subtask"
-  | "skip_subtask";
+  | "skip_subtask"
+  | "apply_reviewer_revision";
 
 export type Subtask = {
   id: string;

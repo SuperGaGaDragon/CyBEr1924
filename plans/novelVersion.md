@@ -1,9 +1,9 @@
 目标：实现 Novel Mode（仅 novel_mode=true 时触发；默认关闭），覆盖问卷→planner/worker/reviewer 上下文策略与审稿修订。
 
-每一个子任务完成后，在 [] 中打 ✅
+每一个子任务完成后，在 [] 中打 x
 
 Phase 0 — 模式开关与数据流
-- [x] Step 0.1: 前端新建 Session 弹窗 + novel pill，提交时附上 `novel_mode` 开关；未勾选时保持现状（具体问卷内容见原需求草稿）。
+- [x] Step 0.1: 前端新建 Session 弹窗 + novel pill，提交时附上 `novel_mode` 开关；未勾选时保持现状（具体问卷内容见附件）
 - [x] Step 0.2: 问卷回答打包为 `novel_profile`（篇幅/年份/题材/角色表/风格/题目），随创建或首次 planner 消息传给后端；orchestrator state.extra 持久化 `novel_mode`、`novel_profile`。
 - [x] Step 0.3 验证本功能可以function，且不会报404，500等错误。
 
@@ -29,6 +29,53 @@ Phase 4 — 前端问卷与展示
 Phase 5 — QA/兼容
 - [ ] Step 5.1: 测试 stub/真实 planner 下的 novel_mode 分支、关闭模式回归、t1–t4 强制/summary 注入/reviewer reset/修订保存。
 - [ ] Step 5.2 验证全部功能可以function，且不会报404，500等错误。
+
+
+附件：问卷内容
+1、您的小说会是什么篇幅？
+选项1：flash fiction (<1000 words)
+选项2：short story (1000-7500 words)
+选项3：novelette (7500-17500 words)
+选项4：novella (17500-40000)
+选项5：novel (40000+ words)
+
+2、请输入您期望的小说发生的年份
+选项1: 架空历史
+选项2: 请输入大致年份区间（可以是未来年份）
+
+3、请输入您的希望的题材
+
+选项：Literary Fiction
+选项：Fantasy
+选项：Sci-Fi
+选项：Mystery / Crime
+选项：Horror
+选项：Romance
+选项：Historical
+选项：Adventure
+选项：Thriller
+选项：Hybrid
+选项：请输入您想到的其他体裁（如果有很多，“/”分割）：
+
+4、请给出您已经想到的一些角色姓名和身份
+角色姓名｜身份信息（如果没想好，可以不写）
+|
+|（用户可以自由新加rows。每个row至少要有一个column填好）
+
+5、您希望文笔类似什么风格
+请输入（请描述风格，推荐您输入一个您希望我模仿的作家）
+
+6、您想好的小说题目吗
+选项一：Not yet (which is totally NOT a problem!)
+选项二：请输入你想好的题目
+
+7、您有其他想让我们知道的关于小说的信息吗？
+选项一：没有
+选项二：请输入
+
+
+
+
 
 
 --------------------

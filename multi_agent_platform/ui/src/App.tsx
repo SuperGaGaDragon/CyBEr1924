@@ -1682,7 +1682,17 @@ function App() {
       show: true,
       topic: "",
       novelMode: false,
-      novelProfile: "",
+      wizardOpen: false,
+      step: 1,
+      length: "",
+      year: "",
+      genre: "",
+      otherGenres: "",
+      characters: [{ name: "", role: "" }],
+      style: "",
+      titleChoice: "",
+      titleText: "",
+      extraNotes: "",
       error: null,
     });
   }
@@ -1932,6 +1942,28 @@ function App() {
         ...prev,
         loading: false,
         error: err.message ?? "Plan edit command failed",
+      }));
+    }
+  }
+
+  async function applyReviewerRevision(subtaskId: string) {
+    if (!state.activeSessionId) return;
+    setState((prev) => ({ ...prev, loading: true, error: null }));
+    try {
+      const snapshot = await sendCommand(state.activeSessionId, "apply_reviewer_revision", { subtask_id: subtaskId });
+      setState((prev) => ({
+        ...prev,
+        loading: false,
+        snapshot,
+        lastEventTs: snapshot.last_progress_event_ts ?? prev.lastEventTs,
+        pollingEvents: snapshot.is_running ?? prev.pollingEvents,
+      }));
+    } catch (err: any) {
+      if (handleAuthError(err)) return;
+      setState((prev) => ({
+        ...prev,
+        loading: false,
+        error: err.message ?? "Failed to apply revision",
       }));
     }
   }
@@ -3007,6 +3039,7 @@ function App() {
                 progressSeenCount={progressSeenCounts.reviewer}
                 viewMode={viewModes.reviewer}
                 onViewModeChange={(mode) => setViewModes((prev) => ({ ...prev, reviewer: mode }))}
+                onAdoptRevision={applyReviewerRevision}
               />
 
               <div
@@ -3271,7 +3304,7 @@ function App() {
                   onChange={(e) => setCreateSessionForm((prev) => ({
                     ...prev,
                     novelMode: e.target.checked,
-                    wizardOpen: e.target.checked or prev.wizardOpen,
+                    wizardOpen: e.target.checked || prev.wizardOpen,
                     step: 1,
                     length: e.target.checked ? prev.length : "",
                     year: e.target.checked ? prev.year : "",
@@ -3485,6 +3518,7 @@ type ColumnProps = {
   progressSeenCount?: number;
   viewMode?: ViewMode;
   onViewModeChange?: (mode: ViewMode) => void;
+  onAdoptRevision?: (subtaskId: string) => void;
 };
 
 function ProgressStrip({ items, label, sourceCount = 0 }: { items: ProgressItem[]; label: string; sourceCount?: number }) {
@@ -4075,7 +4109,7 @@ function WorkerColumn({ snapshot, progress, progressSeenCount = 0, viewMode = "t
   );
 }
 
-function CoordinatorColumn({ snapshot, width, progress = [], progressSeenCount = 0, viewMode = "timeline", onViewModeChange }: ColumnProps) {
+function CoordinatorColumn({ snapshot, width, progress = [], progressSeenCount = 0, viewMode = "timeline", onViewModeChange, onAdoptRevision }: ColumnProps) {
   const baseDecisions: any[] = snapshot?.coord_decisions ?? [];
   const subtaskOrder = new Map((snapshot?.subtasks ?? []).map((s, i) => [String(s.id), i + 1]));
   const activeViewMode: ViewMode = viewMode ?? "timeline";
@@ -4270,6 +4304,25 @@ function CoordinatorColumn({ snapshot, width, progress = [], progressSeenCount =
                     <div style={{ fontSize: "13px", color: "#1f2937", whiteSpace: "pre-wrap", lineHeight: 1.5 }}>
                       {String(text)}
                     </div>
+                    {onAdoptRevision && (
+                      <div style={{ marginTop: "10px", display: "flex", justifyContent: "flex-end" }}>
+                        <button
+                          onClick={() => onAdoptRevision(subId)}
+                          style={{
+                            padding: "8px 12px",
+                            borderRadius: "10px",
+                            border: "1px solid #d1d5db",
+                            background: "#0f172a",
+                            color: "#ffffff",
+                            fontWeight: 700,
+                            fontSize: "12px",
+                            cursor: "pointer",
+                          }}
+                        >
+                          Adopt revision
+                        </button>
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>
