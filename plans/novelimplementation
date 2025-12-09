@@ -24,19 +24,19 @@ description：1、生成前4个task的概要（简明但清晰）2、对每个�
 - 调度仍然是 subtask → review → redo 的单条流水，reviewer 也不会把成组正文一次性打包回传给 worker，缺失目标流程里 reviewer 发现问题后明确指向每个章节/worker 的反馈闭环。
 
 ***落地方案***
-
+每完成一个内容就在[]中打x
 phase1 — 确保 t1–t4 产出可重用
-- [ ] 1.1: 修改 `_update_novel_summary`（`multi_agent_platform/run_flow.py` 约 262 行），每次从 plan.subtasks[:4] 中生成摘要后同时写入 ArtifactStore (`Orchestrator._record_progress_event`/`worker` 保存后的 Artifact)，并把 artifact_ref 存入 `state.extra["novel_summary_artifact"]`。
-- [ ] 1.2: 把 `_call_planner` 的 prompt 构造（`Orchestrator._call_planner`）扩展成 `context + profile + summary`，其中 `context` 取自 `state.extra["novel_summary_t1_t4"]`（若存在）并附上 artifact link，这样真实 planner/stub planner 在生成 t5+ 时已经具有前四个任务的完整上下文。
-- [ ] 1.3: 在 `_novel_extra_context` 里加入 summary/artifact info 作为 extra_context 供 worker/coordinator 参考，确保 reviewer 以及 worker 能“看到”那份 t4 文本（不只是 profile 字段）。
+- [x] 1.1: 修改 `_update_novel_summary`（`multi_agent_platform/run_flow.py` 约 262 行），每次从 plan.subtasks[:4] 中生成摘要后同时写入 ArtifactStore (`Orchestrator._record_progress_event`/`worker` 保存后的 Artifact)，并把 artifact_ref 存入 `state.extra["novel_summary_artifact"]`。
+- [x] 1.2: 把 `_call_planner` 的 prompt 构造（`Orchestrator._call_planner`）扩展成 `context + profile + summary`，其中 `context` 取自 `state.extra["novel_summary_t1_t4"]`（若存在）并附上 artifact link，这样真实 planner/stub planner 在生成 t5+ 时已经具有前四个任务的完整上下文。
+- [x] 1.3: 在 `_novel_extra_context` 里加入 summary/artifact info 作为 extra_context 供 worker/coordinator 参考，确保 reviewer 以及 worker 能“看到”那份 t4 文本（不只是 profile 字段）。
 
 phase2 — 完成 t4 后自动驱动章节生成
-- [ ] 2.1: 在 `run_next_pending_subtask` 的 worker loop 每次 `subtask.id == "t4"` 且 `decision == "ACCEPT"` 后，通过 `_call_planner`（传 `state.extra["novel_summary_t1_t4"]`）重新生成 plan stub、调用 `_apply_planner_result_to_state`，把新增的 t5+ 章节拼入 plan（避免重复 id）。
-- [ ] 2.2: 把 `_record_progress_event`/`Orchestrator._persist_plan_state` 中新增 `state.extra["novel_phase_step"]`（记录已补充章节数量），用于后续验证“t4 之后至少有 3 个 Chapter 任务”。
-- [ ] 2.3: 给 `generate_stub_plan_from_planning_input` 增加 `chapter_batch_size` 参数，默认每次调用 append 三个 `Chapter` 子任务；当用户主动补充（/plan）也复用同一入口，保持行为一致。
+- [x] 2.1: 在 `run_next_pending_subtask` 的 worker loop 每次 `subtask.id == "t4"` 且 `decision == "ACCEPT"` 后，通过 `_call_planner`（传 `state.extra["novel_summary_t1_t4"]`）重新生成 plan stub、调用 `_apply_planner_result_to_state`，把新增的 t5+ 章节拼入 plan（避免重复 id）。
+- [x] 2.2: 把 `_record_progress_event`/`Orchestrator._persist_plan_state` 中新增 `state.extra["novel_phase_step"]`（记录已补充章节数量），用于后续验证“t4 之后至少有 3 个 Chapter 任务”。
+- [x] 2.3: 给 `generate_stub_plan_from_planning_input` 增加 `chapter_batch_size` 参数，默认每次调用 append 三个 `Chapter` 子任务；当用户主动补充（/plan）也复用同一入口，保持行为一致。
 
 phase3 — 强制后续任务就是章节
-- [ ] 3.1: 提取 `_normalize_chapter_subtask(raw: dict, index: int)`，包装 `_chapter_title`/`_chapter_description`/`CHAPTER_FULL_CONTENT`，把所有 `raw` subtasks（planner result + stub append）统一过该函数，生成 `title`, `description`, `id`。
+- [x] 3.1: 提取 `_normalize_chapter_subtask(raw: dict, index: int)`，包装 `_chapter_title`/`_chapter_description`/`CHAPTER_FULL_CONTENT`，把所有 `raw` subtasks（planner result + stub append）统一过该函数，生成 `title`, `description`, `id`。
 - [ ] 3.2: 在 `_apply_planner_result_to_state` 和 `generate_stub_plan_from_planning_input` 中加入校验，如果 `raw.get("description")` 里缺失 `CHAPTER_FULL_CONTENT` 或 `raw.get("title")` 不包含 `Chapter {n}`，则在 `plan.notes` 追加 warning 信息并跳过该 task（防止 planner 生成非章节内容）。
 - [ ] 3.3: 更新 `Plan.from_outline`/`Plan` 数据结构（若需要）以便可读性地标注章节 metadata（例如 `subtask.metadata["chapter_index"]`），方便 coordinator/worker 追踪哪几章是一组。
 

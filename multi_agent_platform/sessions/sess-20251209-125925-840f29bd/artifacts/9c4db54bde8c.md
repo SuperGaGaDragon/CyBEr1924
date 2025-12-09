@@ -1,0 +1,14 @@
+Profile:
+Length: novella
+Year: 架空历史
+Genre: Fantasy
+Style: Hemingway
+Title: Chronicles of Time
+Characters: Alice (Protagonist)
+Extra: Keep tone consistent
+t1 Research: [worker 模拟回复] 你是 Worker 角色，专注地执行当前的单个 subtask。 -> 任务主题：Novel Health Check  整体计划如下： Plan: Novel Health Check (id=plan-d1240ff9)  - t1 [in_progress]: Research - t2 [pending
+- 模拟产出 1：按照 subtask 生成具体内容
+- 模拟产出 2：继续补全该段落
+t2 人物设定: Character roster
+t3 情节设计: Plot arcs
+t4 章节分配 & 小说概要撰写: Chapter plan and synopsis

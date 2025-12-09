@@ -73,6 +73,22 @@ def _chapter_description(base_desc: str | None) -> str:
     return CHAPTER_FULL_CONTENT
 
 
+def _normalize_chapter_subtask(raw: Dict[str, Any], index: int) -> Dict[str, Any]:
+    chapter_index = max(1, index - 4)
+    base_title = raw.get("title") or raw.get("subtask_description") or ""
+    normalized_title = _chapter_title(chapter_index, base_title)
+    normalized_description = _chapter_description(raw.get("description") or raw.get("notes") or "")
+    subtask_id = raw.get("subtask_id") or raw.get("id") or f"t{index}"
+    return {
+        "subtask_id": subtask_id,
+        "id": subtask_id,
+        "title": normalized_title,
+        "description": normalized_description,
+        "status": raw.get("status") or "pending",
+        "notes": raw.get("notes") or "",
+    }
+
+
 def _normalize_event_kind(kind: str | None) -> str:
     """Normalize event kinds so variants still route to the consumer branches."""
     if not kind:
@@ -259,7 +275,11 @@ def _format_novel_profile_context(profile: Dict[str, Any] | None) -> str:
     return "\n".join(parts)
 
 
-def _update_novel_summary(state: OrchestratorState | None, plan: Plan) -> str | None:
+def _update_novel_summary(
+    state: OrchestratorState | None,
+    plan: Plan,
+    artifact_store: ArtifactStore | None = None,
+) -> str | None:
     """Compute and cache t1-t4 summary for novel mode."""
     if state is None:
         return None
@@ -280,10 +300,53 @@ def _update_novel_summary(state: OrchestratorState | None, plan: Plan) -> str | 
 
     summary = "\n".join(summary_lines).strip()
     try:
+        if state.extra is None:
+            state.extra = {}
         state.extra["novel_summary_t1_t4"] = summary
     except Exception:
         pass
+
+    if (
+        artifact_store
+        and summary
+        and hasattr(state, "session_id")
+        and getattr(state, "session_id")
+    ):
+        session_id = state.session_id
+        try:
+            summary_ref = artifact_store.save_artifact(
+                session_id,
+                summary,
+                kind="markdown",
+                description="Novel mode t1-t4 summary",
+            )
+            try:
+                state.extra["novel_summary_artifact"] = summary_ref.to_payload()
+            except Exception:
+                pass
+        except Exception:
+            pass
     return summary
+
+
+def _format_novel_summary_block(summary: str | None) -> Optional[str]:
+    trimmed = (summary or "").strip()
+    if not trimmed:
+        return None
+    return f"Novel summary (t1-t4):\n{trimmed}"
+
+
+def _format_novel_summary_artifact_block(artifact_payload: Dict[str, Any] | None) -> Optional[str]:
+    if not artifact_payload:
+        return None
+    path = artifact_payload.get("path") or artifact_payload.get("artifact_path")
+    if not path:
+        return None
+    desc = artifact_payload.get("description")
+    line = f"Novel summary artifact: {path}"
+    if desc:
+        line += f" ({desc})"
+    return line
 
 
 def _novel_extra_context(state: OrchestratorState | None, plan: Plan, subtask: Subtask) -> Optional[str]:
@@ -296,10 +359,18 @@ def _novel_extra_context(state: OrchestratorState | None, plan: Plan, subtask: S
         return None
     profile_ctx = _format_novel_profile_context(getattr(state, "extra", {}).get("novel_profile"))
     summary = getattr(state, "extra", {}).get("novel_summary_t1_t4") or ""
+    artifact_payload = getattr(state, "extra", {}).get("novel_summary_artifact") or {}
+
+    summary_block = _format_novel_summary_block(summary)
+    artifact_block = _format_novel_summary_artifact_block(artifact_payload)
 
     if subtask.id in {"t1", "t2", "t3", "t4"}:
-        return "\n\n".join(filter(None, [profile_ctx, summary])).strip()
-    return (summary or profile_ctx or None) or None
+        sections = [profile_ctx, summary_block, artifact_block]
+    else:
+        sections = [summary_block, artifact_block, profile_ctx]
+
+    context = "\n\n".join(filter(None, sections)).strip()
+    return context or None
 
 def consume_orchestrator_events(state: OrchestratorState, plan: Plan | None = None) -> None:
     """v0.2: true action consumer — handles structured events produced by the intent agent."""
@@ -570,6 +641,8 @@ def generate_stub_plan_from_planning_input(
     plan: Plan,
     user_text: str,
     novel_profile: Optional[Dict[str, Any]] = None,
+    *,
+    chapter_batch_size: int = 3,
 ) -> Plan:
     """
     Populate/update a placeholder plan and subtasks based on planning input.
@@ -600,19 +673,38 @@ def generate_stub_plan_from_planning_input(
     notes_prefix = plan.notes or ""
     plan.notes = f"{notes_prefix}\n[用户补充] {text}".strip()
 
-    # Append a new subtask reflecting the latest instruction
-    next_id_num = len(plan.subtasks) + 1
-    chapter_index = max(1, next_id_num - 4)
-    title_base = text or f"Chapter {chapter_index}"
-    new_subtask = Subtask(
-        id=f"t{next_id_num}",
-        title=_chapter_title(chapter_index, f"根据补充要求：{title_base}") if novel_mode else (title_base),
-        status="pending",
-        notes="来自规划对话的最新需求",
-        description=_chapter_description(text) if novel_mode else (text or ""),
-        needs_redo=False,
-    )
-    plan.subtasks.append(new_subtask)
+    batch_count = chapter_batch_size if novel_mode else 1
+    batch_count = max(1, batch_count)
+
+    for batch_idx in range(batch_count):
+        next_id_num = len(plan.subtasks) + 1
+        chapter_index = max(1, next_id_num - 4)
+        title_base = text or f"Chapter {chapter_index}"
+        title_suffix = f"（续 {batch_idx + 1}）" if batch_count > 1 else ""
+        rule_title = f"根据补充要求：{title_base}{title_suffix}"
+
+        raw_chapter = {
+            "subtask_id": f"t{next_id_num}",
+            "title": rule_title,
+            "description": text or "",
+            "notes": "来自规划对话的最新需求",
+            "status": "pending",
+        }
+
+        if novel_mode:
+            normalized = _normalize_chapter_subtask(raw_chapter, next_id_num)
+        else:
+            normalized = raw_chapter
+
+        new_subtask = Subtask(
+            id=normalized["subtask_id"],
+            title=normalized["title"],
+            status=normalized.get("status", "pending"),
+            notes=normalized.get("notes", ""),
+            description=normalized.get("description", ""),
+            needs_redo=False,
+        )
+        plan.subtasks.append(new_subtask)
 
     return plan
 
@@ -677,9 +769,12 @@ def _apply_planner_result_to_state(
         notes = raw.get("notes") or ""
         desc = raw.get("description", "")
         if novel_mode and idx > 4:
-            chapter_index = idx - 4
-            title = _chapter_title(chapter_index, title)
-            desc = _chapter_description(desc)
+            normalized = _normalize_chapter_subtask(raw, idx)
+            sub_id = normalized["subtask_id"]
+            title = normalized["title"]
+            desc = normalized["description"]
+            status = normalized.get("status", status)
+            notes = normalized.get("notes", notes)
 
         new_subtasks.append(
             Subtask(
@@ -758,14 +853,45 @@ class Orchestrator:
         )
         self._last_outline_ref: ArtifactRef | None = None
 
-    def _call_planner(self, topic: str, novel_profile: Optional[Dict[str, Any]] = None) -> str:
-        context = ""
-        novel_hint = ""
+    def _call_planner(
+        self,
+        topic: str,
+        novel_profile: Optional[Dict[str, Any]] = None,
+        novel_summary: Optional[str] = None,
+        summary_artifact: Optional[Dict[str, Any]] = None,
+    ) -> str:
+        context_parts: List[str] = []
+
+        if summary_artifact:
+            artifact_path = summary_artifact.get("path")
+            if artifact_path:
+                artifact_desc = summary_artifact.get("description")
+                descriptor = f"Novel summary artifact stored at {artifact_path}"
+                if artifact_desc:
+                    descriptor += f" ({artifact_desc})"
+                context_parts.append(descriptor)
+
+        if novel_summary:
+            context_parts.append(f"Novel summary content (t1-t4):\\n{novel_summary}")
+
+        profile_block = ""
         if novel_profile:
             try:
-                context = f"\\n\\nNovel mode context: {json.dumps(novel_profile, ensure_ascii=False)}"
+                profile_block = json.dumps(novel_profile, ensure_ascii=False)
             except Exception:
-                context = ""
+                profile_block = str(novel_profile)
+
+        extra_sections: List[str] = []
+        if context_parts:
+            extra_sections.append("Context:\\n" + "\\n\\n".join(context_parts))
+        if profile_block:
+            extra_sections.append("Profile:\\n" + profile_block)
+        if novel_summary:
+            extra_sections.append(f"Summary:\\n{novel_summary}")
+
+        extra_context = "\\n\\n".join(extra_sections).strip()
+        novel_hint = ""
+        if novel_profile or novel_summary:
             novel_hint = (
                 "\\n\\nNovel mode is ON. You MUST output the first four subtasks exactly as:"
                 "\\n- t1 Research (include questionnaire info, cover full content)"
@@ -774,9 +900,12 @@ class Orchestrator:
                 "\\n- t4 章节分配 & 小说概要撰写 (include questionnaire info, cover full content)"
                 "\\nAll remaining subtasks (t5+) should focus on drafting chapters/正文; keep IDs incremental."
             )
-        return self.planner.run(
-            f"请为下面的主题生成一个分步骤的计划，每个子任务一句话：\\n\\n主题：{topic}{context}{novel_hint}"
-        )
+
+        prompt = f"请为下面的主题生成一个分步骤的计划，每个子任务一句话：\\n\\n主题：{topic}"
+        if extra_context:
+            prompt += f"\\n\\n{extra_context}"
+        prompt += novel_hint
+        return self.planner.run(prompt)
 
     def _call_worker(self, plan: Plan, subtask: Subtask, state: OrchestratorState | None = None) -> str:
         extra_ctx = _novel_extra_context(state, plan, subtask)
@@ -825,6 +954,101 @@ class Orchestrator:
                 strict_novel_mode=strict_novel,
             )
         )
+
+    def _append_chapter_tasks_from_planner_stub(
+        self,
+        session_id: str,
+        plan: Plan,
+        state: OrchestratorState | None,
+    ) -> None:
+        """Invoke planner again after t4 to append t5+ chapter subtasks."""
+        if state is None:
+            return
+        try:
+            if not state.extra or not state.extra.get("novel_mode"):
+                return
+        except Exception:
+            return
+
+        summary = state.extra.get("novel_summary_t1_t4")
+        artifact_payload = state.extra.get("novel_summary_artifact")
+        profile = state.extra.get("novel_profile")
+
+        topic = plan.title or "Novel Story"
+        outline = ""
+        try:
+            outline = self._call_planner(
+                topic,
+                novel_profile=profile,
+                novel_summary=summary,
+                summary_artifact=artifact_payload,
+            )
+        except Exception:
+            return
+
+        try:
+            stub_plan = Plan.from_outline(topic, outline)
+        except Exception:
+            return
+
+        planner_result = PlannerResult(
+            plan={
+                "plan_id": stub_plan.plan_id,
+                "title": stub_plan.title,
+                "description": stub_plan.description,
+                "notes": stub_plan.notes,
+            },
+            subtasks=[
+                {
+                    "subtask_id": sub.id,
+                    "title": sub.title,
+                    "status": sub.status,
+                    "description": sub.description,
+                    "notes": sub.notes,
+                }
+                for sub in stub_plan.subtasks
+            ],
+        )
+
+        try:
+            updated_plan = _apply_planner_result_to_state(
+                state,
+                planner_result,
+                fallback_user_text=summary or "",
+                existing_plan=plan,
+                novel_profile=profile,
+            )
+        except Exception:
+            return
+
+        existing_ids = {sub.id for sub in plan.subtasks}
+        added = 0
+        for new_sub in updated_plan.subtasks:
+            if new_sub.id in existing_ids:
+                continue
+            plan.subtasks.append(new_sub)
+            existing_ids.add(new_sub.id)
+            added += 1
+
+        if added:
+            self._update_novel_phase_step(state, increment=added)
+        else:
+            self._update_novel_phase_step(state, increment=0)
+
+    def _update_novel_phase_step(self, state: OrchestratorState | None, *, increment: int = 0) -> None:
+        if state is None:
+            return
+        try:
+            if state.extra is None:
+                state.extra = {}
+            current = int(state.extra.get("novel_phase_step", 0) or 0)
+            if increment:
+                state.extra["novel_phase_step"] = current + increment
+            else:
+                # ensure key exists even when no change
+                state.extra.setdefault("novel_phase_step", current)
+        except Exception:
+            pass
 
     def _state_path(self, session_id: str) -> Path:
         """Get the path to the state.json file for a session."""
@@ -919,6 +1143,7 @@ class Orchestrator:
         ts: Optional[datetime] = None,
     ) -> None:
         """Append a progress event, persist state, and log to progress_events.jsonl."""
+        self._update_novel_phase_step(state)
         event = _append_progress_event(state, agent=agent, subtask_id=subtask_id, stage=stage, payload=payload, ts=ts)
         if state is None or event is None:
             return
@@ -1126,7 +1351,7 @@ class Orchestrator:
                 subtask.output = worker_output
             except Exception:
                 pass
-            _update_novel_summary(state, plan)
+            _update_novel_summary(state, plan, self.store)
 
             self._record_progress_event(
                 session_id,
@@ -1221,6 +1446,8 @@ class Orchestrator:
             if decision == "ACCEPT":
                 subtask.status = "done"
                 subtask.notes = reason
+                if subtask.id == "t4":
+                    self._append_chapter_tasks_from_planner_stub(session_id, plan, state)
                 print("  Decision: ACCEPT")
             else:
                 subtask.status = "pending"
@@ -1496,6 +1723,7 @@ class Orchestrator:
         """
         Persist the plan and orchestrator state for a session.
         """
+        self._update_novel_phase_step(state)
         self.save_state(session_id, plan)
         self.save_orchestrator_state(state)
 
@@ -2046,7 +2274,7 @@ class Orchestrator:
                                     timestamp=datetime.utcnow(),
                                 )
                             )
-                            _update_novel_summary(state, plan)
+                            _update_novel_summary(state, plan, self.store)
                         message = f"已采纳 reviewer 修订并写回子任务 {target.id}"
                         ok = True
                     except Exception as exc:

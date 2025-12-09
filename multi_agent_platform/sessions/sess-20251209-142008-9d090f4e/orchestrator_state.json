@@ -1,0 +1,16 @@
+{
+  "session_id": "sess-20251209-142008-9d090f4e",
+  "plan_id": "plan-7541d85d",
+  "status": "idle",
+  "current_subtask_id": null,
+  "extra": {
+    "novel_mode": false,
+    "novel_profile": {}
+  },
+  "plan_locked": false,
+  "orchestrator_messages": [],
+  "orch_events": [],
+  "progress_events": [],
+  "planner_chat": [],
+  "worker_outputs": []
+}

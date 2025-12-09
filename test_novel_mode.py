@@ -81,7 +81,7 @@ def test_apply_planner_result_enforces_t1_t4_and_merges():
 
     ids = [s.id for s in merged.subtasks]
     assert ids[:4] == ["t1", "t2", "t3", "t4"]
-    assert "Write Chapter 1" in [s.title for s in merged.subtasks]
+    assert any("Chapter 1" in s.title for s in merged.subtasks)
     # Ensure descriptions on seeded tasks include profile fields
     assert "Hemingway" in (merged.subtasks[0].description or "")
 
@@ -147,9 +147,11 @@ def test_stub_planner_appends_chapter_task():
         novel_profile=profile,
     )
 
-    new_task = updated.subtasks[-1]
-    assert new_task.title.startswith("Chapter")
-    assert CHAPTER_FULL_CONTENT in new_task.description
+    appended = updated.subtasks[4:]
+    assert len(appended) == 3
+    for task in appended:
+        assert task.title.startswith("Chapter")
+        assert CHAPTER_FULL_CONTENT in task.description
 
 
 def test_worker_extra_context_uses_novel_summary():
@@ -178,6 +180,205 @@ def test_worker_extra_context_uses_novel_summary():
     assert extra_ctx is not None
     assert "research notes" in extra_ctx
     assert "chapter outline" in extra_ctx
+
+
+def test_stub_planner_custom_batch_size():
+    profile = _sample_profile()
+    plan = Plan(
+        plan_id="p-batch",
+        title="Batch Chapters",
+        subtasks=[Subtask(**raw) for raw in _build_novel_t1_t4(profile, "Batch Chapters")],
+    )
+    updated = generate_stub_plan_from_planning_input(
+        plan,
+        "写下一章",
+        novel_profile=profile,
+        chapter_batch_size=2,
+    )
+    appended = updated.subtasks[4:]
+    assert len(appended) == 2
+    assert all(task.title.startswith("Chapter") for task in appended)
+
+
+def test_novel_extra_context_includes_artifact_link():
+    profile = _sample_profile()
+    artifact_payload = {
+        "path": "sessions/artifacts/t4-summary.md",
+        "description": "T1-T4 overview",
+    }
+    state = OrchestratorState(
+        session_id="sess-artifact",
+        plan_id="plan-artifact",
+        status="idle",
+        extra={
+            "novel_mode": True,
+            "novel_profile": profile,
+            "novel_summary_t1_t4": "t4 章节分配: detailed plan",
+            "novel_summary_artifact": artifact_payload,
+        },
+    )
+    plan = Plan(
+        plan_id="plan-artifact",
+        title="Artifact Context Test",
+        subtasks=[
+            Subtask(id="t1", title="Research", status="done", output=""),
+            Subtask(id="t2", title="人物设定", status="done", output=""),
+            Subtask(id="t3", title="情节设计", status="done", output=""),
+            Subtask(id="t4", title="章节分配", status="done", output=""),
+            Subtask(id="t5", title="正文第1章", status="pending"),
+        ],
+    )
+    extra_ctx = _novel_extra_context(state, plan, plan.subtasks[-1])
+    assert extra_ctx is not None
+    assert "Novel summary (t1-t4)" in extra_ctx
+    assert "Novel summary artifact: sessions/artifacts/t4-summary.md" in extra_ctx
+    assert "T1-T4 overview" in extra_ctx
+
+
+def test_run_next_pending_t4_appends_chapters():
+    store = ArtifactStore()
+    bus = MessageBus(store=store)
+    orch = Orchestrator(artifact_store=store, message_bus=bus)
+    profile = _sample_profile()
+    plan = Plan(
+        plan_id="plan-t4",
+        title="Novel T4 Append",
+        subtasks=[
+            Subtask(id="t1", title="Research", status="done", output="research notes"),
+            Subtask(id="t2", title="人物设定", status="done", output="character notes"),
+            Subtask(id="t3", title="情节设计", status="done", output="plot notes"),
+            Subtask(id="t4", title="章节分配", status="pending"),
+        ],
+    )
+    def fake_call_planner(topic, novel_profile=None, novel_summary=None, summary_artifact=None):
+        return "\n".join(
+            [
+                "Chapter 1: Write the opening",
+                "Chapter 2: Continue the arc",
+                "Chapter 3: Introduce conflict",
+                "Chapter 4: Reach finale",
+                "Chapter 5: Wrap up epilogue",
+            ]
+        )
+    orch._call_planner = fake_call_planner
+    state = OrchestratorState(
+        session_id="sess-t4-append",
+        plan_id=plan.plan_id,
+        status="idle",
+        extra={"novel_mode": True, "novel_profile": profile},
+    )
+
+    updated_plan = orch.run_next_pending_subtask(
+        "sess-t4-append",
+        plan,
+        state=state,
+        interactive=False,
+    )
+
+    assert len(updated_plan.subtasks) > 4
+    extra_tasks = updated_plan.subtasks[4:]
+    assert extra_tasks
+    for task in extra_tasks:
+        assert CHAPTER_FULL_CONTENT in task.description
+
+
+def test_novel_phase_step_tracks_chapter_count():
+    store = ArtifactStore()
+    bus = MessageBus(store=store)
+    orch = Orchestrator(artifact_store=store, message_bus=bus)
+    profile = _sample_profile()
+    plan = Plan(
+        plan_id="plan-t4-step",
+        title="Novel Phase Step",
+        subtasks=[
+            Subtask(id="t1", title="Research", status="done", output="research"),
+            Subtask(id="t2", title="人物设定", status="done", output="characters"),
+            Subtask(id="t3", title="情节设计", status="done", output="plot"),
+            Subtask(id="t4", title="章节分配", status="pending"),
+        ],
+    )
+    def fake_call_planner(topic, novel_profile=None, novel_summary=None, summary_artifact=None):
+        return "\n".join(
+            [
+                "Chapter 1: Fresh start",
+                "Chapter 2: Rising tension",
+                "Chapter 3: Reverse twist",
+            ]
+        )
+    orch._call_planner = fake_call_planner
+    state = OrchestratorState(
+        session_id="sess-t4-step",
+        plan_id=plan.plan_id,
+        status="idle",
+        extra={"novel_mode": True, "novel_profile": profile},
+    )
+
+    updated_plan = orch.run_next_pending_subtask(
+        "sess-t4-step",
+        plan,
+        state=state,
+        interactive=False,
+    )
+
+    added_count = len(updated_plan.subtasks) - 4
+    assert added_count == state.extra.get("novel_phase_step")
+
+
+def test_planner_prompt_includes_summary_context():
+    store = ArtifactStore()
+    bus = MessageBus(store=store)
+    orch = Orchestrator(artifact_store=store, message_bus=bus)
+    captured: dict[str, str] = {}
+
+    class StubPlanner:
+        def run(self, user_message: str) -> str:
+            captured["prompt"] = user_message
+            return "stub plan"
+
+    orch.planner = StubPlanner()
+    summary = "t1 Research: deep dive\n"
+    artifact_payload = {
+        "path": "sessions/sess-summary/artifacts/summary.md",
+        "description": "T1-T4 overview",
+    }
+    orch._call_planner(
+        "Sample Topic",
+        novel_profile=_sample_profile(),
+        novel_summary=summary,
+        summary_artifact=artifact_payload,
+    )
+    prompt = captured.get("prompt", "")
+    assert "Novel summary artifact stored at sessions/sess-summary/artifacts/summary.md" in prompt
+    assert "Context:" in prompt
+    assert "Profile:" in prompt
+    assert "Summary:" in prompt
+    assert summary.strip() in prompt
+
+
+def test_update_novel_summary_saves_artifact():
+    store = ArtifactStore()
+    state = OrchestratorState(
+        session_id="sess-summary",
+        plan_id="plan-summary",
+        status="idle",
+        extra={"novel_mode": True},
+    )
+    plan = Plan(
+        plan_id="plan-summary",
+        title="Summary Storage Test",
+        subtasks=[
+            Subtask(id="t1", title="Research", status="done", output="research details"),
+            Subtask(id="t2", title="人物设定", status="done", output="characters"),
+            Subtask(id="t3", title="情节设计", status="done", output="plot"),
+            Subtask(id="t4", title="章节分配", status="done", output="chapters"),
+        ],
+    )
+
+    summary = _update_novel_summary(state, plan, artifact_store=store)
+    assert summary
+    artifact_payload = state.extra.get("novel_summary_artifact")
+    assert artifact_payload
+    assert artifact_payload.get("kind") == "markdown"
 
 
 def test_reviewer_prompt_includes_strict_critic_and_context():

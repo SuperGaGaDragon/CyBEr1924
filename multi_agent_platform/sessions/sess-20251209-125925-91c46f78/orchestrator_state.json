@@ -1,0 +1,454 @@
+{
+  "session_id": "sess-20251209-125925-91c46f78",
+  "plan_id": "plan-e55fa2b0",
+  "status": "idle",
+  "current_subtask_id": null,
+  "extra": {
+    "novel_mode": true,
+    "novel_profile": {
+      "length": "novella",
+      "year": "架空历史",
+      "genre": "Fantasy",
+      "style": "Hemingway",
+      "title_text": "Chronicles of Time",
+      "characters": [
+        {
+          "name": "Alice",
+          "role": "Protagonist"
+        }
+      ],
+      "extra_notes": "Keep tone consistent"
+    },
+    "novel_summary_t1_t4": "Profile:\nLength: novella\nYear: 架空历史\nGenre: Fantasy\nStyle: Hemingway\nTitle: Chronicles of Time\nCharacters: Alice (Protagonist)\nExtra: Keep tone consistent\nt1 Research: Revised content for t1\nt2 人物设定: [worker 模拟回复] 你是 Worker 角色，专注地执行当前的单个 subtask。 -> 任务主题：Novel Review Revision  整体计划如下： Plan: Novel Review Revision (id=plan-e55fa2b0)  - t1 [done]: Research - t2 [in_progr\n- 模拟产出 1：按照 subtask 生成具体内容\n- 模拟产出 2：继续补全该段落\nt3 情节设计: [worker 模拟回复] 你是 Worker 角色，专注地执行当前的单个 subtask。 -> 任务主题：Novel Review Revision  整体计划如下： Plan: Novel Review Revision (id=plan-e55fa2b0)  - t1 [done]: Research - t2 [done]: 人\n- 模拟产出 1：按照 subtask 生成具体内容\n- 模拟产出 2：继续补全该段落\nt4 章节分配 & 小说概要撰写: [worker 模拟回复] 你是 Worker 角色，专注地执行当前的单个 subtask。 -> 任务主题：Novel Review Revision  整体计划如下： Plan: Novel Review Revision (id=plan-e55fa2b0)  - t1 [done]: Research - t2 [done]: 人\n- 模拟产出 1：按照 subtask 生成具体内容\n- 模拟产出 2：继续补全该段落",
+    "novel_summary_artifact": {
+      "session_id": "sess-20251209-125925-91c46f78",
+      "artifact_id": "b18e36eb6829",
+      "kind": "markdown",
+      "path": "sessions/sess-20251209-125925-91c46f78/artifacts/b18e36eb6829.md",
+      "description": "Novel mode t1-t4 summary"
+    },
+    "reviewer_revisions": {
+      "t1": "Revised content for t1"
+    },
+    "reviewer_batch_counter": 1
+  },
+  "plan_locked": false,
+  "orchestrator_messages": [],
+  "orch_events": [],
+  "progress_events": [
+    {
+      "agent": "worker",
+      "subtask_id": "t1",
+      "stage": "start",
+      "status": "in_progress",
+      "ts": "2025-12-09T12:59:25.635519",
+      "payload": {
+        "title": "Research",
+        "session_id": "sess-20251209-125925-91c46f78"
+      }
+    },
+    {
+      "agent": "worker",
+      "subtask_id": "t1",
+      "stage": "finish",
+      "status": "completed",
+      "ts": "2025-12-09T12:59:25.640270",
+      "payload": {
+        "artifact_path": "sessions/sess-20251209-125925-91c46f78/artifacts/c56698b23026.md",
+        "session_id": "sess-20251209-125925-91c46f78"
+      }
+    },
+    {
+      "agent": "reviewer",
+      "subtask_id": "t1",
+      "stage": "start",
+      "status": "in_progress",
+      "ts": "2025-12-09T12:59:25.642008",
+      "payload": {
+        "mode": "auto",
+        "session_id": "sess-20251209-125925-91c46f78"
+      }
+    },
+    {
+      "agent": "reviewer",
+      "subtask_id": "t1",
+      "stage": "finish",
+      "status": "completed",
+      "ts": "2025-12-09T12:59:25.643550",
+      "payload": {
+        "decision": "REDO",
+        "reason": "请根据最新要求重写该段落。",
+        "session_id": "sess-20251209-125925-91c46f78"
+      }
+    },
+    {
+      "agent": "worker",
+      "subtask_id": "t1",
+      "stage": "start",
+      "status": "in_progress",
+      "ts": "2025-12-09T12:59:25.646217",
+      "payload": {
+        "title": "Research",
+        "session_id": "sess-20251209-125925-91c46f78"
+      }
+    },
+    {
+      "agent": "worker",
+      "subtask_id": "t1",
+      "stage": "finish",
+      "status": "completed",
+      "ts": "2025-12-09T12:59:25.653576",
+      "payload": {
+        "artifact_path": "sessions/sess-20251209-125925-91c46f78/artifacts/7ca7f0b645d6.md",
+        "session_id": "sess-20251209-125925-91c46f78"
+      }
+    },
+    {
+      "agent": "reviewer",
+      "subtask_id": "t1",
+      "stage": "start",
+      "status": "in_progress",
+      "ts": "2025-12-09T12:59:25.655148",
+      "payload": {
+        "mode": "auto",
+        "session_id": "sess-20251209-125925-91c46f78"
+      }
+    },
+    {
+      "agent": "reviewer",
+      "subtask_id": "t1",
+      "stage": "finish",
+      "status": "completed",
+      "ts": "2025-12-09T12:59:25.656895",
+      "payload": {
+        "decision": "ACCEPT",
+        "reason": "内容已经满足要求。",
+        "session_id": "sess-20251209-125925-91c46f78"
+      }
+    },
+    {
+      "agent": "worker",
+      "subtask_id": "t2",
+      "stage": "start",
+      "status": "in_progress",
+      "ts": "2025-12-09T12:59:25.660119",
+      "payload": {
+        "title": "人物设定",
+        "session_id": "sess-20251209-125925-91c46f78"
+      }
+    },
+    {
+      "agent": "worker",
+      "subtask_id": "t2",
+      "stage": "finish",
+      "status": "completed",
+      "ts": "2025-12-09T12:59:25.666515",
+      "payload": {
+        "artifact_path": "sessions/sess-20251209-125925-91c46f78/artifacts/c82bf5ee2a53.md",
+        "session_id": "sess-20251209-125925-91c46f78"
+      }
+    },
+    {
+      "agent": "reviewer",
+      "subtask_id": "t2",
+      "stage": "start",
+      "status": "in_progress",
+      "ts": "2025-12-09T12:59:25.668022",
+      "payload": {
+        "mode": "auto",
+        "session_id": "sess-20251209-125925-91c46f78"
+      }
+    },
+    {
+      "agent": "reviewer",
+      "subtask_id": "t2",
+      "stage": "finish",
+      "status": "completed",
+      "ts": "2025-12-09T12:59:25.669455",
+      "payload": {
+        "decision": "ACCEPT",
+        "reason": "内容已经满足要求。",
+        "session_id": "sess-20251209-125925-91c46f78"
+      }
+    },
+    {
+      "agent": "worker",
+      "subtask_id": "t3",
+      "stage": "start",
+      "status": "in_progress",
+      "ts": "2025-12-09T12:59:25.675332",
+      "payload": {
+        "title": "情节设计",
+        "session_id": "sess-20251209-125925-91c46f78"
+      }
+    },
+    {
+      "agent": "worker",
+      "subtask_id": "t3",
+      "stage": "finish",
+      "status": "completed",
+      "ts": "2025-12-09T12:59:25.682016",
+      "payload": {
+        "artifact_path": "sessions/sess-20251209-125925-91c46f78/artifacts/33b4a9dea042.md",
+        "session_id": "sess-20251209-125925-91c46f78"
+      }
+    },
+    {
+      "agent": "reviewer",
+      "subtask_id": "t3",
+      "stage": "start",
+      "status": "in_progress",
+      "ts": "2025-12-09T12:59:25.684063",
+      "payload": {
+        "mode": "auto",
+        "session_id": "sess-20251209-125925-91c46f78"
+      }
+    },
+    {
+      "agent": "reviewer",
+      "subtask_id": "t3",
+      "stage": "finish",
+      "status": "completed",
+      "ts": "2025-12-09T12:59:25.686630",
+      "payload": {
+        "decision": "ACCEPT",
+        "reason": "内容已经满足要求。",
+        "session_id": "sess-20251209-125925-91c46f78"
+      }
+    },
+    {
+      "agent": "worker",
+      "subtask_id": "t4",
+      "stage": "start",
+      "status": "in_progress",
+      "ts": "2025-12-09T12:59:25.691092",
+      "payload": {
+        "title": "章节分配 & 小说概要撰写",
+        "session_id": "sess-20251209-125925-91c46f78"
+      }
+    },
+    {
+      "agent": "worker",
+      "subtask_id": "t4",
+      "stage": "finish",
+      "status": "completed",
+      "ts": "2025-12-09T12:59:25.697120",
+      "payload": {
+        "artifact_path": "sessions/sess-20251209-125925-91c46f78/artifacts/3e147b909d33.md",
+        "session_id": "sess-20251209-125925-91c46f78"
+      }
+    },
+    {
+      "agent": "reviewer",
+      "subtask_id": "t4",
+      "stage": "start",
+      "status": "in_progress",
+      "ts": "2025-12-09T12:59:25.699310",
+      "payload": {
+        "mode": "auto",
+        "session_id": "sess-20251209-125925-91c46f78"
+      }
+    },
+    {
+      "agent": "reviewer",
+      "subtask_id": "t4",
+      "stage": "finish",
+      "status": "completed",
+      "ts": "2025-12-09T12:59:25.701347",
+      "payload": {
+        "decision": "ACCEPT",
+        "reason": "内容已经满足要求。",
+        "session_id": "sess-20251209-125925-91c46f78"
+      }
+    },
+    {
+      "agent": "worker",
+      "subtask_id": "t5",
+      "stage": "start",
+      "status": "in_progress",
+      "ts": "2025-12-09T12:59:25.705239",
+      "payload": {
+        "title": "正文第 1 部分",
+        "session_id": "sess-20251209-125925-91c46f78"
+      }
+    },
+    {
+      "agent": "worker",
+      "subtask_id": "t5",
+      "stage": "finish",
+      "status": "completed",
+      "ts": "2025-12-09T12:59:25.711036",
+      "payload": {
+        "artifact_path": "sessions/sess-20251209-125925-91c46f78/artifacts/42f71be31aeb.md",
+        "session_id": "sess-20251209-125925-91c46f78"
+      }
+    },
+    {
+      "agent": "reviewer",
+      "subtask_id": "t5",
+      "stage": "start",
+      "status": "in_progress",
+      "ts": "2025-12-09T12:59:25.713415",
+      "payload": {
+        "mode": "auto",
+        "session_id": "sess-20251209-125925-91c46f78"
+      }
+    },
+    {
+      "agent": "reviewer",
+      "subtask_id": "t5",
+      "stage": "finish",
+      "status": "completed",
+      "ts": "2025-12-09T12:59:25.715947",
+      "payload": {
+        "decision": "ACCEPT",
+        "reason": "内容已经满足要求。",
+        "session_id": "sess-20251209-125925-91c46f78"
+      }
+    },
+    {
+      "agent": "worker",
+      "subtask_id": "t6",
+      "stage": "start",
+      "status": "in_progress",
+      "ts": "2025-12-09T12:59:25.719557",
+      "payload": {
+        "title": "正文第 2 部分",
+        "session_id": "sess-20251209-125925-91c46f78"
+      }
+    },
+    {
+      "agent": "worker",
+      "subtask_id": "t6",
+      "stage": "finish",
+      "status": "completed",
+      "ts": "2025-12-09T12:59:25.732138",
+      "payload": {
+        "artifact_path": "sessions/sess-20251209-125925-91c46f78/artifacts/4e839f46393d.md",
+        "session_id": "sess-20251209-125925-91c46f78"
+      }
+    },
+    {
+      "agent": "reviewer",
+      "subtask_id": "t6",
+      "stage": "start",
+      "status": "in_progress",
+      "ts": "2025-12-09T12:59:25.734439",
+      "payload": {
+        "mode": "auto",
+        "session_id": "sess-20251209-125925-91c46f78"
+      }
+    },
+    {
+      "agent": "reviewer",
+      "subtask_id": "t6",
+      "stage": "finish",
+      "status": "completed",
+      "ts": "2025-12-09T12:59:25.737556",
+      "payload": {
+        "decision": "ACCEPT",
+        "reason": "内容已经满足要求。",
+        "session_id": "sess-20251209-125925-91c46f78"
+      }
+    }
+  ],
+  "planner_chat": [],
+  "worker_outputs": [
+    {
+      "subtask_id": "t1",
+      "title": "Research",
+      "artifact": {
+        "session_id": "sess-20251209-125925-91c46f78",
+        "artifact_id": "c56698b23026",
+        "kind": "markdown",
+        "path": "sessions/sess-20251209-125925-91c46f78/artifacts/c56698b23026.md",
+        "description": "子任务 t1 的执行结果"
+      },
+      "timestamp": "2025-12-09T12:59:25.639073"
+    },
+    {
+      "subtask_id": "t1",
+      "title": "Research",
+      "artifact": {
+        "session_id": "sess-20251209-125925-91c46f78",
+        "artifact_id": "7ca7f0b645d6",
+        "kind": "markdown",
+        "path": "sessions/sess-20251209-125925-91c46f78/artifacts/7ca7f0b645d6.md",
+        "description": "子任务 t1 的执行结果"
+      },
+      "timestamp": "2025-12-09T12:59:25.652003"
+    },
+    {
+      "subtask_id": "t2",
+      "title": "人物设定",
+      "artifact": {
+        "session_id": "sess-20251209-125925-91c46f78",
+        "artifact_id": "c82bf5ee2a53",
+        "kind": "markdown",
+        "path": "sessions/sess-20251209-125925-91c46f78/artifacts/c82bf5ee2a53.md",
+        "description": "子任务 t2 的执行结果"
+      },
+      "timestamp": "2025-12-09T12:59:25.663746"
+    },
+    {
+      "subtask_id": "t3",
+      "title": "情节设计",
+      "artifact": {
+        "session_id": "sess-20251209-125925-91c46f78",
+        "artifact_id": "33b4a9dea042",
+        "kind": "markdown",
+        "path": "sessions/sess-20251209-125925-91c46f78/artifacts/33b4a9dea042.md",
+        "description": "子任务 t3 的执行结果"
+      },
+      "timestamp": "2025-12-09T12:59:25.679893"
+    },
+    {
+      "subtask_id": "t4",
+      "title": "章节分配 & 小说概要撰写",
+      "artifact": {
+        "session_id": "sess-20251209-125925-91c46f78",
+        "artifact_id": "3e147b909d33",
+        "kind": "markdown",
+        "path": "sessions/sess-20251209-125925-91c46f78/artifacts/3e147b909d33.md",
+        "description": "子任务 t4 的执行结果"
+      },
+      "timestamp": "2025-12-09T12:59:25.694826"
+    },
+    {
+      "subtask_id": "t5",
+      "title": "正文第 1 部分",
+      "artifact": {
+        "session_id": "sess-20251209-125925-91c46f78",
+        "artifact_id": "42f71be31aeb",
+        "kind": "markdown",
+        "path": "sessions/sess-20251209-125925-91c46f78/artifacts/42f71be31aeb.md",
+        "description": "子任务 t5 的执行结果"
+      },
+      "timestamp": "2025-12-09T12:59:25.709417"
+    },
+    {
+      "subtask_id": "t6",
+      "title": "正文第 2 部分",
+      "artifact": {
+        "session_id": "sess-20251209-125925-91c46f78",
+        "artifact_id": "4e839f46393d",
+        "kind": "markdown",
+        "path": "sessions/sess-20251209-125925-91c46f78/artifacts/4e839f46393d.md",
+        "description": "子任务 t6 的执行结果"
+      },
+      "timestamp": "2025-12-09T12:59:25.727993"
+    },
+    {
+      "subtask_id": "t1",
+      "title": "Research",
+      "artifact": {
+        "session_id": "sess-20251209-125925-91c46f78",
+        "artifact_id": "448f74133e81",
+        "kind": "markdown",
+        "path": "sessions/sess-20251209-125925-91c46f78/artifacts/448f74133e81.md",
+        "description": "Reviewer revision applied for t1"
+      },
+      "timestamp": "2025-12-09T12:59:25.746460"
+    }
+  ]
+}
