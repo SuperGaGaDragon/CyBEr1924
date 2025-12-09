@@ -1113,8 +1113,6 @@ class Orchestrator:
             if not sub_id:
                 continue
             entry_reason = revised_text if revised_text and sub_id == primary_id else reason or ""
-            if not entry_reason:
-                entry_reason = entry.get("worker_output_preview") or ""
             artifact_path = entry.get("artifact_path")
             _cache_reviewer_revision_entry(
                 state,

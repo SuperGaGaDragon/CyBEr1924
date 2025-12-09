@@ -4071,7 +4071,7 @@ function WorkerColumn({ snapshot, progress, progressSeenCount = 0, viewMode = "t
               background: "#ffffff",
               border: "1px dashed #d1d5db",
             }}>
-              No worker output yet. If tasks are running, verify backend SUBTASK_RESULT logs and artifact access.
+              Reviewer comments will show up here once a batch is reviewed.
             </div>
           )}
           {outputs.map((out, idx) => {
@@ -4204,7 +4204,7 @@ function CoordinatorColumn({ snapshot, width, progress = [], progressSeenCount =
         display: "flex",
         flexDirection: "column",
         background: "#ffffff",
-        overflow: "visible",
+        overflow: "hidden",
         minHeight: 0,
         height: "100%",
         flex: "1 1 0",
@@ -4299,7 +4299,16 @@ function CoordinatorColumn({ snapshot, width, progress = [], progressSeenCount =
         </div>
       )}
       {activeViewMode === "timeline" ? (
-        <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: "12px" }}>
+        <div
+          style={{
+            flex: 1,
+            display: "flex",
+            flexDirection: "column",
+            gap: "12px",
+            overflowY: "auto",
+            paddingRight: "6px",
+          }}
+        >
           <ProgressStrip items={progress} label="Reviewer" sourceCount={progressSeenCount} />
           {progress.length === 0 && (
             <div style={{
@@ -4344,6 +4353,8 @@ function CoordinatorColumn({ snapshot, width, progress = [], progressSeenCount =
                     typeof revision === "object" && revision !== null
                       ? (revision as any)
                       : { text: revision };
+                  const entryText = String(entry.text ?? "").trim();
+                  const displayText = entryText || "Reviewer accepted the batch with no further comments.";
                   return (
                     <div key={subId} style={{ padding: "10px 12px", borderRadius: "10px", border: "1px solid #e5e7eb", background: "#ffffff" }}>
                       <div style={{ fontWeight: 700, fontSize: "13px", marginBottom: "6px", color: "#111827" }}>Task {subId}</div>
@@ -4353,7 +4364,7 @@ function CoordinatorColumn({ snapshot, width, progress = [], progressSeenCount =
                         </div>
                       )}
                       <div style={{ fontSize: "13px", color: "#1f2937", whiteSpace: "pre-wrap", lineHeight: 1.5 }}>
-                        {String(entry.text ?? "")}
+                        {displayText}
                       </div>
                       {entry.artifact_path && (
                         <div style={{ fontSize: "11px", marginTop: "6px", color: "#2563eb" }}>
@@ -4385,11 +4396,6 @@ function CoordinatorColumn({ snapshot, width, progress = [], progressSeenCount =
               </div>
             </div>
           )}
-          {!snapshot && (
-            <div style={{ color: "#666666", fontSize: "14px" }}>
-              Reviewer decisions will appear here.
-            </div>
-          )}
           {snapshot && decisions.length === 0 && (
             <div style={{
               color: "#4b5563",
@@ -4400,7 +4406,7 @@ function CoordinatorColumn({ snapshot, width, progress = [], progressSeenCount =
               border: "1px dashed #d1d5db",
               textAlign: "center",
             }}>
-              No reviewer decisions yet.
+              Reviewer decisions will appear here once reviews are complete.
             </div>
           )}
           {sortedDecisions.map((decision, index) => {
