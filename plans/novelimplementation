@@ -37,7 +37,7 @@ phase2 — 完成 t4 后自动驱动章节生成
 
 phase3 — 强制后续任务就是章节
 - [x] 3.1: 提取 `_normalize_chapter_subtask(raw: dict, index: int)`，包装 `_chapter_title`/`_chapter_description`/`CHAPTER_FULL_CONTENT`，把所有 `raw` subtasks（planner result + stub append）统一过该函数，生成 `title`, `description`, `id`。
-- [ ] 3.2: 在 `_apply_planner_result_to_state` 和 `generate_stub_plan_from_planning_input` 中加入校验，如果 `raw.get("description")` 里缺失 `CHAPTER_FULL_CONTENT` 或 `raw.get("title")` 不包含 `Chapter {n}`，则在 `plan.notes` 追加 warning 信息并跳过该 task（防止 planner 生成非章节内容）。
+- [x] 3.2: 在 `_apply_planner_result_to_state` 和 `generate_stub_plan_from_planning_input` 中加入校验，如果 `raw.get("description")` 里缺失 `CHAPTER_FULL_CONTENT` 或 `raw.get("title")` 不包含 `Chapter {n}`，则在 `plan.notes` 追加 warning 信息并跳过该 task（防止 planner 生成非章节内容）。
 - [ ] 3.3: 更新 `Plan.from_outline`/`Plan` 数据结构（若需要）以便可读性地标注章节 metadata（例如 `subtask.metadata["chapter_index"]`），方便 coordinator/worker 追踪哪几章是一组。
 
 phase4 — Reviewer 按 3 个章节批次复核

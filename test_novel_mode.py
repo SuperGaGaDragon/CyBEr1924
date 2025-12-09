@@ -5,6 +5,7 @@ from multi_agent_platform.run_flow import (
     Orchestrator,
     _apply_planner_result_to_state,
     _build_novel_t1_t4,
+    _chapter_description,
     _novel_extra_context,
     _update_novel_summary,
     generate_stub_plan_from_planning_input,
@@ -66,8 +67,18 @@ def test_apply_planner_result_enforces_t1_t4_and_merges():
     result = PlannerResult(
         plan={"plan_id": "plan", "title": "Novel Plan"},
         subtasks=[
-            {"subtask_id": "t5", "title": "Write Chapter 1", "status": "pending"},
-            {"subtask_id": "t6", "title": "Write Chapter 2", "status": "pending"},
+            {
+                "subtask_id": "t5",
+                "title": "Chapter 1: Write Chapter 1",
+                "status": "pending",
+                "description": _chapter_description("Write Chapter 1"),
+            },
+            {
+                "subtask_id": "t6",
+                "title": "Chapter 2: Write Chapter 2",
+                "status": "pending",
+                "description": _chapter_description("Write Chapter 2"),
+            },
         ],
     )
 
@@ -115,8 +126,18 @@ def test_planner_result_formats_post_t4_as_chapters():
     result = PlannerResult(
         plan={"plan_id": "plan-chapter", "title": "Novel Chapter Test"},
         subtasks=[
-            {"subtask_id": "t5", "title": "First chapter", "status": "pending"},
-            {"subtask_id": "t6", "title": "Second chapter", "status": "pending"},
+            {
+                "subtask_id": "t5",
+                "title": "Chapter 1: First chapter",
+                "status": "pending",
+                "description": _chapter_description("First chapter"),
+            },
+            {
+                "subtask_id": "t6",
+                "title": "Chapter 2: Second chapter",
+                "status": "pending",
+                "description": _chapter_description("Second chapter"),
+            },
         ],
     )
 
@@ -198,6 +219,39 @@ def test_stub_planner_custom_batch_size():
     appended = updated.subtasks[4:]
     assert len(appended) == 2
     assert all(task.title.startswith("Chapter") for task in appended)
+
+
+def test_apply_planner_result_skips_invalid_chapter():
+    profile = _sample_profile()
+    state = OrchestratorState(
+        session_id="sess-invalid",
+        plan_id="plan-invalid",
+        status="idle",
+        extra={"novel_mode": True, "novel_profile": profile},
+    )
+    existing_plan = Plan(
+        plan_id="plan-invalid",
+        title="Invalid Chapter Test",
+        subtasks=[Subtask(**raw) for raw in _build_novel_t1_t4(profile, "Invalid Chapter Test")],
+    )
+    result = PlannerResult(
+        plan={"plan_id": "plan-invalid", "title": "Invalid Chapter Test"},
+        subtasks=[
+            {"subtask_id": "t5", "title": "Chapter 1 Outline", "status": "pending"},
+            {"subtask_id": "t6", "title": "Chapter 2", "status": "pending", "description": "Incomplete."},
+        ],
+    )
+
+    merged = _apply_planner_result_to_state(
+        state,
+        result,
+        fallback_user_text="继续",
+        existing_plan=existing_plan,
+        novel_profile=profile,
+    )
+
+    assert len(merged.subtasks) == 4
+    assert "Skipped planner chapter" in merged.notes
 
 
 def test_novel_extra_context_includes_artifact_link():

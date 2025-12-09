@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 from dataclasses import dataclass
 import os
+import re
 import threading
 from pathlib import Path
 from typing import Tuple, Optional, Dict, Any, List, Callable
@@ -71,6 +72,22 @@ def _chapter_description(base_desc: str | None) -> str:
     if trimmed:
         return f"{trimmed}\n{CHAPTER_FULL_CONTENT}"
     return CHAPTER_FULL_CONTENT
+
+
+def _chapter_title_has_index(title: str | None) -> bool:
+    if not title:
+        return False
+    return bool(re.search(r"chapter\s*\d+", title, re.IGNORECASE))
+
+
+def _chapter_description_has_full_content(desc: str | None) -> bool:
+    return bool(desc and CHAPTER_FULL_CONTENT in desc)
+
+
+def _is_valid_chapter_candidate(raw: Dict[str, Any]) -> bool:
+    title = raw.get("title") or ""
+    desc = raw.get("description") or raw.get("notes") or ""
+    return _chapter_title_has_index(title) and _chapter_description_has_full_content(desc)
 
 
 def _normalize_chapter_subtask(raw: Dict[str, Any], index: int) -> Dict[str, Any]:
@@ -685,8 +702,8 @@ def generate_stub_plan_from_planning_input(
 
         raw_chapter = {
             "subtask_id": f"t{next_id_num}",
-            "title": rule_title,
-            "description": text or "",
+            "title": _chapter_title(chapter_index, rule_title) if novel_mode else rule_title,
+            "description": _chapter_description(text if novel_mode else text or ""),
             "notes": "来自规划对话的最新需求",
             "status": "pending",
         }
@@ -761,6 +778,7 @@ def _apply_planner_result_to_state(
     if not merged_subtasks:
         merged_subtasks = subtasks_dicts
 
+    warning_lines: List[str] = []
     new_subtasks: List[Subtask] = []
     for idx, raw in enumerate(merged_subtasks, start=1):
         sub_id = raw.get("subtask_id") or raw.get("id") or f"t{idx}"
@@ -769,6 +787,11 @@ def _apply_planner_result_to_state(
         notes = raw.get("notes") or ""
         desc = raw.get("description", "")
         if novel_mode and idx > 4:
+            if not _is_valid_chapter_candidate(raw):
+                warning_lines.append(
+                    f"Skipped planner chapter {sub_id} because title must include 'Chapter {{n}}' and description must contain '{CHAPTER_FULL_CONTENT}'."
+                )
+                continue
             normalized = _normalize_chapter_subtask(raw, idx)
             sub_id = normalized["subtask_id"]
             title = normalized["title"]
@@ -806,6 +829,11 @@ def _apply_planner_result_to_state(
                 notes="auto-generated fallback",
             ),
         ]
+
+    if warning_lines:
+        warning_block = "\n".join(warning_lines)
+        plan_notes = new_plan.notes or ""
+        new_plan.notes = f"{plan_notes}\n{warning_block}".strip()
 
     new_plan.subtasks = new_subtasks
     return new_plan
@@ -991,6 +1019,23 @@ class Orchestrator:
         except Exception:
             return
 
+        sanitized_subtasks: List[Dict[str, Any]] = []
+        base_count = len(plan.subtasks)
+        for sub in stub_plan.subtasks:
+            title = sub.title or ""
+            if "chapter" not in title.lower():
+                continue
+            desc = sub.description or _chapter_description(title)
+            next_id = f"t{base_count + len(sanitized_subtasks) + 1}"
+            sanitized_subtasks.append(
+                {
+                    "subtask_id": next_id,
+                    "title": title,
+                    "status": "pending",
+                    "description": desc,
+                    "notes": sub.notes,
+                }
+            )
         planner_result = PlannerResult(
             plan={
                 "plan_id": stub_plan.plan_id,
@@ -998,16 +1043,7 @@ class Orchestrator:
                 "description": stub_plan.description,
                 "notes": stub_plan.notes,
             },
-            subtasks=[
-                {
-                    "subtask_id": sub.id,
-                    "title": sub.title,
-                    "status": sub.status,
-                    "description": sub.description,
-                    "notes": sub.notes,
-                }
-                for sub in stub_plan.subtasks
-            ],
+            subtasks=sanitized_subtasks,
         )
 
         try:
