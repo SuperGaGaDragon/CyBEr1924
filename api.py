@@ -293,7 +293,11 @@ def create_session(
     current_user = Depends(get_current_user),
 ) -> SessionSnapshotModel:
     try:
-        session_id, plan, state = orch.init_session(request.topic)
+        session_id, plan, state = orch.init_session(
+            request.topic,
+            novel_mode=bool(request.novel_mode),
+            novel_profile=request.novel_profile,
+        )
         snapshot = build_session_snapshot(artifact_store, state, message_bus)
         snapshot.command = "plan"
         snapshot.message = "Session created"

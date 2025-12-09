@@ -114,6 +114,11 @@ export function setAccessToken(token: string | null) {
   accessToken = token;
 }
 
+export type CreateSessionOptions = {
+  novel_mode?: boolean;
+  novel_profile?: Record<string, unknown> | null;
+};
+
 async function request<T>(
   path: string,
   options: RequestInit = {}
@@ -165,10 +170,18 @@ export async function listSessions(): Promise<SessionSummary[]> {
   return request<SessionSummary[]>("/sessions");
 }
 
-export async function createSession(topic: string): Promise<SessionSnapshot> {
+export async function createSession(topic: string, options: CreateSessionOptions = {}): Promise<SessionSnapshot> {
+  const payload: Record<string, unknown> = { topic };
+  if (typeof options.novel_mode === "boolean") {
+    payload.novel_mode = options.novel_mode;
+  }
+  if (options.novel_profile !== undefined) {
+    payload.novel_profile = options.novel_profile;
+  }
+
   return request<SessionSnapshot>("/sessions", {
     method: "POST",
-    body: JSON.stringify({ topic }),
+    body: JSON.stringify(payload),
   });
 }
 

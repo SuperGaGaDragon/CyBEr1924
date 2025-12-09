@@ -752,6 +752,19 @@ function App() {
     worker: "timeline",
     reviewer: "timeline",
   });
+  const [createSessionForm, setCreateSessionForm] = useState<{
+    show: boolean;
+    topic: string;
+    novelMode: boolean;
+    novelProfile: string;
+    error: string | null;
+  }>({
+    show: false,
+    topic: "",
+    novelMode: false,
+    novelProfile: "",
+    error: null,
+  });
   const eventsPollTimer = useRef<number | null>(null);
   const isRunning = state.snapshot?.is_running ?? false;
   const commandsDisabled = isRunning || state.pollingEvents;
@@ -1180,12 +1193,42 @@ function App() {
     }
   }
 
-  async function handleCreateSession() {
-    const topic = window.prompt("Project name (requirements go to Planner chat)");
-    if (!topic) return;
-    setState((prev) => ({ ...prev, loading: true, error: null }));
+  function handleCreateSession() {
+    setCreateSessionForm({
+      show: true,
+      topic: "",
+      novelMode: false,
+      novelProfile: "",
+      error: null,
+    });
+  }
+
+  const parseNovelProfileInput = (): Record<string, unknown> | undefined => {
+    const raw = createSessionForm.novelProfile.trim();
+    if (!raw) return undefined;
     try {
-      const snapshot = await createSession(topic);
+      return JSON.parse(raw) as Record<string, unknown>;
+    } catch {
+      return { notes: raw };
+    }
+  };
+
+  async function submitCreateSession(e?: FormEvent) {
+    if (e) e.preventDefault();
+    const topic = createSessionForm.topic.trim();
+    if (!topic) {
+      setCreateSessionForm((prev) => ({ ...prev, error: "Session name is required." }));
+      return;
+    }
+    const novelProfile = parseNovelProfileInput();
+
+    setState((prev) => ({ ...prev, loading: true, error: null }));
+    setCreateSessionForm((prev) => ({ ...prev, error: null }));
+    try {
+      const snapshot = await createSession(topic, {
+        novel_mode: createSessionForm.novelMode,
+        novel_profile: novelProfile,
+      });
       const sessions = await listSessions();
       const id = snapshot.session_id;
 
@@ -1199,12 +1242,27 @@ function App() {
         activeSessionId: id,
         snapshot,
       }));
+      setCreateSessionForm({
+        show: false,
+        topic: "",
+        novelMode: false,
+        novelProfile: "",
+        error: null,
+      });
     } catch (err: any) {
-      if (handleAuthError(err)) return;
+      if (handleAuthError(err)) {
+        setState((prev) => ({ ...prev, loading: false }));
+        return;
+      }
+      const message = err.message ?? "Failed to create session";
       setState((prev) => ({
         ...prev,
         loading: false,
-        error: err.message ?? "Failed to create session",
+        error: message,
+      }));
+      setCreateSessionForm((prev) => ({
+        ...prev,
+        error: message,
       }));
     }
   }
@@ -2596,6 +2654,141 @@ function App() {
           </section>
         )}
       </main>
+
+      {/* Create Session Modal */}
+      {createSessionForm.show && (
+        <div
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "rgba(0,0,0,0.55)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            zIndex: 1100,
+            backdropFilter: "blur(4px)",
+          }}
+          onClick={() => setCreateSessionForm((prev) => ({ ...prev, show: false }))}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              width: "100%",
+              maxWidth: "520px",
+              background: "#ffffff",
+              borderRadius: "18px",
+              boxShadow: "0 24px 60px rgba(0,0,0,0.25)",
+              padding: "28px",
+              display: "flex",
+              flexDirection: "column",
+              gap: "16px",
+            }}
+          >
+            <div>
+              <div style={{ fontSize: "14px", letterSpacing: "0.08em", textTransform: "uppercase", color: "#6b7280", marginBottom: "6px" }}>
+                New Session
+              </div>
+              <div style={{ fontSize: "24px", fontWeight: 800, color: "#0b0b0b", letterSpacing: "-0.3px" }}>
+                Please Name this Session
+              </div>
+            </div>
+            <form onSubmit={(e) => void submitCreateSession(e)} style={{ display: "flex", flexDirection: "column", gap: "14px" }}>
+              <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+                <label style={{ fontSize: "13px", fontWeight: 700, color: "#111827" }}>Session Name</label>
+                <input
+                  autoFocus
+                  type="text"
+                  value={createSessionForm.topic}
+                  onChange={(e) => setCreateSessionForm((prev) => ({ ...prev, topic: e.target.value }))}
+                  placeholder="e.g. Long-form novel about time travel"
+                  style={{
+                    width: "100%",
+                    padding: "12px 14px",
+                    borderRadius: "10px",
+                    border: "1px solid #e5e7eb",
+                    background: "#f9fafb",
+                    fontSize: "14px",
+                    outline: "none",
+                  }}
+                />
+              </div>
+
+              <label style={{ display: "flex", alignItems: "center", gap: "10px", cursor: "pointer", userSelect: "none" }}>
+                <input
+                  type="checkbox"
+                  checked={createSessionForm.novelMode}
+                  onChange={(e) => setCreateSessionForm((prev) => ({ ...prev, novelMode: e.target.checked }))}
+                  style={{ width: "18px", height: "18px" }}
+                />
+                <div>
+                  <div style={{ fontWeight: 700, fontSize: "14px", color: "#0b0b0b" }}>Enable Novel Mode</div>
+                  <div style={{ fontSize: "12px", color: "#4b5563" }}>Novel prompts and flows only apply when this is on.</div>
+                </div>
+              </label>
+
+              <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+                <label style={{ fontSize: "13px", fontWeight: 700, color: "#111827" }}>
+                  Novel profile (optional, JSON or notes)
+                </label>
+                <textarea
+                  value={createSessionForm.novelProfile}
+                  onChange={(e) => setCreateSessionForm((prev) => ({ ...prev, novelProfile: e.target.value }))}
+                  placeholder='Paste draft answers or notes. Example: {"length":"novella","year":"19th century","genre":"Historical","style":"Hemingway"}'
+                  rows={4}
+                  style={{
+                    width: "100%",
+                    padding: "12px 14px",
+                    borderRadius: "10px",
+                    border: "1px solid #e5e7eb",
+                    background: "#f9fafb",
+                    fontSize: "13px",
+                    resize: "vertical",
+                    minHeight: "96px",
+                  }}
+                />
+              </div>
+
+              {createSessionForm.error && (
+                <div style={{ fontSize: "12px", color: "#b91c1c", background: "#fef2f2", border: "1px solid #fecaca", borderRadius: "10px", padding: "10px 12px" }}>
+                  {createSessionForm.error}
+                </div>
+              )}
+
+              <div style={{ display: "flex", justifyContent: "flex-end", gap: "10px", marginTop: "4px" }}>
+                <button
+                  type="button"
+                  onClick={() => setCreateSessionForm((prev) => ({ ...prev, show: false }))}
+                  style={{
+                    padding: "12px 18px",
+                    borderRadius: "10px",
+                    border: "1px solid #e5e7eb",
+                    background: "#ffffff",
+                    color: "#111827",
+                    fontWeight: 700,
+                    cursor: "pointer",
+                  }}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  style={{
+                    padding: "12px 18px",
+                    borderRadius: "10px",
+                    border: "none",
+                    background: "#000000",
+                    color: "#ffffff",
+                    fontWeight: 800,
+                    cursor: "pointer",
+                  }}
+                >
+                  Start Session
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
       {/* Delete Confirmation Modal */}
       {deleteConfirm.show && (

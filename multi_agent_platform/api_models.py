@@ -8,6 +8,8 @@ from pydantic import BaseModel, Field
 
 class CreateSessionRequest(BaseModel):
     topic: str
+    novel_mode: Optional[bool] = False
+    novel_profile: Optional[Dict[str, Any]] = None
 
 
 class CommandRequest(BaseModel):

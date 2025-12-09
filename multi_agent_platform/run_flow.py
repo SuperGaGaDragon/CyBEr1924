@@ -673,6 +673,8 @@ class Orchestrator:
     def init_session(
         self,
         topic: str,
+        novel_mode: bool = False,
+        novel_profile: Optional[Dict[str, Any]] = None,
     ) -> Tuple[str, Plan, OrchestratorState]:
         """
         Initialize a new session with a topic.
@@ -717,6 +719,10 @@ class Orchestrator:
             plan_id=plan.plan_id,
             status="idle",
             current_subtask_id=None,
+            extra={
+                "novel_mode": bool(novel_mode),
+                "novel_profile": novel_profile or {},
+            },
         )
         self.save_orchestrator_state(state)
 
