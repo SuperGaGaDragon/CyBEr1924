@@ -213,3 +213,8 @@ WORKStage2
 
 WORKStage3
 - [ ] 前端 Plan 列也隐藏/标记 meta 项，防止误导用户点击执行；必要时在后端将这些节点标记为 `skipped`。
+
+
+### enable task and subtask
+
+让planner把东西分为task和subtask。在同一个大task中，每次worker开始都会有task里面当前已经出现的subtask的summary来做上下文。task不能太大，约束task当中subtask的数量

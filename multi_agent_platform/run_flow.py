@@ -121,6 +121,63 @@ def run_reviewer_on_output(plan: Plan, subtask: Subtask, text: str) -> Dict[str,
         "notes": "placeholder review",
     }
 
+
+def _build_novel_t1_t4(profile: Dict[str, Any] | None, base_topic: str) -> List[Dict[str, Any]]:
+    """Construct the mandatory first four subtasks for novel mode."""
+    profile = profile or {}
+    length = profile.get("length") or ""
+    year = profile.get("year") or ""
+    genre = profile.get("genre") or profile.get("other_genres") or ""
+    style = profile.get("style") or ""
+    title_text = profile.get("title_text") or ""
+    characters = profile.get("characters") or []
+    chars_desc = "; ".join(
+        [
+            f"{c.get('name','').strip()} ({c.get('role','').strip()})".strip()
+            for c in characters
+            if isinstance(c, dict) and (c.get("name") or c.get("role"))
+        ]
+    )
+    extra_notes = profile.get("extra_notes") or ""
+
+    def _desc(text: str) -> str:
+        return (
+            f"{text}（cover full content for this task）\n"
+            f"- Length: {length}\n- Year: {year}\n- Genre: {genre}\n- Style: {style}\n"
+            f"- Title: {title_text}\n- Characters: {chars_desc}\n- Extra: {extra_notes}"
+        ).strip()
+
+    return [
+        {
+            "subtask_id": "t1",
+            "title": "Research",
+            "status": "pending",
+            "notes": "Research for genre/time/style context",
+            "description": _desc("Research the genre, time setting, and target style."),
+        },
+        {
+            "subtask_id": "t2",
+            "title": "人物设定",
+            "status": "pending",
+            "notes": "Character roster",
+            "description": _desc("List and refine character names and roles."),
+        },
+        {
+            "subtask_id": "t3",
+            "title": "情节设计",
+            "status": "pending",
+            "notes": "Plot arcs",
+            "description": _desc("Design main plot arcs consistent with the brief."),
+        },
+        {
+            "subtask_id": "t4",
+            "title": "章节分配 & 小说概要撰写",
+            "status": "pending",
+            "notes": "Chapter plan and synopsis",
+            "description": _desc("Produce chapter allocation and concise novel synopsis; include chapter-wise responsibilities."),
+        },
+    ]
+
 def consume_orchestrator_events(state: OrchestratorState, plan: Plan | None = None) -> None:
     """v0.2: true action consumer — handles structured events produced by the intent agent."""
 
@@ -213,13 +270,25 @@ def consume_orchestrator_events(state: OrchestratorState, plan: Plan | None = No
                             latest_user_input=instr or "",
                         )
                         updated_plan = _apply_planner_result_to_state(
-                            state, result, fallback_user_text=instr or "", existing_plan=plan
+                            state,
+                            result,
+                            fallback_user_text=instr or "",
+                            existing_plan=plan,
+                            novel_profile=getattr(state, "extra", {}).get("novel_profile") if getattr(state, "extra", None) else None,
                         )
                     except Exception:
                         # Fallback to stub if planner call fails
-                        updated_plan = generate_stub_plan_from_planning_input(plan, instr or "")
+                        updated_plan = generate_stub_plan_from_planning_input(
+                            plan,
+                            instr or "",
+                            novel_profile=getattr(state, "extra", {}).get("novel_profile") if getattr(state, "extra", None) else None,
+                        )
                 else:
-                    updated_plan = generate_stub_plan_from_planning_input(plan, instr or "")
+                    updated_plan = generate_stub_plan_from_planning_input(
+                        plan,
+                        instr or "",
+                        novel_profile=getattr(state, "extra", {}).get("novel_profile") if getattr(state, "extra", None) else None,
+                    )
 
                 plan.notes = getattr(updated_plan, "notes", plan.notes)
                 plan.title = getattr(updated_plan, "title", plan.title)
@@ -366,7 +435,11 @@ def run_orchestrator_turn(
     )
 
 
-def generate_stub_plan_from_planning_input(plan: Plan, user_text: str) -> Plan:
+def generate_stub_plan_from_planning_input(
+    plan: Plan,
+    user_text: str,
+    novel_profile: Optional[Dict[str, Any]] = None,
+) -> Plan:
     """
     Populate/update a placeholder plan and subtasks based on planning input.
     v0.2: on every planning input, append a visible subtask so structure changes are observable.
@@ -375,14 +448,22 @@ def generate_stub_plan_from_planning_input(plan: Plan, user_text: str) -> Plan:
     if not text:
         return plan
 
+    novel_mode = bool(novel_profile)
+
     # Seed a basic plan and initial subtasks if empty
     if not plan.subtasks:
         plan.title = plan.title or "写一个长篇小说"
         plan.notes = (plan.notes or "stub planner").strip()
-        plan.subtasks = [
-            Subtask(id="t1", title="确定小说的主题和整体思想", status="pending"),
-            Subtask(id="t2", title="设计主要人物角色和基本设定", status="pending"),
-        ]
+        if novel_mode:
+            plan.subtasks = [
+                Subtask(**raw)
+                for raw in _build_novel_t1_t4(novel_profile or {}, plan.title)
+            ]
+        else:
+            plan.subtasks = [
+                Subtask(id="t1", title="确定小说的主题和整体思想", status="pending"),
+                Subtask(id="t2", title="设计主要人物角色和基本设定", status="pending"),
+            ]
 
     # Update plan notes with user input
     notes_prefix = plan.notes or ""
@@ -406,6 +487,7 @@ def _apply_planner_result_to_state(
     result: PlannerResult,
     fallback_user_text: str,
     existing_plan: Plan | None,
+    novel_profile: Optional[Dict[str, Any]] = None,
 ) -> Plan:
     """Merge PlannerResult into a Plan object (state does not store plan directly)."""
 
@@ -426,8 +508,34 @@ def _apply_planner_result_to_state(
     )
 
     # ---- Subtasks ----
+    novel_mode = False
+    try:
+        novel_mode = bool(state.extra.get("novel_mode"))
+    except Exception:
+        novel_mode = False
+
+    # If novel mode, seed with mandatory t1–t4 and then append remaining planner items (dedup by id)
+    base_subtasks: List[Dict[str, Any]] = []
+    if novel_mode:
+        base_subtasks.extend(_build_novel_t1_t4(novel_profile, title))
+
+    merged_subtasks: List[Dict[str, Any]] = []
+    seen_ids = set()
+    for raw in base_subtasks + subtasks_dicts:
+        sub_id = raw.get("subtask_id") or raw.get("id")
+        if not sub_id:
+            # auto-generate id after existing ones
+            sub_id = f"t{len(seen_ids) + 1}"
+        if sub_id in seen_ids:
+            continue
+        seen_ids.add(sub_id)
+        merged_subtasks.append(raw | {"subtask_id": sub_id})
+
+    if not merged_subtasks:
+        merged_subtasks = subtasks_dicts
+
     new_subtasks: List[Subtask] = []
-    for idx, raw in enumerate(subtasks_dicts, start=1):
+    for idx, raw in enumerate(merged_subtasks, start=1):
         sub_id = raw.get("subtask_id") or raw.get("id") or f"t{idx}"
         title = raw.get("title") or f"Subtask {idx}"
         status = raw.get("status") or "pending"
@@ -511,9 +619,15 @@ class Orchestrator:
         )
         self._last_outline_ref: ArtifactRef | None = None
 
-    def _call_planner(self, topic: str) -> str:
+    def _call_planner(self, topic: str, novel_profile: Optional[Dict[str, Any]] = None) -> str:
+        context = ""
+        if novel_profile:
+            try:
+                context = f"\\n\\nNovel mode context: {json.dumps(novel_profile, ensure_ascii=False)}"
+            except Exception:
+                context = ""
         return self.planner.run(
-            f"请为下面的主题生成一个分步骤的计划，每个子任务一句话：\\n\\n主题：{topic}"
+            f"请为下面的主题生成一个分步骤的计划，每个子任务一句话：\\n\\n主题：{topic}{context}"
         )
 
     def _call_worker(self, plan: Plan, subtask: Subtask) -> str:
@@ -684,7 +798,12 @@ class Orchestrator:
         """
         session_id = self.store.create_session_id()
         print(f"Session created: {session_id}\\n")
-        outline = self._call_planner(topic)
+        safe_profile = None
+        try:
+            safe_profile = dict(novel_profile) if isinstance(novel_profile, dict) else None
+        except Exception:
+            safe_profile = None
+        outline = self._call_planner(topic, novel_profile=safe_profile)
         ref_outline = self.store.save_artifact(
             session_id,
             outline,
@@ -693,6 +812,14 @@ class Orchestrator:
         )
         print("Outline saved:", ref_outline.path)
         plan = Plan.from_outline(topic, outline)
+        try:
+            if safe_profile:
+                plan.subtasks = [
+                    Subtask(**raw)
+                    for raw in _build_novel_t1_t4(safe_profile, plan.title or topic)
+                ]
+        except Exception:
+            pass
         ref_plan = self.store.save_artifact(
             session_id,
             plan.to_dict(),
@@ -721,7 +848,7 @@ class Orchestrator:
             current_subtask_id=None,
             extra={
                 "novel_mode": bool(novel_mode),
-                "novel_profile": novel_profile or {},
+                "novel_profile": safe_profile or {},
             },
         )
         self.save_orchestrator_state(state)
@@ -1095,9 +1222,19 @@ class Orchestrator:
                 subtasks=subtasks_dicts,
                 latest_user_input=text,
             )
-            plan = _apply_planner_result_to_state(state, result, fallback_user_text=text, existing_plan=plan)
+            plan = _apply_planner_result_to_state(
+                state,
+                result,
+                fallback_user_text=text,
+                existing_plan=plan,
+                novel_profile=getattr(state, "extra", {}).get("novel_profile") if getattr(state, "extra", None) else None,
+            )
         else:
-            plan = generate_stub_plan_from_planning_input(plan, text)
+            plan = generate_stub_plan_from_planning_input(
+                plan,
+                text,
+                novel_profile=getattr(state, "extra", {}).get("novel_profile") if getattr(state, "extra", None) else None,
+            )
         answer = self.answer_user_question(session_id, plan, user_text)
         return plan, answer
 

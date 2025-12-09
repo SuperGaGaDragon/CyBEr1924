@@ -5,26 +5,30 @@
 Phase 0 — 模式开关与数据流
 - [x] Step 0.1: 前端新建 Session 弹窗 + novel pill，提交时附上 `novel_mode` 开关；未勾选时保持现状（具体问卷内容见原需求草稿）。
 - [x] Step 0.2: 问卷回答打包为 `novel_profile`（篇幅/年份/题材/角色表/风格/题目），随创建或首次 planner 消息传给后端；orchestrator state.extra 持久化 `novel_mode`、`novel_profile`。
-- [ ] Step 0.3 验证本功能可以function，且不会报404，500等错误。
+- [x] Step 0.3 验证本功能可以function，且不会报404，500等错误。
 
 Phase 1 — Planner 约束（仅 novel_mode）
-- [ ] Step 1.1: 覆写/扩展 planner prompt，强制前置 t1–t4（Research、人物设定、情节设计、章节分配&概要），description 注入问卷信息并要求“cover full content”；t5+ 留给正文分解。
-- [ ] Step 1.2: 真实 planner 输出后置处理：确保 t1–t4 存在/覆盖；stub planner 生成时直接加入固定四条。
+- [x] Step 1.1: 覆写/扩展 planner prompt，强制前置 t1–t4（Research、人物设定、情节设计、章节分配&概要），description 注入问卷信息并要求“cover full content”；t5+ 留给正文分解。
+- [x] Step 1.2: 真实 planner 输出后置处理：确保 t1–t4 存在/覆盖；stub planner 生成时直接加入固定四条。
 
 Phase 2 — Worker 上下文
 - [ ] Step 2.1: t1–t4 运行时注入累计 summary（题材/年份/风格/题目/人物表/前序产出），并将产出汇总为 `novel_summary_t1_t4` 存 state.extra。
 - [ ] Step 2.2: t5+ 默认为单任务上下文，但 prompt 头部注入 `novel_summary_t1_t4`，description 要求“写完整内容”。
+- [ ] Step 2.3 验证本功能可以function，且不会报404，500等错误。
 
 Phase 3 — Reviewer 行为
 - [ ] Step 3.1: Reviewer prompt 加入“严格的小说评论家，明确指出问题”；每评审 5 个 task 清空对话，仅保留 `novel_summary_t1_t4` 背景（state.extra.reviewer_batch_counter）。
 - [ ] Step 3.2: 允许 reviewer 返回修订版（notes + optional revised_text）；另存 artifact/字段，不覆盖原稿；前端提供“一键采纳”写回 worker output。
+- [ ] Step 3.3 验证本功能可以function，且不会报404，500等错误。
 
 Phase 4 — 前端问卷与展示
 - [ ] Step 4.1: 问卷 6 题线性 wizard（必答才能下一题，角色表增删行），提交后自动生成英文 summary 发给 planner。
 - [ ] Step 4.2: Execution UI 显示 novel pill、章节 summary 提示、Reviewer Revised 区块；非 novel_mode 不受影响。
+- [ ] Step 4.3 验证本功能可以function，且不会报404，500等错误。
 
 Phase 5 — QA/兼容
 - [ ] Step 5.1: 测试 stub/真实 planner 下的 novel_mode 分支、关闭模式回归、t1–t4 强制/summary 注入/reviewer reset/修订保存。
+- [ ] Step 5.2 验证全部功能可以function，且不会报404，500等错误。
 
 
 --------------------
