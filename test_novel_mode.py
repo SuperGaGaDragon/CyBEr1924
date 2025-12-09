@@ -309,7 +309,13 @@ def test_run_next_pending_t4_appends_chapters():
             Subtask(id="t4", title="章节分配", status="pending"),
         ],
     )
-    def fake_call_planner(topic, novel_profile=None, novel_summary=None, summary_artifact=None):
+    def fake_call_planner(
+        topic,
+        novel_profile=None,
+        novel_summary=None,
+        summary_artifact=None,
+        reviewer_batch_annotations=None,
+    ):
         return "\n".join(
             [
                 "Chapter 1: Write the opening",
@@ -381,6 +387,49 @@ def test_novel_phase_step_tracks_chapter_count():
 
     added_count = len(updated_plan.subtasks) - 4
     assert added_count == state.extra.get("novel_phase_step")
+
+
+def test_reviewer_batch_waits_for_three():
+    store = ArtifactStore()
+    bus = MessageBus(store=store)
+    orch = Orchestrator(artifact_store=store, message_bus=bus)
+    profile = _sample_profile()
+    plan = Plan(
+        plan_id="plan-batch-review",
+        title="Batch Review",
+        subtasks=[
+            Subtask(id="t1", title="Research", status="done", output=""),
+            Subtask(id="t2", title="人物设定", status="done", output=""),
+            Subtask(id="t3", title="情节设计", status="done", output=""),
+            Subtask(id="t4", title="章节分配", status="done", output=""),
+            Subtask(id="t5", title="Chapter 1", status="pending"),
+            Subtask(id="t6", title="Chapter 2", status="pending"),
+            Subtask(id="t7", title="Chapter 3", status="pending"),
+        ],
+    )
+    state = OrchestratorState(
+        session_id="sess-batch",
+        plan_id=plan.plan_id,
+        status="idle",
+        extra={"novel_mode": True, "novel_profile": profile},
+    )
+
+    captured: list[str | None] = []
+    def stub_coordinator(plan_arg, subtask, worker_output, state=None, batch_context=None):
+        captured.append(batch_context)
+        return "ACCEPT\n"
+    orch._call_coordinator = stub_coordinator
+
+    for _ in range(5, 8):
+        plan = orch.run_next_pending_subtask("sess-batch", plan, state=state, interactive=False)
+
+    assert captured == [captured[0]]
+    batch_ctx = captured[0]
+    assert batch_ctx
+    assert "t5" in batch_ctx
+    assert "t6" in batch_ctx
+    assert "t7" in batch_ctx
+    assert state.extra.get("reviewer_batch_tasks") == []
 
 
 def test_planner_prompt_includes_summary_context():
@@ -514,29 +563,48 @@ def test_reviewer_revision_flow_end_to_end():
 
     run_flow.build_coordinator_review_prompt = spy_build_prompt
     try:
-        for _ in range(5):
+        for _ in range(7):
             plan = orch.run_next_pending_subtask(session_id, plan, state=state)
 
         assert len(seen_unique) == 5
         summary_before_reset = state.extra.get("novel_summary_t1_t4") or ""
         assert summary_before_reset, "Expected novel_summary_t1_t4 to exist before reviewer reset"
+        assert state.extra.get("reviewer_batch_tasks") == []
+        assert state.extra.get("reviewer_batch_counter") == 1
+        inflight_info = state.extra.get("novel_inflight_batch") or {}
+        assert inflight_info.get("batch_id") == "batch_1"
+        batch_notes = state.extra.get("reviewer_revisions_batch") or ""
+        assert batch_notes.startswith("Reviewer batch batch_1 summary:")
+        batch_revision = state.extra.get("reviewer_revisions", {}).get("t1") or {}
+        assert batch_revision.get("text") == "Revised content for t1"
+        t5_revision = state.extra.get("reviewer_revisions", {}).get("t5") or {}
+        assert t5_revision.get("batch_id") == "batch_1"
+        assert t5_revision.get("artifact_path")
 
         # Trigger the reset branch on the next reviewer call so the prompt only keeps the summary.
         state.extra["reviewer_batch_counter"] = 5
-        plan = orch.run_next_pending_subtask(session_id, plan, state=state)
+        for idx in range(9, 12):
+            plan.subtasks.append(Subtask(id=f"t{idx}", title=f"正文第 {idx - 4} 部分"))
+        prev_seen = len(seen_unique)
+        next_review_id = None
+        while next_review_id is None:
+            plan = orch.run_next_pending_subtask(session_id, plan, state=state)
+            if len(seen_unique) > prev_seen:
+                next_review_id = seen_unique[-1]
 
         assert state.extra.get("reviewer_batch_counter") == 1
-        contexts_t6 = captured_contexts.get("t6") or []
-        assert contexts_t6
-        assert contexts_t6[-1] == summary_before_reset
+        contexts_next = captured_contexts.get(next_review_id) or []
+        assert contexts_next
+        assert summary_before_reset in contexts_next[-1]
     finally:
         run_flow.build_coordinator_review_prompt = original_build_prompt
 
     orch.save_state(session_id, plan)
     orch.save_orchestrator_state(state)
 
-    revised_text = state.extra.get("reviewer_revisions", {}).get("t1")
-    assert revised_text == "Revised content for t1"
+    revisions = state.extra.get("reviewer_revisions", {}) or {}
+    t1_revision = revisions.get("t1") or {}
+    assert t1_revision.get("text") == "Revised content for t1"
 
     snapshot = orch.execute_command(
         session_id,
@@ -555,6 +623,45 @@ def test_reviewer_revision_flow_end_to_end():
     last_output = state_after.worker_outputs[-1]
     assert last_output.subtask_id == "t1"
     assert last_output.artifact.kind == "markdown"
+    inflight_after = state_after.extra.get("novel_inflight_batch") or {}
+    assert "t1" in (inflight_after.get("applied_subtasks") or [])
+
+
+def test_planner_prompt_includes_novel_context():
+    store = ArtifactStore()
+    bus = MessageBus(store=store)
+    orch = Orchestrator(artifact_store=store, message_bus=bus)
+
+    session_id, plan, state = orch.init_session(
+        "Planner Prompt Context",
+        novel_mode=True,
+        novel_profile=_sample_profile(),
+    )
+    state.extra["novel_summary_t1_t4"] = "Novel summary content (t1-t4):\nSample summary"
+    state.extra["novel_summary_artifact"] = {
+        "path": "sessions/sample/summary.md",
+        "description": "T1-T4 summary",
+    }
+    state.extra["reviewer_revisions_batch"] = "Batch batch_1 summary"
+
+    prompts: dict[str, str] = {}
+    original_run = orch.planner.run
+
+    def fake_planner_run(prompt: str) -> str:
+        prompts["prompt"] = prompt
+        return "Chapter 5: Act One\nChapter 6: Act Two\nChapter 7: Act Three"
+
+    orch.planner.run = fake_planner_run
+    try:
+        orch._append_chapter_tasks_from_planner_stub(session_id, plan, state)
+    finally:
+        orch.planner.run = original_run
+
+    captured_prompt = prompts.get("prompt", "")
+    assert "Novel summary content (t1-t4)" in captured_prompt
+    assert "sessions/sample/summary.md" in captured_prompt
+    assert "Batch batch_1 summary" in captured_prompt
+    assert len(plan.subtasks) > 4
 
 
 def test_novel_mode_disabled_has_no_summary():

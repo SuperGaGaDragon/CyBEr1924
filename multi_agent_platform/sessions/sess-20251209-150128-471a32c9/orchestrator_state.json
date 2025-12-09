@@ -1,0 +1,489 @@
+{
+  "session_id": "sess-20251209-150128-471a32c9",
+  "plan_id": "plan-d69c28c3",
+  "status": "idle",
+  "current_subtask_id": null,
+  "extra": {
+    "novel_mode": true,
+    "novel_profile": {
+      "length": "novella",
+      "year": "架空历史",
+      "genre": "Fantasy",
+      "style": "Hemingway",
+      "title_text": "Chronicles of Time",
+      "characters": [
+        {
+          "name": "Alice",
+          "role": "Protagonist"
+        }
+      ],
+      "extra_notes": "Keep tone consistent"
+    },
+    "novel_phase_step": 0,
+    "recent_worker_outputs": [
+      {
+        "subtask_id": "t5",
+        "title": "正文第 1 部分",
+        "preview": "[worker 模拟回复] 你是 Worker 角色，专注地执行当前的单个 subtask。 -> 任务主题：Novel Health Check  整体计划如下： Plan: Novel Health Check (id=plan-d69c28c3)  - t1 [done]: Research - t2 [done]: 人物设定 - \n- 模拟产出 1：按照 subtask 生成具体内容\n- 模拟产出 2：继续补全该段落",
+        "artifact_path": "sessions/sess-20251209-150128-471a32c9/artifacts/2f5cdbfc5a47.md",
+        "ts": "2025-12-09T15:01:28.972516"
+      },
+      {
+        "subtask_id": "t6",
+        "title": "正文第 2 部分",
+        "preview": "[worker 模拟回复] 你是 Worker 角色，专注地执行当前的单个 subtask。 -> 任务主题：Novel Health Check  整体计划如下： Plan: Novel Health Check (id=plan-d69c28c3)  - t1 [done]: Research - t2 [done]: 人物设定 - \n- 模拟产出 1：按照 subtask 生成具体内容\n- 模拟产出 2：继续补全该段落",
+        "artifact_path": "sessions/sess-20251209-150128-471a32c9/artifacts/1bd8e9b18934.md",
+        "ts": "2025-12-09T15:01:29.006955"
+      },
+      {
+        "subtask_id": "t7",
+        "title": "正文第 3 部分",
+        "preview": "[worker 模拟回复] 你是 Worker 角色，专注地执行当前的单个 subtask。 -> 任务主题：Novel Health Check  整体计划如下： Plan: Novel Health Check (id=plan-d69c28c3)  - t1 [done]: Research - t2 [done]: 人物设定 - \n- 模拟产出 1：按照 subtask 生成具体内容\n- 模拟产出 2：继续补全该段落",
+        "artifact_path": "sessions/sess-20251209-150128-471a32c9/artifacts/ff9fe4a46700.md",
+        "ts": "2025-12-09T15:01:29.019523"
+      }
+    ],
+    "novel_summary_t1_t4": "Profile:\nLength: novella\nYear: 架空历史\nGenre: Fantasy\nStyle: Hemingway\nTitle: Chronicles of Time\nCharacters: Alice (Protagonist)\nExtra: Keep tone consistent\nt1 Research: [worker 模拟回复] 你是 Worker 角色，专注地执行当前的单个 subtask。 -> 任务主题：Novel Health Check  整体计划如下： Plan: Novel Health Check (id=plan-d69c28c3)  - t1 [in_progress]: Research - t2 [pending\n- 模拟产出 1：按照 subtask 生成具体内容\n- 模拟产出 2：继续补全该段落\nt2 人物设定: [worker 模拟回复] 你是 Worker 角色，专注地执行当前的单个 subtask。 -> 任务主题：Novel Health Check  整体计划如下： Plan: Novel Health Check (id=plan-d69c28c3)  - t1 [done]: Research - t2 [in_progress]: \n- 模拟产出 1：按照 subtask 生成具体内容\n- 模拟产出 2：继续补全该段落\nt3 情节设计: [worker 模拟回复] 你是 Worker 角色，专注地执行当前的单个 subtask。 -> 任务主题：Novel Health Check  整体计划如下： Plan: Novel Health Check (id=plan-d69c28c3)  - t1 [done]: Research - t2 [done]: 人物设定 - \n- 模拟产出 1：按照 subtask 生成具体内容\n- 模拟产出 2：继续补全该段落\nt4 章节分配 & 小说概要撰写: [worker 模拟回复] 你是 Worker 角色，专注地执行当前的单个 subtask。 -> 任务主题：Novel Health Check  整体计划如下： Plan: Novel Health Check (id=plan-d69c28c3)  - t1 [done]: Research - t2 [done]: 人物设定 - \n- 模拟产出 1：按照 subtask 生成具体内容\n- 模拟产出 2：继续补全该段落",
+    "novel_summary_artifact": {
+      "session_id": "sess-20251209-150128-471a32c9",
+      "artifact_id": "d8c032ba955f",
+      "kind": "markdown",
+      "path": "sessions/sess-20251209-150128-471a32c9/artifacts/d8c032ba955f.md",
+      "description": "Novel mode t1-t4 summary"
+    },
+    "reviewer_batch_tasks": [],
+    "reviewer_batch_counter": 1,
+    "novel_inflight_batch": {
+      "batch_id": "batch_1",
+      "summary": "t5: 正文第 1 部分 (artifact: sessions/sess-20251209-150128-471a32c9/artifacts/2f5cdbfc5a47.md)\n\nPreview:\n[worker 模拟回复] 你是 Worker 角色，专注地执行当前的单个 subtask。 -> 任务主题：Novel Health Check  整体计划如下： Plan: Novel Health Check (id=plan-d69c28c3)  - t1 [done]: Research - t2 [done]: 人物设定 - \n- 模拟产出 1：按照 subtask 生成具体内容\n- 模拟产出 2：继续补全该段落\n\nt6: 正文第 2 部分 (artifact: sessions/sess-20251209-150128-471a32c9/artifacts/1bd8e9b18934.md)\n\nPreview:\n[worker 模拟回复] 你是 Worker 角色，专注地执行当前的单个 subtask。 -> 任务主题：Novel Health Check  整体计划如下： Plan: Novel Health Check (id=plan-d69c28c3)  - t1 [done]: Research - t2 [done]: 人物设定 - \n- 模拟产出 1：按照 subtask 生成具体内容\n- 模拟产出 2：继续补全该段落\n\nt7: 正文第 3 部分 (artifact: sessions/sess-20251209-150128-471a32c9/artifacts/ff9fe4a46700.md)\n\nPreview:\n[worker 模拟回复] 你是 Worker 角色，专注地执行当前的单个 subtask。 -> 任务主题：Novel Health Check  整体计划如下： Plan: Novel Health Check (id=plan-d69c28c3)  - t1 [done]: Research - t2 [done]: 人物设定 - \n- 模拟产出 1：按照 subtask 生成具体内容\n- 模拟产出 2：继续补全该段落",
+      "reason": "[模拟] 自动判定当前子任务通过。",
+      "decision": "ACCEPT",
+      "timestamp": "2025-12-09T15:01:29.024402"
+    },
+    "reviewer_revisions_batch": "Reviewer batch batch_1 summary:\nDecision: ACCEPT\nReason: [模拟] 自动判定当前子任务通过。\nContext:\nt5: 正文第 1 部分 (artifact: sessions/sess-20251209-150128-471a32c9/artifacts/2f5cdbfc5a47.md)\n\nPreview:\n[worker 模拟回复] 你是 Worker 角色，专注地执行当前的单个 subtask。 -> 任务主题：Novel Health Check  整体计划如下： Plan: Novel Health Check (id=plan-d69c28c3)  - t1 [done]: Research - t2 [done]: 人物设定 - \n- 模拟产出 1：按照 subtask 生成具体内容\n- 模拟产出 2：继续补全该段落\n\nt6: 正文第 2 部分 (artifact: sessions/sess-20251209-150128-471a32c9/artifacts/1bd8e9b18934.md)\n\nPreview:\n[worker 模拟回复] 你是 Worker 角色，专注地执行当前的单个 subtask。 -> 任务主题：Novel Health Check  整体计划如下： Plan: Novel Health Check (id=plan-d69c28c3)  - t1 [done]: Research - t2 [done]: 人物设定 - \n- 模拟产出 1：按照 subtask 生成具体内容\n- 模拟产出 2：继续补全该段落\n\nt7: 正文第 3 部分 (artifact: sessions/sess-20251209-150128-471a32c9/artifacts/ff9fe4a46700.md)\n\nPreview:\n[worker 模拟回复] 你是 Worker 角色，专注地执行当前的单个 subtask。 -> 任务主题：Novel Health Check  整体计划如下： Plan: Novel Health Check (id=plan-d69c28c3)  - t1 [done]: Research - t2 [done]: 人物设定 - \n- 模拟产出 1：按照 subtask 生成具体内容\n- 模拟产出 2：继续补全该段落",
+    "reviewer_revisions": {
+      "t5": {
+        "batch_id": "batch_1",
+        "text": "[模拟] 自动判定当前子任务通过。",
+        "artifact_path": "sessions/sess-20251209-150128-471a32c9/artifacts/2f5cdbfc5a47.md"
+      },
+      "t6": {
+        "batch_id": "batch_1",
+        "text": "[模拟] 自动判定当前子任务通过。",
+        "artifact_path": "sessions/sess-20251209-150128-471a32c9/artifacts/1bd8e9b18934.md"
+      },
+      "t7": {
+        "batch_id": "batch_1",
+        "text": "[模拟] 自动判定当前子任务通过。",
+        "artifact_path": "sessions/sess-20251209-150128-471a32c9/artifacts/ff9fe4a46700.md"
+      }
+    }
+  },
+  "plan_locked": false,
+  "orchestrator_messages": [],
+  "orch_events": [],
+  "progress_events": [
+    {
+      "agent": "worker",
+      "subtask_id": "t1",
+      "stage": "start",
+      "status": "in_progress",
+      "payload": {
+        "title": "Research",
+        "session_id": "sess-20251209-150128-471a32c9"
+      },
+      "ts": "2025-12-09T15:01:28.908252"
+    },
+    {
+      "agent": "worker",
+      "subtask_id": "t1",
+      "stage": "finish",
+      "status": "completed",
+      "payload": {
+        "artifact_path": "sessions/sess-20251209-150128-471a32c9/artifacts/ef8ad56efd63.md",
+        "session_id": "sess-20251209-150128-471a32c9"
+      },
+      "ts": "2025-12-09T15:01:28.914112"
+    },
+    {
+      "agent": "reviewer",
+      "subtask_id": "t1",
+      "stage": "start",
+      "status": "in_progress",
+      "payload": {
+        "mode": "auto",
+        "session_id": "sess-20251209-150128-471a32c9"
+      },
+      "ts": "2025-12-09T15:01:28.915808"
+    },
+    {
+      "agent": "reviewer",
+      "subtask_id": "t1",
+      "stage": "finish",
+      "status": "completed",
+      "payload": {
+        "decision": "ACCEPT",
+        "reason": "[模拟] 自动判定当前子任务通过。",
+        "session_id": "sess-20251209-150128-471a32c9"
+      },
+      "ts": "2025-12-09T15:01:28.917623"
+    },
+    {
+      "agent": "worker",
+      "subtask_id": "t2",
+      "stage": "start",
+      "status": "in_progress",
+      "payload": {
+        "title": "人物设定",
+        "session_id": "sess-20251209-150128-471a32c9"
+      },
+      "ts": "2025-12-09T15:01:28.920400"
+    },
+    {
+      "agent": "worker",
+      "subtask_id": "t2",
+      "stage": "finish",
+      "status": "completed",
+      "payload": {
+        "artifact_path": "sessions/sess-20251209-150128-471a32c9/artifacts/7eac8bb5abb5.md",
+        "session_id": "sess-20251209-150128-471a32c9"
+      },
+      "ts": "2025-12-09T15:01:28.925585"
+    },
+    {
+      "agent": "reviewer",
+      "subtask_id": "t2",
+      "stage": "start",
+      "status": "in_progress",
+      "payload": {
+        "mode": "auto",
+        "session_id": "sess-20251209-150128-471a32c9"
+      },
+      "ts": "2025-12-09T15:01:28.927602"
+    },
+    {
+      "agent": "reviewer",
+      "subtask_id": "t2",
+      "stage": "finish",
+      "status": "completed",
+      "payload": {
+        "decision": "ACCEPT",
+        "reason": "[模拟] 自动判定当前子任务通过。",
+        "session_id": "sess-20251209-150128-471a32c9"
+      },
+      "ts": "2025-12-09T15:01:28.929691"
+    },
+    {
+      "agent": "worker",
+      "subtask_id": "t3",
+      "stage": "start",
+      "status": "in_progress",
+      "payload": {
+        "title": "情节设计",
+        "session_id": "sess-20251209-150128-471a32c9"
+      },
+      "ts": "2025-12-09T15:01:28.933670"
+    },
+    {
+      "agent": "worker",
+      "subtask_id": "t3",
+      "stage": "finish",
+      "status": "completed",
+      "payload": {
+        "artifact_path": "sessions/sess-20251209-150128-471a32c9/artifacts/e6976993fbae.md",
+        "session_id": "sess-20251209-150128-471a32c9"
+      },
+      "ts": "2025-12-09T15:01:28.940888"
+    },
+    {
+      "agent": "reviewer",
+      "subtask_id": "t3",
+      "stage": "start",
+      "status": "in_progress",
+      "payload": {
+        "mode": "auto",
+        "session_id": "sess-20251209-150128-471a32c9"
+      },
+      "ts": "2025-12-09T15:01:28.945466"
+    },
+    {
+      "agent": "reviewer",
+      "subtask_id": "t3",
+      "stage": "finish",
+      "status": "completed",
+      "payload": {
+        "decision": "ACCEPT",
+        "reason": "[模拟] 自动判定当前子任务通过。",
+        "session_id": "sess-20251209-150128-471a32c9"
+      },
+      "ts": "2025-12-09T15:01:28.947786"
+    },
+    {
+      "agent": "worker",
+      "subtask_id": "t4",
+      "stage": "start",
+      "status": "in_progress",
+      "payload": {
+        "title": "章节分配 & 小说概要撰写",
+        "session_id": "sess-20251209-150128-471a32c9"
+      },
+      "ts": "2025-12-09T15:01:28.951827"
+    },
+    {
+      "agent": "worker",
+      "subtask_id": "t4",
+      "stage": "finish",
+      "status": "completed",
+      "payload": {
+        "artifact_path": "sessions/sess-20251209-150128-471a32c9/artifacts/e08f0961a7fb.md",
+        "session_id": "sess-20251209-150128-471a32c9"
+      },
+      "ts": "2025-12-09T15:01:28.958035"
+    },
+    {
+      "agent": "reviewer",
+      "subtask_id": "t4",
+      "stage": "start",
+      "status": "in_progress",
+      "payload": {
+        "mode": "auto",
+        "session_id": "sess-20251209-150128-471a32c9"
+      },
+      "ts": "2025-12-09T15:01:28.959605"
+    },
+    {
+      "agent": "reviewer",
+      "subtask_id": "t4",
+      "stage": "finish",
+      "status": "completed",
+      "payload": {
+        "decision": "ACCEPT",
+        "reason": "[模拟] 自动判定当前子任务通过。",
+        "session_id": "sess-20251209-150128-471a32c9"
+      },
+      "ts": "2025-12-09T15:01:28.962260"
+    },
+    {
+      "agent": "worker",
+      "subtask_id": "t5",
+      "stage": "start",
+      "status": "in_progress",
+      "payload": {
+        "title": "正文第 1 部分",
+        "session_id": "sess-20251209-150128-471a32c9"
+      },
+      "ts": "2025-12-09T15:01:28.966836"
+    },
+    {
+      "agent": "worker",
+      "subtask_id": "t5",
+      "stage": "finish",
+      "status": "completed",
+      "payload": {
+        "artifact_path": "sessions/sess-20251209-150128-471a32c9/artifacts/2f5cdbfc5a47.md",
+        "session_id": "sess-20251209-150128-471a32c9"
+      },
+      "ts": "2025-12-09T15:01:28.973177"
+    },
+    {
+      "agent": "reviewer",
+      "subtask_id": "t5",
+      "stage": "start",
+      "status": "in_progress",
+      "payload": {
+        "mode": "auto",
+        "session_id": "sess-20251209-150128-471a32c9"
+      },
+      "ts": "2025-12-09T15:01:28.982006"
+    },
+    {
+      "agent": "reviewer",
+      "subtask_id": "t5",
+      "stage": "finish",
+      "status": "completed",
+      "payload": {
+        "decision": "ACCEPT",
+        "reason": "等待批次满 3 个任务后再复核。",
+        "session_id": "sess-20251209-150128-471a32c9"
+      },
+      "ts": "2025-12-09T15:01:28.995556"
+    },
+    {
+      "agent": "worker",
+      "subtask_id": "t6",
+      "stage": "start",
+      "status": "in_progress",
+      "payload": {
+        "title": "正文第 2 部分",
+        "session_id": "sess-20251209-150128-471a32c9"
+      },
+      "ts": "2025-12-09T15:01:29.001089"
+    },
+    {
+      "agent": "worker",
+      "subtask_id": "t6",
+      "stage": "finish",
+      "status": "completed",
+      "payload": {
+        "artifact_path": "sessions/sess-20251209-150128-471a32c9/artifacts/1bd8e9b18934.md",
+        "session_id": "sess-20251209-150128-471a32c9"
+      },
+      "ts": "2025-12-09T15:01:29.007785"
+    },
+    {
+      "agent": "reviewer",
+      "subtask_id": "t6",
+      "stage": "start",
+      "status": "in_progress",
+      "payload": {
+        "mode": "auto",
+        "session_id": "sess-20251209-150128-471a32c9"
+      },
+      "ts": "2025-12-09T15:01:29.009952"
+    },
+    {
+      "agent": "reviewer",
+      "subtask_id": "t6",
+      "stage": "finish",
+      "status": "completed",
+      "payload": {
+        "decision": "ACCEPT",
+        "reason": "等待批次满 3 个任务后再复核。",
+        "session_id": "sess-20251209-150128-471a32c9"
+      },
+      "ts": "2025-12-09T15:01:29.011791"
+    },
+    {
+      "agent": "worker",
+      "subtask_id": "t7",
+      "stage": "start",
+      "status": "in_progress",
+      "payload": {
+        "title": "正文第 3 部分",
+        "session_id": "sess-20251209-150128-471a32c9"
+      },
+      "ts": "2025-12-09T15:01:29.014795"
+    },
+    {
+      "agent": "worker",
+      "subtask_id": "t7",
+      "stage": "finish",
+      "status": "completed",
+      "payload": {
+        "artifact_path": "sessions/sess-20251209-150128-471a32c9/artifacts/ff9fe4a46700.md",
+        "session_id": "sess-20251209-150128-471a32c9"
+      },
+      "ts": "2025-12-09T15:01:29.019994"
+    },
+    {
+      "agent": "reviewer",
+      "subtask_id": "t7",
+      "stage": "start",
+      "status": "in_progress",
+      "payload": {
+        "mode": "auto",
+        "session_id": "sess-20251209-150128-471a32c9"
+      },
+      "ts": "2025-12-09T15:01:29.021838"
+    },
+    {
+      "agent": "reviewer",
+      "subtask_id": "t7",
+      "stage": "finish",
+      "status": "completed",
+      "payload": {
+        "decision": "ACCEPT",
+        "reason": "[模拟] 自动判定当前子任务通过。",
+        "session_id": "sess-20251209-150128-471a32c9"
+      },
+      "ts": "2025-12-09T15:01:29.024426"
+    }
+  ],
+  "planner_chat": [],
+  "worker_outputs": [
+    {
+      "subtask_id": "t1",
+      "title": "Research",
+      "artifact": {
+        "session_id": "sess-20251209-150128-471a32c9",
+        "artifact_id": "ef8ad56efd63",
+        "kind": "markdown",
+        "path": "sessions/sess-20251209-150128-471a32c9/artifacts/ef8ad56efd63.md",
+        "description": "子任务 t1 的执行结果"
+      },
+      "timestamp": "2025-12-09T15:01:28.912806"
+    },
+    {
+      "subtask_id": "t2",
+      "title": "人物设定",
+      "artifact": {
+        "session_id": "sess-20251209-150128-471a32c9",
+        "artifact_id": "7eac8bb5abb5",
+        "kind": "markdown",
+        "path": "sessions/sess-20251209-150128-471a32c9/artifacts/7eac8bb5abb5.md",
+        "description": "子任务 t2 的执行结果"
+      },
+      "timestamp": "2025-12-09T15:01:28.924025"
+    },
+    {
+      "subtask_id": "t3",
+      "title": "情节设计",
+      "artifact": {
+        "session_id": "sess-20251209-150128-471a32c9",
+        "artifact_id": "e6976993fbae",
+        "kind": "markdown",
+        "path": "sessions/sess-20251209-150128-471a32c9/artifacts/e6976993fbae.md",
+        "description": "子任务 t3 的执行结果"
+      },
+      "timestamp": "2025-12-09T15:01:28.938579"
+    },
+    {
+      "subtask_id": "t4",
+      "title": "章节分配 & 小说概要撰写",
+      "artifact": {
+        "session_id": "sess-20251209-150128-471a32c9",
+        "artifact_id": "e08f0961a7fb",
+        "kind": "markdown",
+        "path": "sessions/sess-20251209-150128-471a32c9/artifacts/e08f0961a7fb.md",
+        "description": "子任务 t4 的执行结果"
+      },
+      "timestamp": "2025-12-09T15:01:28.956301"
+    },
+    {
+      "subtask_id": "t5",
+      "title": "正文第 1 部分",
+      "artifact": {
+        "session_id": "sess-20251209-150128-471a32c9",
+        "artifact_id": "2f5cdbfc5a47",
+        "kind": "markdown",
+        "path": "sessions/sess-20251209-150128-471a32c9/artifacts/2f5cdbfc5a47.md",
+        "description": "子任务 t5 的执行结果"
+      },
+      "timestamp": "2025-12-09T15:01:28.971292"
+    },
+    {
+      "subtask_id": "t6",
+      "title": "正文第 2 部分",
+      "artifact": {
+        "session_id": "sess-20251209-150128-471a32c9",
+        "artifact_id": "1bd8e9b18934",
+        "kind": "markdown",
+        "path": "sessions/sess-20251209-150128-471a32c9/artifacts/1bd8e9b18934.md",
+        "description": "子任务 t6 的执行结果"
+      },
+      "timestamp": "2025-12-09T15:01:29.005325"
+    },
+    {
+      "subtask_id": "t7",
+      "title": "正文第 3 部分",
+      "artifact": {
+        "session_id": "sess-20251209-150128-471a32c9",
+        "artifact_id": "ff9fe4a46700",
+        "kind": "markdown",
+        "path": "sessions/sess-20251209-150128-471a32c9/artifacts/ff9fe4a46700.md",
+        "description": "子任务 t7 的执行结果"
+      },
+      "timestamp": "2025-12-09T15:01:29.018290"
+    }
+  ]
+}

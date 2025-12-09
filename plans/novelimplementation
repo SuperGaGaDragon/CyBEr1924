@@ -41,11 +41,11 @@ phase3 — 强制后续任务就是章节
 - [x] 3.3: 更新 `Plan.from_outline`/`Plan` 数据结构（若需要）以便可读性地标注章节 metadata（例如 `subtask.metadata["chapter_index"]`），方便 coordinator/worker 追踪哪几章是一组。
 
 phase4 — Reviewer 按 3 个章节批次复核
-- [ ] 4.1: 让 `state.extra["reviewer_batch_counter"]` 记录当前批次数量，每次 review 一个 subtask 前先检查 `state.extra["reviewer_batch_tasks"]`（list），如果该 list 长度 < 3 则把当前 `subtask.id`/artifact 加入并等待，只有集齐 3 个后才调用 `_call_coordinator`；否则延后至分组完成再 review。
-- [ ] 4.2: `_call_coordinator` 要求 `extra_context` 包含三条 `worker_output` 摘要（可从 `state.extra["recent_worker_outputs"]` 读），并在 strict_novel_mode 下把 `novel_summary_t1_t4` + 当前 batch 书写进 prompt。
-- [ ] 4.3: 审核完毕（即 coordinator 回答后）重置 `state.extra["reviewer_batch_tasks"]`，但保留 `novel_summary_t1_t4`/artifact 和 `reviewer_batch_counter`（置为 `+1`），并将 reviewer output 编号为 `batch_{n}` 写入 `state.extra["reviewer_revisions"]`（key = subtask_id，value 包含 `batch_id` + revision text + optional artifact ref）。
+- [x] 4.1: 让 `state.extra["reviewer_batch_counter"]` 记录当前批次数量，每次 review 一个 subtask 前先检查 `state.extra["reviewer_batch_tasks"]`（list），如果该 list 长度 < 3 则把当前 `subtask.id`/artifact 加入并等待，只有集齐 3 个后才调用 `_call_coordinator`；否则延后至分组完成再 review。
+- [x] 4.2: `_call_coordinator` 要求 `extra_context` 包含三条 `worker_output` 摘要（可从 `state.extra["recent_worker_outputs"]` 读），并在 strict_novel_mode 下把 `novel_summary_t1_t4` + 当前 batch 书写进 prompt。
+- [x] 4.3: 审核完毕（即 coordinator 回答后）重置 `state.extra["reviewer_batch_tasks"]`，但保留 `novel_summary_t1_t4`/artifact 和 `reviewer_batch_counter`（置为 `+1`），并将 reviewer output 编号为 `batch_{n}` 写入 `state.extra["reviewer_revisions"]`（key = subtask_id，value 包含 `batch_id` + revision text + optional artifact ref）。
 
 phase5 — 让 reviewer 修订结果驱动 worker+planner
-- [ ] 5.1: `Orchestrator.execute_command("/apply_reviewer_revision")` 里除了替换 subtask.output，也应该把 `state.extra["novel_inflight_batch"]` 的 summary 再次注入 `_call_worker` 的 `extra_context`，让 worker 在重写时能参考 reviewer 原始意见 + t4 summary。
-- [ ] 5.2: 当 planner 在 phase2 重新运行时，除了 summary，还要把 `state.extra["reviewer_revisions_batch"]`（最新批次的批注）附加在 prompt 中，以保证后续章节写作遵循 reviewer 的批量反馈。
-- [ ] 5.3: 测试：扩展 `test_novel_mode.py` 让 `mock_coordinator_run` 依序在第 3 个任务后触发 reset、[1.2] 之后 assert planner prompt 包含 summary+artifact, [3.2] 断言非章节任务被 skip, [4.1] 读出 `state.extra["reviewer_batch_tasks"]` 和 `batch_id`，[5.1] 通过 `/apply_reviewer_revision` 验证 worker output 被覆盖且 summary 继续可见。
+- [x] 5.1: `Orchestrator.execute_command("/apply_reviewer_revision")` 里除了替换 subtask.output，也应该把 `state.extra["novel_inflight_batch"]` 的 summary 再次注入 `_call_worker` 的 `extra_context`，让 worker 在重写时能参考 reviewer 原始意见 + t4 summary。
+- [x] 5.2: 当 planner 在 phase2 重新运行时，除了 summary，还要把 `state.extra["reviewer_revisions_batch"]`（最新批次的批注）附加在 prompt 中，以保证后续章节写作遵循 reviewer 的批量反馈。
+- [x] 5.3: 测试：扩展 `test_novel_mode.py` 让 `mock_coordinator_run` 依序在第 3 个任务后触发 reset、[1.2] 之后 assert planner prompt 包含 summary+artifact, [3.2] 断言非章节任务被 skip, [4.1] 读出 `state.extra["reviewer_batch_tasks"]` 和 `batch_id`，[5.1] 通过 `/apply_reviewer_revision` 验证 worker output 被覆盖且 summary 继续可见。

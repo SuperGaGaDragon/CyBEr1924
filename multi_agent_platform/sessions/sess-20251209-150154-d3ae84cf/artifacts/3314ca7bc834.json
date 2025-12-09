@@ -1,0 +1,38 @@
+{
+  "plan_id": "plan-f010c2aa",
+  "title": "Classic Writing",
+  "description": "",
+  "notes": "",
+  "subtasks": [
+    {
+      "id": "t1",
+      "title": "[planner 模拟回复] 你是 Planner 角色，负责把用户给出的 topic/goal 变成严格可执行的 plan。 -> 请为下面的主题生成一个分步骤的计划，每个子任务一句话：\\n\\n主题：Classic Writing",
+      "description": "",
+      "status": "pending",
+      "notes": "",
+      "output": "",
+      "needs_redo": false,
+      "metadata": {}
+    },
+    {
+      "id": "t2",
+      "title": "模拟产出 1：按照 subtask 生成具体内容",
+      "description": "",
+      "status": "pending",
+      "notes": "",
+      "output": "",
+      "needs_redo": false,
+      "metadata": {}
+    },
+    {
+      "id": "t3",
+      "title": "模拟产出 2：继续补全该段落",
+      "description": "",
+      "status": "pending",
+      "notes": "",
+      "output": "",
+      "needs_redo": false,
+      "metadata": {}
+    }
+  ]
+}

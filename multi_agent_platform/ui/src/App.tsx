@@ -4303,33 +4303,49 @@ function CoordinatorColumn({ snapshot, width, progress = [], progressSeenCount =
                 Reviewer Revised Drafts
               </div>
               <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
-                {Object.entries(reviewerRevisions).map(([subId, text]) => (
-                  <div key={subId} style={{ padding: "10px 12px", borderRadius: "10px", border: "1px solid #e5e7eb", background: "#ffffff" }}>
-                    <div style={{ fontWeight: 700, fontSize: "13px", marginBottom: "6px", color: "#111827" }}>Task {subId}</div>
-                    <div style={{ fontSize: "13px", color: "#1f2937", whiteSpace: "pre-wrap", lineHeight: 1.5 }}>
-                      {String(text)}
-                    </div>
-                    {onAdoptRevision && (
-                      <div style={{ marginTop: "10px", display: "flex", justifyContent: "flex-end" }}>
-                        <button
-                          onClick={() => onAdoptRevision(subId)}
-                          style={{
-                            padding: "8px 12px",
-                            borderRadius: "10px",
-                            border: "1px solid #d1d5db",
-                            background: "#0f172a",
-                            color: "#ffffff",
-                            fontWeight: 700,
-                            fontSize: "12px",
-                            cursor: "pointer",
-                          }}
-                        >
-                          Adopt revision
-                        </button>
+                {Object.entries(reviewerRevisions).map(([subId, revision]) => {
+                  const entry =
+                    typeof revision === "object" && revision !== null
+                      ? (revision as any)
+                      : { text: revision };
+                  return (
+                    <div key={subId} style={{ padding: "10px 12px", borderRadius: "10px", border: "1px solid #e5e7eb", background: "#ffffff" }}>
+                      <div style={{ fontWeight: 700, fontSize: "13px", marginBottom: "6px", color: "#111827" }}>Task {subId}</div>
+                      {entry.batch_id && (
+                        <div style={{ fontSize: "11px", marginBottom: "4px", color: "#4b5563" }}>
+                          Batch {entry.batch_id}
+                        </div>
+                      )}
+                      <div style={{ fontSize: "13px", color: "#1f2937", whiteSpace: "pre-wrap", lineHeight: 1.5 }}>
+                        {String(entry.text ?? "")}
                       </div>
-                    )}
-                  </div>
-                ))}
+                      {entry.artifact_path && (
+                        <div style={{ fontSize: "11px", marginTop: "6px", color: "#2563eb" }}>
+                          Artifact: {entry.artifact_path}
+                        </div>
+                      )}
+                      {onAdoptRevision && (
+                        <div style={{ marginTop: "10px", display: "flex", justifyContent: "flex-end" }}>
+                          <button
+                            onClick={() => onAdoptRevision(subId)}
+                            style={{
+                              padding: "8px 12px",
+                              borderRadius: "10px",
+                              border: "1px solid #d1d5db",
+                              background: "#0f172a",
+                              color: "#ffffff",
+                              fontWeight: 700,
+                              fontSize: "12px",
+                              cursor: "pointer",
+                            }}
+                          >
+                            Adopt revision
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
             </div>
           )}

@@ -1,0 +1,51 @@
+{
+  "session_id": "sess-20251209-150110-e46086d3",
+  "plan": {
+    "plan_id": "plan-db96dc44",
+    "title": "Planner Prompt Context",
+    "description": "",
+    "notes": "",
+    "subtasks": [
+      {
+        "id": "t1",
+        "title": "Research",
+        "description": "Research the genre, time setting, and target style.（cover full content for this task）\n- Length: novella\n- Year: 架空历史\n- Genre: Fantasy\n- Style: Hemingway\n- Title: Chronicles of Time\n- Characters: Alice (Protagonist)\n- Extra: Keep tone consistent",
+        "status": "pending",
+        "notes": "Research for genre/time/style context",
+        "output": "",
+        "needs_redo": false,
+        "metadata": {}
+      },
+      {
+        "id": "t2",
+        "title": "人物设定",
+        "description": "List and refine character names and roles.（cover full content for this task）\n- Length: novella\n- Year: 架空历史\n- Genre: Fantasy\n- Style: Hemingway\n- Title: Chronicles of Time\n- Characters: Alice (Protagonist)\n- Extra: Keep tone consistent",
+        "status": "pending",
+        "notes": "Character roster",
+        "output": "",
+        "needs_redo": false,
+        "metadata": {}
+      },
+      {
+        "id": "t3",
+        "title": "情节设计",
+        "description": "Design main plot arcs consistent with the brief.（cover full content for this task）\n- Length: novella\n- Year: 架空历史\n- Genre: Fantasy\n- Style: Hemingway\n- Title: Chronicles of Time\n- Characters: Alice (Protagonist)\n- Extra: Keep tone consistent",
+        "status": "pending",
+        "notes": "Plot arcs",
+        "output": "",
+        "needs_redo": false,
+        "metadata": {}
+      },
+      {
+        "id": "t4",
+        "title": "章节分配 & 小说概要撰写",
+        "description": "Produce chapter allocation and concise novel synopsis; include chapter-wise responsibilities.（cover full content for this task）\n- Length: novella\n- Year: 架空历史\n- Genre: Fantasy\n- Style: Hemingway\n- Title: Chronicles of Time\n- Characters: Alice (Protagonist)\n- Extra: Keep tone consistent",
+        "status": "pending",
+        "notes": "Chapter plan and synopsis",
+        "output": "",
+        "needs_redo": false,
+        "metadata": {}
+      }
+    ]
+  }
+}

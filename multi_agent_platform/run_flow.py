@@ -369,6 +369,102 @@ def _format_novel_summary_artifact_block(artifact_payload: Dict[str, Any] | None
     return line
 
 
+def _format_recent_worker_outputs_context(state: OrchestratorState | None) -> Optional[str]:
+    if state is None:
+        return None
+    outputs = (getattr(state, "extra", {}) or {}).get("recent_worker_outputs") or []
+    if not outputs:
+        return None
+    lines: List[str] = ["Recent worker outputs (latest first):"]
+    for entry in outputs[-3:]:
+        header = f"{entry.get('subtask_id')}: {entry.get('title')}"
+        artifact_path = entry.get("artifact_path")
+        if artifact_path:
+            header += f" (artifact: {artifact_path})"
+        lines.append(header)
+        preview = entry.get("preview")
+        if preview:
+            lines.append(f"Preview:\n{preview}")
+    return "\n\n".join(lines)
+
+
+def _format_novel_inflight_batch_context(batch_info: Dict[str, Any] | None) -> Optional[str]:
+    if not batch_info:
+        return None
+    parts: List[str] = []
+    batch_id = batch_info.get("batch_id")
+    if batch_id:
+        parts.append(f"Reviewer batch in-flight: {batch_id}")
+    summary = batch_info.get("summary")
+    if summary:
+        parts.append(f"Batch context:\n{summary}")
+    reason = batch_info.get("reason")
+    if reason:
+        parts.append(f"Reviewer reason:\n{reason}")
+    decision = batch_info.get("decision")
+    if decision:
+        parts.append(f"Decision: {decision}")
+    return "\n\n".join(parts) if parts else None
+
+
+def _cache_reviewer_revision_entry(
+    state: OrchestratorState | None,
+    subtask_id: str | None,
+    *,
+    text: str | None,
+    batch_id: str | None = None,
+    artifact_path: str | None = None,
+) -> None:
+    if state is None or not subtask_id or not text:
+        return
+    try:
+        if state.extra is None:
+            state.extra = {}
+        revisions = state.extra.setdefault("reviewer_revisions", {})
+        entry = revisions.get(subtask_id) or {}
+        entry.update(
+            {
+                "batch_id": batch_id or entry.get("batch_id"),
+                "text": text,
+            }
+        )
+        if artifact_path:
+            entry["artifact_path"] = artifact_path
+        revisions[subtask_id] = entry
+    except Exception:
+        pass
+
+
+def _record_recent_worker_output(
+    state: OrchestratorState | None,
+    subtask: Subtask,
+    worker_output: str,
+    artifact_path: str | None,
+) -> None:
+    if state is None:
+        return
+    try:
+        if state.extra is None:
+            state.extra = {}
+        outputs = state.extra.setdefault("recent_worker_outputs", [])
+        preview = worker_output or ""
+        if len(preview) > 400:
+            preview = f"{preview[:400]}..."
+        outputs.append(
+            {
+                "subtask_id": subtask.id,
+                "title": subtask.title,
+                "preview": preview,
+                "artifact_path": artifact_path,
+                "ts": datetime.utcnow().isoformat(),
+            }
+        )
+        while len(outputs) > 3:
+            outputs.pop(0)
+    except Exception:
+        pass
+
+
 def _novel_extra_context(state: OrchestratorState | None, plan: Plan, subtask: Subtask) -> Optional[str]:
     if state is None:
         return None
@@ -383,11 +479,18 @@ def _novel_extra_context(state: OrchestratorState | None, plan: Plan, subtask: S
 
     summary_block = _format_novel_summary_block(summary)
     artifact_block = _format_novel_summary_artifact_block(artifact_payload)
+    inflight_block = _format_novel_inflight_batch_context(
+        getattr(state, "extra", {}).get("novel_inflight_batch")
+    )
+    recent_block = _format_recent_worker_outputs_context(state)
 
     if subtask.id in {"t1", "t2", "t3", "t4"}:
         sections = [profile_ctx, summary_block, artifact_block]
     else:
         sections = [summary_block, artifact_block, profile_ctx]
+    for block in (inflight_block, recent_block):
+        if block:
+            sections.append(block)
 
     context = "\n\n".join(filter(None, sections)).strip()
     return context or None
@@ -595,10 +698,7 @@ def consume_orchestrator_events(state: OrchestratorState, plan: Plan | None = No
                     subtask.needs_redo = False
                 # cache reviewer revision if provided
                 if revised_text:
-                    try:
-                        state.extra.setdefault("reviewer_revisions", {})[subtask.id] = revised_text
-                    except Exception:
-                        pass
+                    _cache_reviewer_revision_entry(state, subtask.id, text=revised_text)
 
             # 4) orchestrator user-visible message
             final_text = (
@@ -895,6 +995,7 @@ class Orchestrator:
         novel_profile: Optional[Dict[str, Any]] = None,
         novel_summary: Optional[str] = None,
         summary_artifact: Optional[Dict[str, Any]] = None,
+        reviewer_batch_annotations: Optional[str] = None,
     ) -> str:
         context_parts: List[str] = []
 
@@ -924,6 +1025,8 @@ class Orchestrator:
             extra_sections.append("Profile:\\n" + profile_block)
         if novel_summary:
             extra_sections.append(f"Summary:\\n{novel_summary}")
+        if reviewer_batch_annotations:
+            extra_sections.append("Reviewer batch annotations:\\n" + reviewer_batch_annotations)
 
         extra_context = "\\n\\n".join(extra_sections).strip()
         novel_hint = ""
@@ -949,12 +1052,108 @@ class Orchestrator:
             build_worker_prompt(plan, subtask, topic=plan.title, extra_context=extra_ctx)
         )
 
+    def _build_reviewer_batch_context(
+        self,
+        state: OrchestratorState | None,
+    ) -> str | None:
+        if state is None:
+            return None
+        batch = state.extra.get("reviewer_batch_tasks") or []
+        if not batch:
+            return None
+        lines: List[str] = []
+        for entry in batch:
+            header = f"{entry.get('subtask_id')}: {entry.get('title')}"
+            artifact_path = entry.get("artifact_path")
+            if artifact_path:
+                header += f" (artifact: {artifact_path})"
+            lines.append(header)
+            preview = entry.get("worker_output_preview")
+            if preview:
+                lines.append(f"Preview:\n{preview}")
+        return "\n\n".join(lines)
+
+    def _finalize_reviewer_batch(
+        self,
+        state: OrchestratorState | None,
+        batch_tasks: List[Dict[str, Any]],
+        batch_context: str,
+        decision: str,
+        reason: str,
+        revised_text: str | None,
+    ) -> str:
+        if state is None:
+            return ""
+        if state.extra is None:
+            state.extra = {}
+        counter = int(state.extra.get("reviewer_batch_counter", 0) or 0)
+        batch_id = f"batch_{counter + 1}"
+        state.extra["reviewer_batch_counter"] = counter + 1
+        inflight_info = {
+            "batch_id": batch_id,
+            "summary": batch_context or "",
+            "reason": reason or "",
+            "decision": decision,
+            "timestamp": datetime.utcnow().isoformat(),
+        }
+        state.extra["novel_inflight_batch"] = inflight_info
+
+        note_lines: List[str] = [f"Reviewer batch {batch_id} summary:"]
+        if decision:
+            note_lines.append(f"Decision: {decision}")
+        if reason:
+            note_lines.append(f"Reason: {reason}")
+        if batch_context:
+            note_lines.append(f"Context:\n{batch_context}")
+        state.extra["reviewer_revisions_batch"] = "\n".join(note_lines).strip()
+
+        primary_id = batch_tasks[-1].get("subtask_id") if batch_tasks else None
+        for entry in batch_tasks:
+            sub_id = entry.get("subtask_id")
+            if not sub_id:
+                continue
+            entry_reason = revised_text if revised_text and sub_id == primary_id else reason or ""
+            if not entry_reason:
+                entry_reason = entry.get("worker_output_preview") or ""
+            artifact_path = entry.get("artifact_path")
+            _cache_reviewer_revision_entry(
+                state,
+                sub_id,
+                text=entry_reason,
+                batch_id=batch_id,
+                artifact_path=artifact_path,
+            )
+        state.extra["reviewer_batch_tasks"] = []
+        return batch_id
+
+    def _enqueue_reviewer_batch_task(
+        self,
+        state: OrchestratorState | None,
+        subtask: Subtask,
+        worker_output: str,
+        artifact_ref_path: str | None,
+    ) -> bool:
+        if state is None:
+            return False
+        batch = state.extra.setdefault("reviewer_batch_tasks", [])
+        batch.append(
+            {
+                "subtask_id": subtask.id,
+                "title": subtask.title,
+                "artifact_path": artifact_ref_path,
+                "worker_output_preview": worker_output[:400],
+            }
+        )
+        return len(batch) >= 3
+
     def _call_coordinator(
         self,
         plan: Plan,
         subtask: Subtask,
         worker_output: str,
         state: OrchestratorState | None = None,
+        *,
+        batch_context: str | None = None,
     ) -> str:
         strict_novel = False
         try:
@@ -981,6 +1180,10 @@ class Orchestrator:
             extra_ctx = summary_only
         else:
             extra_ctx = _novel_extra_context(state, plan, subtask)
+        if extra_ctx and batch_context:
+            extra_ctx = "\n\n".join([extra_ctx, batch_context])
+        elif batch_context:
+            extra_ctx = batch_context
         return self.coordinator.run(
             build_coordinator_review_prompt(
                 plan,
@@ -1008,6 +1211,7 @@ class Orchestrator:
 
         summary = state.extra.get("novel_summary_t1_t4")
         artifact_payload = state.extra.get("novel_summary_artifact")
+        reviewer_annotations = state.extra.get("reviewer_revisions_batch")
         profile = state.extra.get("novel_profile")
 
         topic = plan.title or "Novel Story"
@@ -1018,6 +1222,7 @@ class Orchestrator:
                 novel_profile=profile,
                 novel_summary=summary,
                 summary_artifact=artifact_payload,
+                reviewer_batch_annotations=reviewer_annotations,
             )
         except Exception:
             return
@@ -1390,6 +1595,12 @@ class Orchestrator:
                 except Exception:
                     # Keep orchestration running even if the in-memory cache fails
                     pass
+            _record_recent_worker_output(
+                state,
+                subtask,
+                worker_output,
+                artifact_path=ref_work.path if ref_work else None,
+            )
             # Cache output on subtask and refresh novel summary if applicable
             try:
                 subtask.output = worker_output
@@ -1424,10 +1635,12 @@ class Orchestrator:
                     decision, reason, revised_text = _parse_reviewer_response(decision_text)
                     if revised_text:
                         reason = reason or "Reviewer provided revised text."
-                        try:
-                            state.extra.setdefault("reviewer_revisions", {})[subtask.id] = revised_text
-                        except Exception:
-                            pass
+                        _cache_reviewer_revision_entry(
+                            state,
+                            subtask.id,
+                            text=revised_text,
+                            artifact_path=ref_work.path if ref_work else None,
+                        )
                     user_feedback_text = None
                 else:
                     decision_type, feedback = user_decision
@@ -1449,7 +1662,7 @@ class Orchestrator:
                         },
                     )
             else:
-                # 自动模式：AI 审核
+                # 自动模式：AI 审核（批次）
                 self._record_progress_event(
                     session_id,
                     state,
@@ -1458,14 +1671,60 @@ class Orchestrator:
                     stage="start",
                     payload={"mode": "auto", "session_id": session_id},
                 )
-                decision_text = self._call_coordinator(plan, subtask, worker_output, state=state)
-                decision, reason, revised_text = _parse_reviewer_response(decision_text)
-                if revised_text:
-                    reason = reason or "Reviewer provided revised text."
-                    try:
-                        state.extra.setdefault("reviewer_revisions", {})[subtask.id] = revised_text
-                    except Exception:
-                        pass
+
+                decision = "ACCEPT"
+                reason = ""
+                revised_text = None
+                batch_mode = bool(
+                    subtask.id not in {"t1", "t2", "t3", "t4"}
+                    and getattr(state, "extra", {}).get("novel_mode")
+                )
+                coordinator_called = False
+
+                if batch_mode:
+                    batch_ready = self._enqueue_reviewer_batch_task(
+                        state,
+                        subtask,
+                        worker_output,
+                        artifact_ref_path=ref_work.path if ref_work else None,
+                    )
+                    if batch_ready:
+                        batch_tasks = list(state.extra.get("reviewer_batch_tasks") or [])
+                        batch_context = self._build_reviewer_batch_context(state) or ""
+                        decision_text = self._call_coordinator(
+                            plan,
+                            subtask,
+                            worker_output,
+                            state=state,
+                            batch_context=batch_context,
+                        )
+                        decision, reason, revised_text = _parse_reviewer_response(decision_text)
+                        self._finalize_reviewer_batch(
+                            state,
+                            batch_tasks,
+                            batch_context,
+                            decision,
+                            reason,
+                            revised_text,
+                        )
+                        coordinator_called = True
+                else:
+                    decision_text = self._call_coordinator(plan, subtask, worker_output, state=state)
+                    decision, reason, revised_text = _parse_reviewer_response(decision_text)
+                    coordinator_called = True
+                    if revised_text:
+                        reason = reason or "Reviewer provided revised text."
+                        _cache_reviewer_revision_entry(
+                            state,
+                            subtask.id,
+                            text=revised_text,
+                            artifact_path=ref_work.path if ref_work else None,
+                        )
+
+                if not coordinator_called:
+                    decision = "ACCEPT"
+                    reason = "等待批次满 3 个任务后再复核。"
+                    revised_text = None
                 user_feedback_text = None
 
             self._record_progress_event(
@@ -1480,13 +1739,6 @@ class Orchestrator:
                     "session_id": session_id,
                 },
             )
-            # reviewer batch counter for novel mode (reset cadence control)
-            try:
-                if state and state.extra is not None:
-                    state.extra["reviewer_batch_counter"] = state.extra.get("reviewer_batch_counter", 0) + 1
-            except Exception:
-                pass
-
             if decision == "ACCEPT":
                 subtask.status = "done"
                 subtask.notes = reason
@@ -2094,6 +2346,12 @@ class Orchestrator:
                     stage="finish",
                     payload={"artifact_path": ref_work.path, "session_id": session_id},
                 )
+                _record_recent_worker_output(
+                    state,
+                    subtask,
+                    worker_output,
+                    artifact_path=ref_work.path,
+                )
 
                 interactive_coordinator.enter_review_mode(
                     session_id, subtask, worker_output, ref_work
@@ -2297,7 +2555,11 @@ class Orchestrator:
                     message = f"未找到子任务 {subtask_id}"
                     ok = False
                 else:
-                    revision_text = str(revisions[str(subtask_id)])
+                    raw_revision = revisions.get(str(subtask_id))
+                    if isinstance(raw_revision, dict):
+                        revision_text = raw_revision.get("text") or ""
+                    else:
+                        revision_text = str(raw_revision)
                     try:
                         ref_revision = self.store.save_artifact(
                             session_id,
@@ -2317,6 +2579,19 @@ class Orchestrator:
                                     artifact=ref_revision,
                                     timestamp=datetime.utcnow(),
                                 )
+                            )
+                            if state.extra is None:
+                                state.extra = {}
+                            inflight = state.extra.get("novel_inflight_batch")
+                            if isinstance(inflight, dict):
+                                inflight.setdefault("applied_subtasks", []).append(target.id)
+                                inflight["applied_at"] = datetime.utcnow().isoformat()
+                                state.extra["novel_inflight_batch"] = inflight
+                            _record_recent_worker_output(
+                                state,
+                                target,
+                                revision_text,
+                                artifact_path=ref_revision.path,
                             )
                             _update_novel_summary(state, plan, self.store)
                         message = f"已采纳 reviewer 修订并写回子任务 {target.id}"

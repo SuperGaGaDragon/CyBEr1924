@@ -1,0 +1,261 @@
+{
+  "session_id": "sess-batch",
+  "plan_id": "plan-batch-review",
+  "status": "idle",
+  "current_subtask_id": null,
+  "extra": {
+    "novel_mode": true,
+    "novel_profile": {
+      "length": "novella",
+      "year": "架空历史",
+      "genre": "Fantasy",
+      "style": "Hemingway",
+      "title_text": "Chronicles of Time",
+      "characters": [
+        {
+          "name": "Alice",
+          "role": "Protagonist"
+        }
+      ],
+      "extra_notes": "Keep tone consistent"
+    },
+    "novel_phase_step": 0,
+    "recent_worker_outputs": [
+      {
+        "subtask_id": "t5",
+        "title": "Chapter 1",
+        "preview": "[worker 模拟回复] 你是 Worker 角色，专注地执行当前的单个 subtask。 -> 任务主题：Batch Review  整体计划如下： Plan: Batch Review (id=plan-batch-review)  - t1 [done]: Research - t2 [done]: 人物设定 - t3 [done\n- 模拟产出 1：按照 subtask 生成具体内容\n- 模拟产出 2：继续补全该段落",
+        "artifact_path": "sessions/sess-batch/artifacts/7a99878c81e1.md",
+        "ts": "2025-12-09T15:02:04.113783"
+      },
+      {
+        "subtask_id": "t6",
+        "title": "Chapter 2",
+        "preview": "[worker 模拟回复] 你是 Worker 角色，专注地执行当前的单个 subtask。 -> 任务主题：Batch Review  整体计划如下： Plan: Batch Review (id=plan-batch-review)  - t1 [done]: Research - t2 [done]: 人物设定 - t3 [done\n- 模拟产出 1：按照 subtask 生成具体内容\n- 模拟产出 2：继续补全该段落",
+        "artifact_path": "sessions/sess-batch/artifacts/efe43b5222a2.md",
+        "ts": "2025-12-09T15:02:04.124007"
+      },
+      {
+        "subtask_id": "t7",
+        "title": "Chapter 3",
+        "preview": "[worker 模拟回复] 你是 Worker 角色，专注地执行当前的单个 subtask。 -> 任务主题：Batch Review  整体计划如下： Plan: Batch Review (id=plan-batch-review)  - t1 [done]: Research - t2 [done]: 人物设定 - t3 [done\n- 模拟产出 1：按照 subtask 生成具体内容\n- 模拟产出 2：继续补全该段落",
+        "artifact_path": "sessions/sess-batch/artifacts/44047a80fe89.md",
+        "ts": "2025-12-09T15:02:04.136112"
+      }
+    ],
+    "novel_summary_t1_t4": "Profile:\nLength: novella\nYear: 架空历史\nGenre: Fantasy\nStyle: Hemingway\nTitle: Chronicles of Time\nCharacters: Alice (Protagonist)\nExtra: Keep tone consistent",
+    "novel_summary_artifact": {
+      "session_id": "sess-batch",
+      "artifact_id": "30a2090f576d",
+      "kind": "markdown",
+      "path": "sessions/sess-batch/artifacts/30a2090f576d.md",
+      "description": "Novel mode t1-t4 summary"
+    },
+    "reviewer_batch_tasks": [],
+    "reviewer_batch_counter": 1,
+    "novel_inflight_batch": {
+      "batch_id": "batch_1",
+      "summary": "t5: Chapter 1 (artifact: sessions/sess-batch/artifacts/7a99878c81e1.md)\n\nPreview:\n[worker 模拟回复] 你是 Worker 角色，专注地执行当前的单个 subtask。 -> 任务主题：Batch Review  整体计划如下： Plan: Batch Review (id=plan-batch-review)  - t1 [done]: Research - t2 [done]: 人物设定 - t3 [done\n- 模拟产出 1：按照 subtask 生成具体内容\n- 模拟产出 2：继续补全该段落\n\nt6: Chapter 2 (artifact: sessions/sess-batch/artifacts/efe43b5222a2.md)\n\nPreview:\n[worker 模拟回复] 你是 Worker 角色，专注地执行当前的单个 subtask。 -> 任务主题：Batch Review  整体计划如下： Plan: Batch Review (id=plan-batch-review)  - t1 [done]: Research - t2 [done]: 人物设定 - t3 [done\n- 模拟产出 1：按照 subtask 生成具体内容\n- 模拟产出 2：继续补全该段落\n\nt7: Chapter 3 (artifact: sessions/sess-batch/artifacts/44047a80fe89.md)\n\nPreview:\n[worker 模拟回复] 你是 Worker 角色，专注地执行当前的单个 subtask。 -> 任务主题：Batch Review  整体计划如下： Plan: Batch Review (id=plan-batch-review)  - t1 [done]: Research - t2 [done]: 人物设定 - t3 [done\n- 模拟产出 1：按照 subtask 生成具体内容\n- 模拟产出 2：继续补全该段落",
+      "reason": "",
+      "decision": "ACCEPT",
+      "timestamp": "2025-12-09T15:02:04.139683"
+    },
+    "reviewer_revisions_batch": "Reviewer batch batch_1 summary:\nDecision: ACCEPT\nContext:\nt5: Chapter 1 (artifact: sessions/sess-batch/artifacts/7a99878c81e1.md)\n\nPreview:\n[worker 模拟回复] 你是 Worker 角色，专注地执行当前的单个 subtask。 -> 任务主题：Batch Review  整体计划如下： Plan: Batch Review (id=plan-batch-review)  - t1 [done]: Research - t2 [done]: 人物设定 - t3 [done\n- 模拟产出 1：按照 subtask 生成具体内容\n- 模拟产出 2：继续补全该段落\n\nt6: Chapter 2 (artifact: sessions/sess-batch/artifacts/efe43b5222a2.md)\n\nPreview:\n[worker 模拟回复] 你是 Worker 角色，专注地执行当前的单个 subtask。 -> 任务主题：Batch Review  整体计划如下： Plan: Batch Review (id=plan-batch-review)  - t1 [done]: Research - t2 [done]: 人物设定 - t3 [done\n- 模拟产出 1：按照 subtask 生成具体内容\n- 模拟产出 2：继续补全该段落\n\nt7: Chapter 3 (artifact: sessions/sess-batch/artifacts/44047a80fe89.md)\n\nPreview:\n[worker 模拟回复] 你是 Worker 角色，专注地执行当前的单个 subtask。 -> 任务主题：Batch Review  整体计划如下： Plan: Batch Review (id=plan-batch-review)  - t1 [done]: Research - t2 [done]: 人物设定 - t3 [done\n- 模拟产出 1：按照 subtask 生成具体内容\n- 模拟产出 2：继续补全该段落",
+    "reviewer_revisions": {
+      "t5": {
+        "batch_id": "batch_1",
+        "text": "[worker 模拟回复] 你是 Worker 角色，专注地执行当前的单个 subtask。 -> 任务主题：Batch Review  整体计划如下： Plan: Batch Review (id=plan-batch-review)  - t1 [done]: Research - t2 [done]: 人物设定 - t3 [done\n- 模拟产出 1：按照 subtask 生成具体内容\n- 模拟产出 2：继续补全该段落",
+        "artifact_path": "sessions/sess-batch/artifacts/7a99878c81e1.md"
+      },
+      "t6": {
+        "batch_id": "batch_1",
+        "text": "[worker 模拟回复] 你是 Worker 角色，专注地执行当前的单个 subtask。 -> 任务主题：Batch Review  整体计划如下： Plan: Batch Review (id=plan-batch-review)  - t1 [done]: Research - t2 [done]: 人物设定 - t3 [done\n- 模拟产出 1：按照 subtask 生成具体内容\n- 模拟产出 2：继续补全该段落",
+        "artifact_path": "sessions/sess-batch/artifacts/efe43b5222a2.md"
+      },
+      "t7": {
+        "batch_id": "batch_1",
+        "text": "[worker 模拟回复] 你是 Worker 角色，专注地执行当前的单个 subtask。 -> 任务主题：Batch Review  整体计划如下： Plan: Batch Review (id=plan-batch-review)  - t1 [done]: Research - t2 [done]: 人物设定 - t3 [done\n- 模拟产出 1：按照 subtask 生成具体内容\n- 模拟产出 2：继续补全该段落",
+        "artifact_path": "sessions/sess-batch/artifacts/44047a80fe89.md"
+      }
+    }
+  },
+  "plan_locked": false,
+  "orchestrator_messages": [],
+  "orch_events": [],
+  "progress_events": [
+    {
+      "agent": "worker",
+      "subtask_id": "t5",
+      "stage": "start",
+      "status": "in_progress",
+      "payload": {
+        "title": "Chapter 1",
+        "session_id": "sess-batch"
+      },
+      "ts": "2025-12-09T15:02:04.110546"
+    },
+    {
+      "agent": "worker",
+      "subtask_id": "t5",
+      "stage": "finish",
+      "status": "completed",
+      "payload": {
+        "artifact_path": "sessions/sess-batch/artifacts/7a99878c81e1.md",
+        "session_id": "sess-batch"
+      },
+      "ts": "2025-12-09T15:02:04.114375"
+    },
+    {
+      "agent": "reviewer",
+      "subtask_id": "t5",
+      "stage": "start",
+      "status": "in_progress",
+      "payload": {
+        "mode": "auto",
+        "session_id": "sess-batch"
+      },
+      "ts": "2025-12-09T15:02:04.115719"
+    },
+    {
+      "agent": "reviewer",
+      "subtask_id": "t5",
+      "stage": "finish",
+      "status": "completed",
+      "payload": {
+        "decision": "ACCEPT",
+        "reason": "等待批次满 3 个任务后再复核。",
+        "session_id": "sess-batch"
+      },
+      "ts": "2025-12-09T15:02:04.117152"
+    },
+    {
+      "agent": "worker",
+      "subtask_id": "t6",
+      "stage": "start",
+      "status": "in_progress",
+      "payload": {
+        "title": "Chapter 2",
+        "session_id": "sess-batch"
+      },
+      "ts": "2025-12-09T15:02:04.119946"
+    },
+    {
+      "agent": "worker",
+      "subtask_id": "t6",
+      "stage": "finish",
+      "status": "completed",
+      "payload": {
+        "artifact_path": "sessions/sess-batch/artifacts/efe43b5222a2.md",
+        "session_id": "sess-batch"
+      },
+      "ts": "2025-12-09T15:02:04.124481"
+    },
+    {
+      "agent": "reviewer",
+      "subtask_id": "t6",
+      "stage": "start",
+      "status": "in_progress",
+      "payload": {
+        "mode": "auto",
+        "session_id": "sess-batch"
+      },
+      "ts": "2025-12-09T15:02:04.126031"
+    },
+    {
+      "agent": "reviewer",
+      "subtask_id": "t6",
+      "stage": "finish",
+      "status": "completed",
+      "payload": {
+        "decision": "ACCEPT",
+        "reason": "等待批次满 3 个任务后再复核。",
+        "session_id": "sess-batch"
+      },
+      "ts": "2025-12-09T15:02:04.127492"
+    },
+    {
+      "agent": "worker",
+      "subtask_id": "t7",
+      "stage": "start",
+      "status": "in_progress",
+      "payload": {
+        "title": "Chapter 3",
+        "session_id": "sess-batch"
+      },
+      "ts": "2025-12-09T15:02:04.131262"
+    },
+    {
+      "agent": "worker",
+      "subtask_id": "t7",
+      "stage": "finish",
+      "status": "completed",
+      "payload": {
+        "artifact_path": "sessions/sess-batch/artifacts/44047a80fe89.md",
+        "session_id": "sess-batch"
+      },
+      "ts": "2025-12-09T15:02:04.136577"
+    },
+    {
+      "agent": "reviewer",
+      "subtask_id": "t7",
+      "stage": "start",
+      "status": "in_progress",
+      "payload": {
+        "mode": "auto",
+        "session_id": "sess-batch"
+      },
+      "ts": "2025-12-09T15:02:04.138092"
+    },
+    {
+      "agent": "reviewer",
+      "subtask_id": "t7",
+      "stage": "finish",
+      "status": "completed",
+      "payload": {
+        "decision": "ACCEPT",
+        "reason": "",
+        "session_id": "sess-batch"
+      },
+      "ts": "2025-12-09T15:02:04.139717"
+    }
+  ],
+  "planner_chat": [],
+  "worker_outputs": [
+    {
+      "subtask_id": "t5",
+      "title": "Chapter 1",
+      "artifact": {
+        "session_id": "sess-batch",
+        "artifact_id": "7a99878c81e1",
+        "kind": "markdown",
+        "path": "sessions/sess-batch/artifacts/7a99878c81e1.md",
+        "description": "子任务 t5 的执行结果"
+      },
+      "timestamp": "2025-12-09T15:02:04.113329"
+    },
+    {
+      "subtask_id": "t6",
+      "title": "Chapter 2",
+      "artifact": {
+        "session_id": "sess-batch",
+        "artifact_id": "efe43b5222a2",
+        "kind": "markdown",
+        "path": "sessions/sess-batch/artifacts/efe43b5222a2.md",
+        "description": "子任务 t6 的执行结果"
+      },
+      "timestamp": "2025-12-09T15:02:04.123246"
+    },
+    {
+      "subtask_id": "t7",
+      "title": "Chapter 3",
+      "artifact": {
+        "session_id": "sess-batch",
+        "artifact_id": "44047a80fe89",
+        "kind": "markdown",
+        "path": "sessions/sess-batch/artifacts/44047a80fe89.md",
+        "description": "子任务 t7 的执行结果"
+      },
+      "timestamp": "2025-12-09T15:02:04.135270"
+    }
+  ]
+}
