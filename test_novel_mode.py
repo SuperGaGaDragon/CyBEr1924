@@ -3,6 +3,8 @@ import json
 from multi_agent_platform.run_flow import (
     Orchestrator,
     _apply_planner_result_to_state,
+    _novel_extra_context,
+    _update_novel_summary,
     generate_stub_plan_from_planning_input,
 )
 from multi_agent_platform.plan_model import Plan, Subtask
@@ -91,3 +93,30 @@ def test_stub_planner_generates_novel_t1_t4_when_empty():
     assert ids == ["t1", "t2", "t3", "t4"]
     assert any("章节分配" in s.title for s in updated.subtasks[:4])
 
+
+def test_worker_extra_context_uses_novel_summary():
+    profile = _sample_profile()
+    state = OrchestratorState(
+        session_id="sess2",
+        plan_id="plan2",
+        status="idle",
+        extra={"novel_mode": True, "novel_profile": profile},
+    )
+    plan = Plan(
+        plan_id="plan2",
+        title="Novel Plan 2",
+        subtasks=[
+            Subtask(id="t1", title="Research", status="done", output="research notes"),
+            Subtask(id="t2", title="人物设定", status="done", output="character list"),
+            Subtask(id="t3", title="情节设计", status="done", output="plot arcs"),
+            Subtask(id="t4", title="章节分配", status="done", output="chapter outline"),
+            Subtask(id="t5", title="写作第1章", status="pending"),
+        ],
+    )
+    summary = _update_novel_summary(state, plan)
+    assert summary
+    subtask5 = plan.subtasks[4]
+    extra_ctx = _novel_extra_context(state, plan, subtask5)
+    assert extra_ctx is not None
+    assert "research notes" in extra_ctx
+    assert "chapter outline" in extra_ctx

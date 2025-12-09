@@ -12,9 +12,9 @@ Phase 1 — Planner 约束（仅 novel_mode）
 - [x] Step 1.2: 真实 planner 输出后置处理：确保 t1–t4 存在/覆盖；stub planner 生成时直接加入固定四条。
 
 Phase 2 — Worker 上下文
-- [ ] Step 2.1: t1–t4 运行时注入累计 summary（题材/年份/风格/题目/人物表/前序产出），并将产出汇总为 `novel_summary_t1_t4` 存 state.extra。
-- [ ] Step 2.2: t5+ 默认为单任务上下文，但 prompt 头部注入 `novel_summary_t1_t4`，description 要求“写完整内容”。
-- [ ] Step 2.3 验证本功能可以function，且不会报404，500等错误。
+- [x] Step 2.1: t1–t4 运行时注入累计 summary（题材/年份/风格/题目/人物表/前序产出），并将产出汇总为 `novel_summary_t1_t4` 存 state.extra。
+- [x] Step 2.2: t5+ 默认为单任务上下文，但 prompt 头部注入 `novel_summary_t1_t4`，description 要求“写完整内容”。
+- [x] Step 2.3 验证本功能可以function，且不会报404，500等错误。
 
 Phase 3 — Reviewer 行为
 - [ ] Step 3.1: Reviewer prompt 加入“严格的小说评论家，明确指出问题”；每评审 5 个 task 清空对话，仅保留 `novel_summary_t1_t4` 背景（state.extra.reviewer_batch_counter）。

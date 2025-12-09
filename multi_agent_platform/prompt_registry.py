@@ -33,6 +33,7 @@ def build_worker_prompt(
     subtask: Subtask,
     topic: str,
     user_feedback: Optional[str] = None,
+    extra_context: Optional[str] = None,
 ) -> str:
     plan_text = format_plan_for_prompt(plan)
     base = (
@@ -47,6 +48,8 @@ def build_worker_prompt(
         sub_id=subtask.id,
         sub_title=subtask.title,
     )
+    if extra_context:
+        message += f"\n额外上下文（请严格遵循）：\n{extra_context}\n\n"
     if user_feedback:
         message += f"用户的修改要求：{user_feedback}\n\n请根据用户的反馈重新完成这个子任务。"
     else:

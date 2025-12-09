@@ -178,6 +178,80 @@ def _build_novel_t1_t4(profile: Dict[str, Any] | None, base_topic: str) -> List[
         },
     ]
 
+
+def _format_novel_profile_context(profile: Dict[str, Any] | None) -> str:
+    profile = profile or {}
+    parts = []
+    if profile.get("length"):
+        parts.append(f"Length: {profile.get('length')}")
+    if profile.get("year"):
+        parts.append(f"Year: {profile.get('year')}")
+    if profile.get("genre") or profile.get("other_genres"):
+        parts.append(f"Genre: {profile.get('genre') or profile.get('other_genres')}")
+    if profile.get("style"):
+        parts.append(f"Style: {profile.get('style')}")
+    if profile.get("title_text"):
+        parts.append(f"Title: {profile.get('title_text')}")
+    characters = profile.get("characters") or []
+    if characters:
+        formatted = []
+        for c in characters:
+            if not isinstance(c, dict):
+                continue
+            name = c.get("name", "").strip()
+            role = c.get("role", "").strip()
+            if not name and not role:
+                continue
+            formatted.append(f"{name} ({role})".strip())
+        if formatted:
+            parts.append(f"Characters: {', '.join(formatted)}")
+    if profile.get("extra_notes"):
+        parts.append(f"Extra: {profile.get('extra_notes')}")
+    return "\n".join(parts)
+
+
+def _update_novel_summary(state: OrchestratorState | None, plan: Plan) -> str | None:
+    """Compute and cache t1-t4 summary for novel mode."""
+    if state is None:
+        return None
+    try:
+        if not state.extra.get("novel_mode"):
+            return None
+    except Exception:
+        return None
+
+    summary_lines: List[str] = []
+    for sub in plan.subtasks[:4]:
+        content = getattr(sub, "output", "") or getattr(sub, "notes", "") or ""
+        if content:
+            summary_lines.append(f"{sub.id} {sub.title}: {content}")
+    profile_ctx = _format_novel_profile_context(getattr(state, "extra", {}).get("novel_profile"))
+    if profile_ctx:
+        summary_lines.insert(0, f"Profile:\n{profile_ctx}")
+
+    summary = "\n".join(summary_lines).strip()
+    try:
+        state.extra["novel_summary_t1_t4"] = summary
+    except Exception:
+        pass
+    return summary
+
+
+def _novel_extra_context(state: OrchestratorState | None, plan: Plan, subtask: Subtask) -> Optional[str]:
+    if state is None:
+        return None
+    try:
+        if not state.extra.get("novel_mode"):
+            return None
+    except Exception:
+        return None
+    profile_ctx = _format_novel_profile_context(getattr(state, "extra", {}).get("novel_profile"))
+    summary = getattr(state, "extra", {}).get("novel_summary_t1_t4") or ""
+
+    if subtask.id in {"t1", "t2", "t3", "t4"}:
+        return "\n\n".join(filter(None, [profile_ctx, summary])).strip()
+    return (summary or profile_ctx or None) or None
+
 def consume_orchestrator_events(state: OrchestratorState, plan: Plan | None = None) -> None:
     """v0.2: true action consumer — handles structured events produced by the intent agent."""
 
@@ -335,6 +409,7 @@ def consume_orchestrator_events(state: OrchestratorState, plan: Plan | None = No
                 worker_output = run_worker_for_subtask(plan, subtask, instr)
                 subtask.output = worker_output
                 subtask.needs_redo = False
+                _update_novel_summary(state, plan)
                 _append_progress_event(
                     state,
                     agent="worker",
@@ -630,9 +705,10 @@ class Orchestrator:
             f"请为下面的主题生成一个分步骤的计划，每个子任务一句话：\\n\\n主题：{topic}{context}"
         )
 
-    def _call_worker(self, plan: Plan, subtask: Subtask) -> str:
+    def _call_worker(self, plan: Plan, subtask: Subtask, state: OrchestratorState | None = None) -> str:
+        extra_ctx = _novel_extra_context(state, plan, subtask)
         return self.worker.run(
-            build_worker_prompt(plan, subtask, topic=plan.title)
+            build_worker_prompt(plan, subtask, topic=plan.title, extra_context=extra_ctx)
         )
 
     def _call_coordinator(self, plan: Plan, subtask: Subtask, worker_output: str) -> str:
@@ -897,10 +973,10 @@ class Orchestrator:
             # 如果有用户反馈，把它传递给 Worker
             if user_feedback_text:
                 worker_output = self._call_worker_with_feedback(
-                    plan, subtask, user_feedback_text
+                    plan, subtask, user_feedback_text, state=state
                 )
             else:
-                worker_output = self._call_worker(plan, subtask)
+                worker_output = self._call_worker(plan, subtask, state=state)
 
             ref_work = self.store.save_artifact(
                 session_id,
@@ -935,6 +1011,13 @@ class Orchestrator:
                 except Exception:
                     # Keep orchestration running even if the in-memory cache fails
                     pass
+            # Cache output on subtask and refresh novel summary if applicable
+            try:
+                subtask.output = worker_output
+            except Exception:
+                pass
+            _update_novel_summary(state, plan)
+
             self._record_progress_event(
                 session_id,
                 state,
@@ -1037,16 +1120,18 @@ class Orchestrator:
                 break
         return plan
 
-    def _call_worker_with_feedback(self, plan: Plan, subtask: Subtask, user_feedback: str) -> str:
+    def _call_worker_with_feedback(self, plan: Plan, subtask: Subtask, user_feedback: str, state: OrchestratorState | None = None) -> str:
         """
         调用 Worker，并传入用户的修改要求
         """
+        extra_ctx = _novel_extra_context(state, plan, subtask)
         return self.worker.run(
             build_worker_prompt(
                 plan,
                 subtask,
                 topic=plan.title,
                 user_feedback=user_feedback,
+                extra_context=extra_ctx,
             )
         )
 
