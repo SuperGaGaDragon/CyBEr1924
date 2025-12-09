@@ -149,28 +149,28 @@ def _build_novel_t1_t4(profile: Dict[str, Any] | None, base_topic: str) -> List[
 
     return [
         {
-            "subtask_id": "t1",
+            "id": "t1",
             "title": "Research",
             "status": "pending",
             "notes": "Research for genre/time/style context",
             "description": _desc("Research the genre, time setting, and target style."),
         },
         {
-            "subtask_id": "t2",
+            "id": "t2",
             "title": "人物设定",
             "status": "pending",
             "notes": "Character roster",
             "description": _desc("List and refine character names and roles."),
         },
         {
-            "subtask_id": "t3",
+            "id": "t3",
             "title": "情节设计",
             "status": "pending",
             "notes": "Plot arcs",
             "description": _desc("Design main plot arcs consistent with the brief."),
         },
         {
-            "subtask_id": "t4",
+            "id": "t4",
             "title": "章节分配 & 小说概要撰写",
             "status": "pending",
             "notes": "Chapter plan and synopsis",
@@ -611,7 +611,7 @@ def _apply_planner_result_to_state(
         if sub_id in seen_ids:
             continue
         seen_ids.add(sub_id)
-        merged_subtasks.append(raw | {"subtask_id": sub_id})
+        merged_subtasks.append(raw | {"subtask_id": sub_id, "id": sub_id})
 
     if not merged_subtasks:
         merged_subtasks = subtasks_dicts
@@ -1066,12 +1066,12 @@ class Orchestrator:
 
                 if user_decision is None:
                     # 用户选择让 AI 审核
-                decision_text = self._call_coordinator(plan, subtask, worker_output, state=state)
-                lines = [line.strip() for line in decision_text.strip().splitlines() if line.strip()]
-                first_line = (lines[0] if lines else "").upper()
-                decision = "ACCEPT" if "ACCEPT" in first_line else "REDO"
-                reason = "\\n".join(lines[1:]) if len(lines) > 1 else ""
-                user_feedback_text = None
+                    decision_text = self._call_coordinator(plan, subtask, worker_output, state=state)
+                    lines = [line.strip() for line in decision_text.strip().splitlines() if line.strip()]
+                    first_line = (lines[0] if lines else "").upper()
+                    decision = "ACCEPT" if "ACCEPT" in first_line else "REDO"
+                    reason = "\\n".join(lines[1:]) if len(lines) > 1 else ""
+                    user_feedback_text = None
                 else:
                     decision_type, feedback = user_decision
                     decision = "ACCEPT" if decision_type == "accept" else "REDO"

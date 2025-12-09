@@ -1,0 +1,29 @@
+{
+  "session_id": "sess-20251209-111436-5d0f7f86",
+  "plan_id": "plan-aa6fb9aa",
+  "status": "idle",
+  "current_subtask_id": null,
+  "extra": {
+    "novel_mode": true,
+    "novel_profile": {
+      "length": "novella",
+      "year": "架空历史",
+      "genre": "Fantasy",
+      "style": "Hemingway",
+      "title_text": "Chronicles of Time",
+      "characters": [
+        {
+          "name": "Alice",
+          "role": "Protagonist"
+        }
+      ],
+      "extra_notes": "Keep tone consistent"
+    }
+  },
+  "plan_locked": false,
+  "orchestrator_messages": [],
+  "orch_events": [],
+  "progress_events": [],
+  "planner_chat": [],
+  "worker_outputs": []
+}
