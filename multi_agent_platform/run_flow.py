@@ -430,6 +430,7 @@ def consume_orchestrator_events(state: OrchestratorState, plan: Plan | None = No
             review = run_reviewer_on_output(plan, subtask, worker_output) if subtask else {"decision": "accept", "notes": ""}
             decision = review.get("decision", "").lower()
             notes = review.get("notes", "")
+            revised_text = review.get("revised_text")
             if subtask:
                 _append_progress_event(
                     state,
@@ -452,6 +453,12 @@ def consume_orchestrator_events(state: OrchestratorState, plan: Plan | None = No
                 else:
                     subtask.status = "done"
                     subtask.needs_redo = False
+                # cache reviewer revision if provided
+                if revised_text:
+                    try:
+                        state.extra.setdefault("reviewer_revisions", {})[subtask.id] = revised_text
+                    except Exception:
+                        pass
 
             # 4) orchestrator user-visible message
             final_text = (
@@ -711,9 +718,27 @@ class Orchestrator:
             build_worker_prompt(plan, subtask, topic=plan.title, extra_context=extra_ctx)
         )
 
-    def _call_coordinator(self, plan: Plan, subtask: Subtask, worker_output: str) -> str:
+    def _call_coordinator(
+        self,
+        plan: Plan,
+        subtask: Subtask,
+        worker_output: str,
+        state: OrchestratorState | None = None,
+    ) -> str:
+        extra_ctx = _novel_extra_context(state, plan, subtask)
+        strict_novel = False
+        try:
+            strict_novel = bool(getattr(state, "extra", {}).get("novel_mode"))
+        except Exception:
+            strict_novel = False
         return self.coordinator.run(
-            build_coordinator_review_prompt(plan, subtask, worker_output)
+            build_coordinator_review_prompt(
+                plan,
+                subtask,
+                worker_output,
+                extra_context=extra_ctx,
+                strict_novel_mode=strict_novel,
+            )
         )
 
     def _state_path(self, session_id: str) -> Path:
@@ -1041,12 +1066,12 @@ class Orchestrator:
 
                 if user_decision is None:
                     # 用户选择让 AI 审核
-                    decision_text = self._call_coordinator(plan, subtask, worker_output)
-                    lines = [line.strip() for line in decision_text.strip().splitlines() if line.strip()]
-                    first_line = (lines[0] if lines else "").upper()
-                    decision = "ACCEPT" if "ACCEPT" in first_line else "REDO"
-                    reason = "\\n".join(lines[1:]) if len(lines) > 1 else ""
-                    user_feedback_text = None
+                decision_text = self._call_coordinator(plan, subtask, worker_output, state=state)
+                lines = [line.strip() for line in decision_text.strip().splitlines() if line.strip()]
+                first_line = (lines[0] if lines else "").upper()
+                decision = "ACCEPT" if "ACCEPT" in first_line else "REDO"
+                reason = "\\n".join(lines[1:]) if len(lines) > 1 else ""
+                user_feedback_text = None
                 else:
                     decision_type, feedback = user_decision
                     decision = "ACCEPT" if decision_type == "accept" else "REDO"
@@ -1075,7 +1100,7 @@ class Orchestrator:
                     stage="start",
                     payload={"mode": "auto", "session_id": session_id},
                 )
-                decision_text = self._call_coordinator(plan, subtask, worker_output)
+                decision_text = self._call_coordinator(plan, subtask, worker_output, state=state)
                 lines = [line.strip() for line in decision_text.strip().splitlines() if line.strip()]
                 first_line = (lines[0] if lines else "").upper()
                 decision = "ACCEPT" if "ACCEPT" in first_line else "REDO"
@@ -1094,6 +1119,12 @@ class Orchestrator:
                     "session_id": session_id,
                 },
             )
+            # reviewer batch counter for novel mode (reset cadence control)
+            try:
+                if state and state.extra is not None:
+                    state.extra["reviewer_batch_counter"] = state.extra.get("reviewer_batch_counter", 0) + 1
+            except Exception:
+                pass
 
             if decision == "ACCEPT":
                 subtask.status = "done"

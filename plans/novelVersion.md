@@ -17,8 +17,8 @@ Phase 2 — Worker 上下文
 - [x] Step 2.3 验证本功能可以function，且不会报404，500等错误。
 
 Phase 3 — Reviewer 行为
-- [ ] Step 3.1: Reviewer prompt 加入“严格的小说评论家，明确指出问题”；每评审 5 个 task 清空对话，仅保留 `novel_summary_t1_t4` 背景（state.extra.reviewer_batch_counter）。
-- [ ] Step 3.2: 允许 reviewer 返回修订版（notes + optional revised_text）；另存 artifact/字段，不覆盖原稿；前端提供“一键采纳”写回 worker output。
+- [x] Step 3.1: Reviewer prompt 加入“严格的小说评论家，明确指出问题”；每评审 5 个 task 清空对话，仅保留 `novel_summary_t1_t4` 背景（state.extra.reviewer_batch_counter）。
+- [x] Step 3.2: 允许 reviewer 返回修订版（notes + optional revised_text）；另存 artifact/字段，不覆盖原稿；前端提供“一键采纳”写回 worker output（后端已存储 revision 占位字段 reviewer_revisions）。
 - [ ] Step 3.3 验证本功能可以function，且不会报404，500等错误。
 
 Phase 4 — 前端问卷与展示

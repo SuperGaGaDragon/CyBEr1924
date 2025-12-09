@@ -7,6 +7,7 @@ from multi_agent_platform.run_flow import (
     _update_novel_summary,
     generate_stub_plan_from_planning_input,
 )
+from multi_agent_platform.prompt_registry import build_coordinator_review_prompt
 from multi_agent_platform.plan_model import Plan, Subtask
 from multi_agent_platform.planner_agent import PlannerResult
 from multi_agent_platform.session_state import OrchestratorState
@@ -120,3 +121,18 @@ def test_worker_extra_context_uses_novel_summary():
     assert extra_ctx is not None
     assert "research notes" in extra_ctx
     assert "chapter outline" in extra_ctx
+
+
+def test_reviewer_prompt_includes_strict_critic_and_context():
+    plan = Plan(plan_id="p3", title="Novel Plan 3", subtasks=[])
+    subtask = Subtask(id="t5", title="写作第1章")
+    worker_output = "章节稿件"
+    prompt = build_coordinator_review_prompt(
+        plan,
+        subtask,
+        worker_output,
+        extra_context="Profile: Fantasy, Hemingway",
+        strict_novel_mode=True,
+    )
+    assert "严格的小说评论家" in prompt
+    assert "Profile: Fantasy" in prompt

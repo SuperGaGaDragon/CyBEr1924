@@ -61,13 +61,19 @@ def build_coordinator_review_prompt(
     plan: Plan,
     subtask: Subtask,
     worker_output: str,
+    *,
+    extra_context: Optional[str] = None,
+    strict_novel_mode: bool = False,
 ) -> str:
     plan_text = format_plan_for_prompt(plan)
+    critic_line = "你是一名严格的小说评论家，请明确指出问题，并在需要时要求重写。" if strict_novel_mode else ""
+    ctx = f"\n额外上下文（请严格参考）：\n{extra_context}\n" if extra_context else ""
     return (
         "任务主题：{topic}\n\n"
         "整体计划：\n{plan_text}\n\n"
         "当前子任务（{sub_id}: {sub_title}）的执行结果如下：\n\n"
         "{result}\n\n"
+        "{critic}{ctx}"
         "请按照约定格式输出：\n"
         "第一行：ACCEPT 或 REDO\n"
         "第二行开始：给出原因和建议。"
@@ -77,4 +83,6 @@ def build_coordinator_review_prompt(
         sub_id=subtask.id,
         sub_title=subtask.title,
         result=worker_output,
+        critic=critic_line + ("\n" if critic_line else ""),
+        ctx=ctx,
     )
