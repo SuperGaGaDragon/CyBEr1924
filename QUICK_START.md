@@ -83,6 +83,12 @@ multi_agent_platform/sessions/{session_id}/
 
 ## 🎯 典型工作流程
 
+## 🌐 前后端联调提示
+
+- 后端 API：`uvicorn api:app --host 0.0.0.0 --port 8000`
+- 前端 API_BASE：默认 `http://localhost:8000`，如有自定义，设置 `VITE_API_BASE_URL`
+- 事件轮询：执行命令后前端应轮询 `GET /sessions/{id}/events?since=<ts>`，用返回的 `progress_events` 与 `worker_outputs` 追加渲染；`GET /sessions/{id}` 快照包含 `is_running` / `current_subtask_id` / `last_progress_event_ts` 以判断是否继续轮询。
+
 ### 场景 1：一次性完成任务
 
 ```bash

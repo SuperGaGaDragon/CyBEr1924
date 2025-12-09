@@ -22,6 +22,7 @@ from multi_agent_platform.api_models import (
     CreateSessionRequest,
     SessionSnapshotModel,
     SessionSummaryModel,
+    EventsResponseModel,
     RegisterRequest,
     VerifyEmailRequest,
     LoginRequest,
@@ -156,6 +157,16 @@ def _iso_datetime(ts: Optional[float]) -> Optional[datetime]:
         return None
     return datetime.fromtimestamp(ts, timezone.utc)
 
+def _parse_since(ts_val: Optional[str | float | int]) -> Optional[datetime]:
+    if ts_val is None:
+        return None
+    if isinstance(ts_val, (int, float)):
+        return datetime.fromtimestamp(float(ts_val), timezone.utc)
+    try:
+        return datetime.fromisoformat(ts_val)
+    except Exception:
+        return None
+
 
 def _load_plan_title(session_id: str) -> Optional[str]:
     state_path = artifact_store.session_dir(session_id) / "state.json"
@@ -186,6 +197,88 @@ def _session_timestamps(session_id: str) -> tuple[Optional[float], Optional[floa
         except FileNotFoundError:
             pass
     return created, updated
+
+
+def _load_progress_events(session_id: str, since: Optional[datetime]) -> list[dict]:
+    """
+    Load progress events from orchestrator_state plus progress_events.jsonl, optionally filtered by since timestamp.
+    """
+    events: list[dict] = []
+    try:
+        state = orch.load_orchestrator_state(session_id)
+        for ev in state.progress_events or []:
+            if not isinstance(ev, dict):
+                continue
+            ts_val = ev.get("ts")
+            ts_dt = None
+            if isinstance(ts_val, str):
+                try:
+                    ts_dt = datetime.fromisoformat(ts_val)
+                except Exception:
+                    ts_dt = None
+            elif isinstance(ts_val, datetime):
+                ts_dt = ts_val
+            if since and ts_dt and ts_dt <= since:
+                continue
+            events.append(ev)
+    except FileNotFoundError:
+        pass
+
+    log_path = artifact_store.logs_dir(session_id) / "progress_events.jsonl"
+    if log_path.exists():
+        try:
+            with log_path.open("r", encoding="utf-8") as f:
+                for line in f:
+                    if not line.strip():
+                        continue
+                    obj = json.loads(line)
+                    ts_str = obj.get("ts")
+                    ts_dt = None
+                    if isinstance(ts_str, str):
+                        try:
+                            ts_dt = datetime.fromisoformat(ts_str)
+                        except Exception:
+                            ts_dt = None
+                    if since and ts_dt and ts_dt <= since:
+                        continue
+                    events.append(obj)
+        except Exception:
+            pass
+
+    # Deduplicate by (agent, subtask_id, stage, ts)
+    seen = set()
+    deduped = []
+    for ev in events:
+        key = (ev.get("agent"), ev.get("subtask_id"), ev.get("stage"), ev.get("ts"))
+        if key in seen:
+            continue
+        seen.add(key)
+        deduped.append(ev)
+    deduped.sort(key=lambda e: str(e.get("ts") or ""))
+    return deduped
+
+
+def _load_worker_outputs_since(session_id: str, since: Optional[datetime]) -> list[dict]:
+    outputs: list[dict] = []
+    try:
+        state = orch.load_orchestrator_state(session_id)
+    except FileNotFoundError:
+        return outputs
+    for wo in state.worker_outputs or []:
+        data = wo.to_dict() if hasattr(wo, "to_dict") else dict(wo)
+        ts_val = data.get("timestamp")
+        ts_dt = None
+        if isinstance(ts_val, str):
+            try:
+                ts_dt = datetime.fromisoformat(ts_val)
+            except Exception:
+                ts_dt = None
+        elif isinstance(ts_val, datetime):
+            ts_dt = ts_val
+        if since and ts_dt and ts_dt <= since:
+            continue
+        outputs.append(data)
+    return outputs
 
 
 @app.get("/")
@@ -256,6 +349,28 @@ def get_session_snapshot(
         snap_dict = snapshot_from_db.model_dump()
         snap_dict["message"] = snap_dict.get("message") or "Session snapshot loaded (from DB cache)"
         return SessionSnapshotModel(**snap_dict)
+
+
+@app.get("/sessions/{session_id}/events", response_model=EventsResponseModel)
+def get_session_events(
+    session_id: str,
+    since: Optional[str] = None,
+    current_user = Depends(get_current_user),
+) -> EventsResponseModel:
+    if not user_owns_session(current_user.id, session_id):
+        raise HTTPException(status_code=404, detail="Session not found")
+
+    since_dt = _parse_since(since)
+    try:
+        progress_events = _load_progress_events(session_id, since_dt)
+        worker_outputs = _load_worker_outputs_since(session_id, since_dt)
+        return EventsResponseModel(
+            progress_events=progress_events,
+            worker_outputs=worker_outputs,
+            since=since_dt,
+        )
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc))
 
 
 @app.post("/sessions/{session_id}/command", response_model=SessionSnapshotModel)

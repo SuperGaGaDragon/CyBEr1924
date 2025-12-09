@@ -194,53 +194,6 @@ stage 4
 
 
 
-### 小说专用模式设计
-
-- stage 1
-
-- [ ] 点击 add section之后，不要用Google 弹窗，正常弹出网页窗口。也是只允许黑白灰的简明现代风格。出现文字 “Please Name this Session" 。不需要加文字指路。
-
-- Stage 2
-
-- [ ] stage1新建的方框右下角出现一个椭圆形标识 novel mode。如果点击，会在用户进入和planner对话的页面前出现如下问题(全部用英文) 
-必须回答完一个问题，才会出现下一个问题。
-
-1、您的小说会是什么篇幅？
-选项1：flash fiction (<1000 words)
-选项2：short story (1000-7500 words)
-选项3：novelette (7500-17500 words)
-选项4：novella (17500-40000)
-选项5：novel (40000+ words)
-
-2、请输入您期望的小说发生的年份
-选项1: 架空历史
-选项2: 请输入大致年份区间（可以是未来年份）
-
-3、请输入您的希望的题材
-
-选项：Literary Fiction
-选项：Fantasy
-选项：Sci-Fi
-选项：Mystery / Crime
-选项：Horror
-选项：Romance
-选项：Historical
-选项：Adventure
-选项：Thriller
-选项：Hybrid
-选项：请输入您想到的其他体裁（如果有很多，“/”分割）：
-
-4、请给出您已经想到的一些角色姓名和身份
-角色姓名｜身份（如果没想好，可以不写）
-
-5、您希望文笔类似什么风格
-请输入（请描述风格，推荐您输入一个您希望我模仿的作家）
-
-全部answer后，自动在对话框生成一段涵盖刚才所有信息的话发给gpt。 
-
-stage 3 
-- [ ] 要求planner的agent的plan涉及到正文的内容，给worker的description中必须涵盖写完所有内容。
-
 ### 自动化问题
 
 TRANSStage1 

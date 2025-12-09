@@ -56,3 +56,41 @@ def test_progress_events_round_trip(tmp_path: Path) -> None:
     assert [ev["stage"] for ev in worker_events] == ["start", "finish"]
     assert worker_events[0]["subtask_id"] == "t1"
     assert worker_events[1]["subtask_id"] == "t1"
+
+
+def test_execution_emits_progress_and_outputs(tmp_path: Path) -> None:
+    """
+    Running a subtask should emit worker/reviewer progress events and persist worker outputs for polling.
+    """
+    store = ArtifactStore(root=tmp_path / "sessions")
+    bus = MessageBus(store=store)
+    orch = Orchestrator(artifact_store=store, message_bus=bus)
+
+    session_id = "sess-integration"
+    plan = Plan(plan_id="plan-integration", title="Demo", subtasks=[Subtask(id="t1", title="Do it")])
+
+    # Persist initial snapshots so orchestrator helpers can load.
+    orch.save_state(session_id, plan)
+    state = OrchestratorState(session_id=session_id, plan_id=plan.plan_id, status="idle", plan_locked=True)
+    orch.save_orchestrator_state(state)
+
+    plan, state = orch.run_next_with_state(session_id, plan, state)
+
+    snapshot = build_session_snapshot(store, state, bus)
+    events = sorted(snapshot.progress_events, key=lambda ev: ev.get("ts") or "")
+
+    # Expect worker start/finish + reviewer start/finish in order.
+    stages = [(ev["agent"], ev["stage"]) for ev in events]
+    assert ("worker", "start") in stages
+    assert ("worker", "finish") in stages
+    assert ("reviewer", "start") in stages
+    assert ("reviewer", "finish") in stages
+
+    # Ensure events are chronologically non-decreasing and tied to the same subtask.
+    timestamps = [ev.get("ts") for ev in events if ev.get("ts")]
+    assert timestamps == sorted(timestamps)
+    assert all(ev.get("subtask_id") == "t1" for ev in events)
+
+    # Worker outputs should be present for polling clients.
+    assert snapshot.worker_outputs, "worker_outputs should be persisted after execution"
+    assert snapshot.last_progress_event_ts is not None

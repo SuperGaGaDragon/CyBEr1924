@@ -575,6 +575,13 @@ class Orchestrator:
         except Exception:
             state.extra = {"last_error": str(exc)}
         try:
+            state.add_orchestrator_message(
+                "orchestrator",
+                f"Background task failed: {exc}. Please retry the command.",
+            )
+        except Exception:
+            pass
+        try:
             self.save_orchestrator_state(state)
         except Exception:
             return
@@ -642,6 +649,11 @@ class Orchestrator:
             with log_path.open("a", encoding="utf-8") as f:
                 f.write(json.dumps(record, ensure_ascii=False))
                 f.write("\n")
+            # Also mirror into envelopes.jsonl for downstream diagnostics/analytics.
+            try:
+                self.bus.log_progress_event(session_id, record)
+            except Exception:
+                pass
         except Exception:
             # Logging is best-effort; do not block orchestration.
             pass

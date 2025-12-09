@@ -9,6 +9,7 @@ from typing import Any, Dict, Union
 from multi_agent_platform.session_store import ArtifactStore
 from src import protocol  # 假设你的 protocol.py 在 src/protocol.py
 from src.protocol import Envelope, PayloadType
+from datetime import datetime
 
 
 @dataclass
@@ -91,6 +92,30 @@ class MessageBus:
             payload=payload_body,
         )
         return self.append_envelope(session_id, envelope)
+
+    def log_progress_event(self, session_id: str, event: Dict[str, Any]) -> None:
+        """
+        Best-effort append of a progress event into envelopes.jsonl for diagnostics.
+        Does not validate protocol schema to keep it lightweight.
+        """
+        log_path = self._log_file(session_id)
+        log_path.parent.mkdir(parents=True, exist_ok=True)
+        payload = {
+            "payload_type": "progress_event",
+            "timestamp": event.get("ts") or datetime.utcnow().isoformat(),
+            "payload": event,
+            "source": "orchestrator",
+            "target": "observer",
+            "version": "1.0",
+            "session_id": session_id,
+        }
+        try:
+            with log_path.open("a", encoding="utf-8") as f:
+                f.write(json.dumps(payload, ensure_ascii=False))
+                f.write("\n")
+        except Exception:
+            # Logging is best-effort; ignore failures.
+            return
 
     def send(
         self,
