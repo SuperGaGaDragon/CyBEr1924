@@ -53,6 +53,26 @@ PLAN_EDITING_KINDS = {
 }
 
 
+CHAPTER_FULL_CONTENT = "请写完整内容，覆盖该章节/任务的全文结果。"
+
+
+def _chapter_title(chapter_index: int, base_title: str | None) -> str:
+    prefix = f"Chapter {chapter_index}"
+    cleaned = (base_title or "").strip()
+    if cleaned.startswith(prefix):
+        return cleaned
+    if cleaned:
+        return f"{prefix}: {cleaned}"
+    return prefix
+
+
+def _chapter_description(base_desc: str | None) -> str:
+    trimmed = (base_desc or "").strip()
+    if trimmed:
+        return f"{trimmed}\n{CHAPTER_FULL_CONTENT}"
+    return CHAPTER_FULL_CONTENT
+
+
 def _normalize_event_kind(kind: str | None) -> str:
     """Normalize event kinds so variants still route to the consumer branches."""
     if not kind:
@@ -582,15 +602,15 @@ def generate_stub_plan_from_planning_input(
 
     # Append a new subtask reflecting the latest instruction
     next_id_num = len(plan.subtasks) + 1
-    desc = ""
-    if novel_mode:
-        desc = "请写完整内容，覆盖该章节/任务的全文结果。"
+    chapter_index = max(1, next_id_num - 4)
+    title_base = text or f"Chapter {chapter_index}"
     new_subtask = Subtask(
         id=f"t{next_id_num}",
-        title=f"根据补充要求：{text}",
+        title=_chapter_title(chapter_index, f"根据补充要求：{title_base}") if novel_mode else (title_base),
         status="pending",
         notes="来自规划对话的最新需求",
-        description=desc,
+        description=_chapter_description(text) if novel_mode else (text or ""),
+        needs_redo=False,
     )
     plan.subtasks.append(new_subtask)
 
@@ -657,9 +677,9 @@ def _apply_planner_result_to_state(
         notes = raw.get("notes") or ""
         desc = raw.get("description", "")
         if novel_mode and idx > 4:
-            base_desc = (desc or "").strip()
-            filler = "请写完整内容，覆盖该章节/任务的全文结果。"
-            desc = f"{base_desc}\n{filler}".strip() if base_desc else filler
+            chapter_index = idx - 4
+            title = _chapter_title(chapter_index, title)
+            desc = _chapter_description(desc)
 
         new_subtasks.append(
             Subtask(

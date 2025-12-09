@@ -8,12 +8,21 @@ Phase 0 — 模式开关与数据流
 - [x] Step 0.3 验证本功能可以function，且不会报404，500等错误。
 
 Phase 1 — Planner 约束（仅 novel_mode）
-- [x] Step 1.1: 覆写/扩展 planner prompt，强制前置 t1–t4（Research、人物设定、情节设计、章节分配&概要），description 注入问卷信息并要求“cover full content”；t5+ 留给正文分解。
+- [x] Step 1.1: 覆写/扩展 planner prompt，强制前置t1-t4（Research、人物设定、情节设计、章节分配&概要，具体内容见下），description 注入问卷信息并要求“cover full content”；t5+ 留给正文分解-强制每个task一个章节，开始时不出现。worker把前四个task完成，审核通过以后，自动回传给planner。planner再继续生成章节plan
+
+t1: Research 请给出对于这种文学体裁，时间背景，相关风格的研究报告。
+description：用户前面输入的小说发生年份、小说题材、风格、小说题目
+t2: 人物设定
+description：用户前面输入的人物设定
+t3: 情节设计
+t4: 章节分配&小说概要撰写
+description：1、生成前4个task的概要（简明但清晰）2、对每个章节些什么进行分配
+
 - [x] Step 1.2: 真实 planner 输出后置处理：确保 t1–t4 存在/覆盖；stub planner 生成时直接加入固定四条。
 
 Phase 2 — Worker 上下文
 - [x] Step 2.1: t1–t4 运行时注入累计 summary（题材/年份/风格/题目/人物表/前序产出），并将产出汇总为 `novel_summary_t1_t4` 存 state.extra。
-- [x] Step 2.2: t5+ 默认为单任务上下文，但 prompt 头部注入 `novel_summary_t1_t4`，description 要求“写完整内容”。
+- [x] Step 2.2: t5+ 默认为单任务上下文（明确要求，一个章节一个task），但 prompt 头部注入 `novel_summary_t1_t4`，description 要求“写完整内容”。
 - [x] Step 2.3 验证本功能可以function，且不会报404，500等错误。
 
 Phase 3 — Reviewer 行为
@@ -27,21 +36,22 @@ Phase 4 — 前端问卷与展示
 - [x] Step 4.3 验证本功能可以function，且不会报404，500等错误。
 
 Phase 5 — QA/兼容
-- [ ] Step 5.1: 测试 stub/真实 planner 下的 novel_mode 分支、关闭模式回归、t1–t4 强制/summary 注入/reviewer reset/修订保存。
-- [ ] Step 5.2 验证全部功能可以function，且不会报404，500等错误。
+- [ ] Step 5.1: 测试 stub/真实 planner 下的 novel_mode 分支、关闭模式回归、t1–t4 强制/summary 注入/reviewer reset/修订保存（真实 planner 暂无法调用，因为需要 OPENAI_API_KEY）。
+- [x] Step 5.2 验证全部功能可以function，且不会报404，500等错误。
 
 ---
  **落地计划**
 
  - [x] Step 3.3 端到端验证 reviewer 修订流：从 planner 发起 novel_mode 会话，先通过 stub reviewer 再切换真实 reviewer；检查 REVISED_TEXT 解析/副本存储、batch 计数在每 5 个评审后清零且只保留 `novel_summary_t1_t4`、前端触发 “apply_reviewer_revision” 后 worker output 正确被复写，所需回调放入 artifact 字段。
  - [x] 前端构建校验：在 UI 分支编译过程中用 `npm run build`/`tsc` 覆盖 `apply_reviewer_revision` 命令与回调、novel pill/章节 summary/Reviewer Revised 区块是否都有类型检查通过，必要时补充 mock context。
- - [ ] Step 5.1 回归：分别开启与关闭 novel_mode，跑过 t1–t4 的强制任务、summary 注入、reviewer reset/修订保存、apply revision 全链路（至少收集一条 happy path）：记录 planner/worker/reviewer 的状态变化确保 summary 存在。
- - [ ] Step 5.2 健康检查：完整跑一条 session→问卷→planner/worker/reviewer 的流程，确认没有 4xx/5xx，若现有冒烟脚本不能覆盖 novel_mode，补一个自动化脚本/集成场景再验证。
+- [ ] Step 5.1 回归：分别开启与关闭 novel_mode，跑过 t1–t4 的强制任务、summary 注入、reviewer reset/修订保存、apply revision 全链路（至少收集一条 happy path）：记录 planner/worker/reviewer 的状态变化确保 summary 存在。
+- [ ] Step 5.2 健康检查：完整跑一条 session→问卷→planner/worker/reviewer 的流程，确认没有 4xx/5xx，若现有冒烟脚本不能覆盖 novel_mode，补一个自动化脚本/集成场景再验证。
+- [ ] Phase 1 真实 planner 验证缺口：目前仅在 stub/path 中捕获 t1–t4 强制约束；缺少 `OPENAI_API_KEY` 使得 real planner 输出无法实时测试。需要基于实际 LLM 响应执行 novel_mode 会话（可用 `run_all` 或 CLI）并确认 `_apply_planner_result_to_state` 仍能塞入 t1–t4、description 仍携带问卷字段，再把结果记录入 state/plan。
 
 执行记录
-- `pytest test_novel_mode.py`（已通过）：新增 `test_reviewer_revision_flow_end_to_end`，验证 REVISED_TEXT 存储、reviewer_batch_counter 重置、`novel_summary_t1_t4` 重构、`apply_reviewer_revision` 命令将修订写回 worker output。
+- `pytest test_novel_mode.py`（已通过）：新增 `test_reviewer_revision_flow_end_to_end`、`test_novel_mode_disabled_has_no_summary`、`test_novel_mode_full_execution_health_check`，覆盖 review revision、关闭 novel_mode 以及从会话到 review 的完整健康路径。
 - `pytest test_long_form_writing.py`（已通过）：验证 Planner/Worker 之间的章节分解与 prompt 生成符合 novel mode 要求。
- - `npm run build`（multi_agent_platform/ui）：成功，已修复 `PlanAdvancedPanel` 依赖 `createSessionForm` 的引用及 `novelProfile` unused 警告，构建在 `tsc -b && vite build` 下通过。
+- `npm run build`（multi_agent_platform/ui）：成功，已修复 `PlanAdvancedPanel` 依赖 `createSessionForm` 的引用及 `novelProfile` unused 警告，构建在 `tsc -b && vite build` 下通过。
 
 
 

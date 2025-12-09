@@ -4,9 +4,11 @@ from collections import defaultdict
 from multi_agent_platform.run_flow import (
     Orchestrator,
     _apply_planner_result_to_state,
+    _build_novel_t1_t4,
     _novel_extra_context,
     _update_novel_summary,
     generate_stub_plan_from_planning_input,
+    CHAPTER_FULL_CONTENT,
 )
 import multi_agent_platform.run_flow as run_flow
 from multi_agent_platform.prompt_registry import build_coordinator_review_prompt
@@ -95,6 +97,59 @@ def test_stub_planner_generates_novel_t1_t4_when_empty():
     ids = [s.id for s in updated.subtasks[:4]]
     assert ids == ["t1", "t2", "t3", "t4"]
     assert any("章节分配" in s.title for s in updated.subtasks[:4])
+
+
+def test_planner_result_formats_post_t4_as_chapters():
+    profile = _sample_profile()
+    state = OrchestratorState(
+        session_id="sess-chapter",
+        plan_id="plan-chapter",
+        status="idle",
+        extra={"novel_mode": True, "novel_profile": profile},
+    )
+    existing_plan = Plan(
+        plan_id="plan-chapter",
+        title="Novel Chapter Test",
+        subtasks=[Subtask(**raw) for raw in _build_novel_t1_t4(profile, "Novel Chapter Test")],
+    )
+    result = PlannerResult(
+        plan={"plan_id": "plan-chapter", "title": "Novel Chapter Test"},
+        subtasks=[
+            {"subtask_id": "t5", "title": "First chapter", "status": "pending"},
+            {"subtask_id": "t6", "title": "Second chapter", "status": "pending"},
+        ],
+    )
+
+    merged = _apply_planner_result_to_state(
+        state,
+        result,
+        fallback_user_text="继续写下一章",
+        existing_plan=existing_plan,
+        novel_profile=profile,
+    )
+
+    chapter_task = merged.subtasks[4]
+    assert chapter_task.title.startswith("Chapter 1")
+    assert CHAPTER_FULL_CONTENT in chapter_task.description
+
+
+def test_stub_planner_appends_chapter_task():
+    profile = _sample_profile()
+    plan = Plan(
+        plan_id="p-novel",
+        title="Stub Chapters",
+        subtasks=[Subtask(**raw) for raw in _build_novel_t1_t4(profile, "Stub Chapters")],
+    )
+
+    updated = generate_stub_plan_from_planning_input(
+        plan,
+        "写下一章",
+        novel_profile=profile,
+    )
+
+    new_task = updated.subtasks[-1]
+    assert new_task.title.startswith("Chapter")
+    assert CHAPTER_FULL_CONTENT in new_task.description
 
 
 def test_worker_extra_context_uses_novel_summary():
@@ -240,3 +295,41 @@ def test_reviewer_revision_flow_end_to_end():
     last_output = state_after.worker_outputs[-1]
     assert last_output.subtask_id == "t1"
     assert last_output.artifact.kind == "markdown"
+
+
+def test_novel_mode_disabled_has_no_summary():
+    store = ArtifactStore()
+    bus = MessageBus(store=store)
+    orch = Orchestrator(artifact_store=store, message_bus=bus)
+
+    session_id, plan, state = orch.init_session(
+        "Classic Writing",
+        novel_mode=False,
+    )
+
+    assert not state.extra.get("novel_mode")
+    assert "novel_summary_t1_t4" not in state.extra
+    assert not state.extra.get("reviewer_batch_counter")
+    assert plan.subtasks
+
+
+def test_novel_mode_full_execution_health_check():
+    store = ArtifactStore()
+    bus = MessageBus(store=store)
+    orch = Orchestrator(artifact_store=store, message_bus=bus)
+
+    session_id, plan, state = orch.init_session(
+        "Novel Health Check",
+        novel_mode=True,
+        novel_profile=_sample_profile(),
+    )
+    for idx in range(5, 8):
+        plan.subtasks.append(Subtask(id=f"t{idx}", title=f"正文第 {idx - 4} 部分"))
+
+    while any(sub.status != "done" for sub in plan.subtasks):
+        plan = orch.run_next_pending_subtask(session_id, plan, state=state)
+
+    assert all(sub.status == "done" for sub in plan.subtasks)
+    assert state.extra.get("novel_summary_t1_t4")
+    assert state.extra.get("reviewer_batch_counter") is not None
+    assert state.worker_outputs
