@@ -1624,6 +1624,17 @@ class Orchestrator:
             },
         )
         self.save_orchestrator_state(state)
+        print(f"[INIT_SESSION] Novel mode: {novel_mode}, plan_locked: {state.plan_locked}")
+
+        # Verify persistence
+        log_path = self.store.root / f"sessions/{session_id}/orchestrator_state.json"
+        if log_path.exists():
+            import json
+            with open(log_path) as f:
+                saved_state = json.load(f)
+                print(f"[INIT_SESSION] Verified plan_locked in file: {saved_state.get('plan_locked')}")
+        else:
+            print(f"[INIT_SESSION] WARNING: State file not found at {log_path}")
 
         self._last_outline_ref = ref_outline
         # Save compatible plan snapshot for quick recovery
