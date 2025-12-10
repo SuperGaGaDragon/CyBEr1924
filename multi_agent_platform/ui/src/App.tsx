@@ -621,6 +621,17 @@ type ProgressItem = {
   order: number;
 };
 
+type ProgressTimelineEntry = {
+  id: string;
+  subtaskId: string;
+  title: string;
+  agent: "worker" | "reviewer";
+  stage: string;
+  status: string;
+  ts?: string;
+  payload?: Record<string, any>;
+};
+
 type ViewMode = "timeline" | "output";
 
 function buildNovelProfileSummary(profile: Record<string, any> | null | undefined): string | null {
@@ -701,6 +712,40 @@ function deriveProgressByAgent(snapshot: SessionSnapshot | null): Record<"worker
     worker: Array.from(buckets.worker.values()).sort((a, b) => a.order - b.order),
     reviewer: Array.from(buckets.reviewer.values()).sort((a, b) => a.order - b.order),
   };
+}
+
+function buildProgressTimelineEntries(
+  snapshot: SessionSnapshot | null,
+  agent: "worker" | "reviewer",
+): ProgressTimelineEntry[] {
+  if (!snapshot?.progress_events) return [];
+  const titleMap = new Map((snapshot.subtasks ?? []).map((s) => [String(s.id), s.title]));
+  const entries = snapshot.progress_events
+    .map((ev, idx) => ({ ev, idx }))
+    .filter(({ ev }) => ev?.agent === agent && ev?.subtask_id)
+    .map(({ ev, idx }) => {
+      const subtaskId = String(ev.subtask_id);
+      const ts = ev.ts ? String(ev.ts) : undefined;
+      return {
+        id: `${agent}-${subtaskId}-${ev.stage ?? "start"}-${idx}-${ts ?? "no-ts"}`,
+        subtaskId,
+        title: titleMap.get(subtaskId) ?? `Task ${subtaskId}`,
+        agent,
+        stage: ev.stage ?? "start",
+        status: ev.status ?? (ev.stage === "finish" ? "completed" : "in_progress"),
+        ts,
+        payload: ev.payload ?? {},
+      };
+    })
+    .sort((a, b) => {
+      const ta = a.ts ? new Date(a.ts).getTime() : 0;
+      const tb = b.ts ? new Date(b.ts).getTime() : 0;
+      if (ta !== tb) {
+        return ta - tb;
+      }
+      return a.id.localeCompare(b.id);
+    });
+  return entries;
 }
 
 const buildSubtasksFromPlan = (planData: Record<string, any> | null | undefined): Subtask[] => {
@@ -3741,6 +3786,92 @@ function ProgressStrip({ items, label, sourceCount = 0 }: { items: ProgressItem[
   );
 }
 
+function ProgressEventTimeline({ entries, label }: { entries: ProgressTimelineEntry[]; label: string }) {
+  if (!entries || entries.length === 0) {
+    return null;
+  }
+  return (
+    <div style={{
+      padding: "10px 14px",
+      borderRadius: "12px",
+      border: "1px solid #e5e7eb",
+      background: "#ffffff",
+      display: "flex",
+      flexDirection: "column",
+      gap: "10px",
+    }}>
+      <div style={{
+        fontSize: "11px",
+        fontWeight: 700,
+        letterSpacing: "0.12em",
+        textTransform: "uppercase",
+        color: "#6b7280",
+      }}>
+        {label} timeline
+      </div>
+      <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+        {entries.map((entry) => {
+          const tsLabel = entry.ts ? new Date(entry.ts).toLocaleString() : "Unknown time";
+          const stageLabel =
+            entry.stage === "finish"
+              ? "Finished"
+              : entry.stage === "start"
+                ? "Started"
+                : entry.stage;
+          const payloadNotes: string[] = [];
+          if (entry.payload?.decision) {
+            payloadNotes.push(`Decision: ${entry.payload.decision}`);
+          }
+          if (entry.payload?.kind) {
+            payloadNotes.push(entry.payload.kind);
+          }
+          if (entry.payload?.source) {
+            payloadNotes.push(`Source: ${entry.payload.source}`);
+          }
+          const metaText = payloadNotes.length > 0 ? payloadNotes.join(" · ") : null;
+          return (
+            <div key={entry.id} style={{
+              padding: "8px 10px",
+              borderRadius: "10px",
+              border: "1px solid #e5e7eb",
+              background: "#f9fafb",
+              display: "flex",
+              flexDirection: "column",
+              gap: "4px",
+            }}>
+              <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                <span style={{
+                  fontSize: "12px",
+                  fontWeight: 700,
+                  color: "#111827",
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
+                  whiteSpace: "nowrap",
+                }}>
+                  {entry.title}
+                </span>
+                <span style={{
+                  fontSize: "11px",
+                  fontWeight: 600,
+                  textTransform: "uppercase",
+                  color: stageLabel === "Finished" ? "#059669" : "#1d4ed8",
+                }}>
+                  {stageLabel}
+                </span>
+                <span style={{ fontSize: "11px", color: "#6b7280" }}>
+                  {entry.status}
+                </span>
+              </div>
+              <div style={{ fontSize: "11px", color: "#6b7280" }}>{tsLabel}</div>
+              {metaText && <div style={{ fontSize: "12px", color: "#374151" }}>{metaText}</div>}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 function PlanColumn({ snapshot }: { snapshot: SessionSnapshot | null }) {
   const planTitle = snapshot?.plan?.title || snapshot?.topic || "Plan";
   const subtasks = snapshot?.subtasks ?? [];
@@ -3937,6 +4068,7 @@ function WorkerColumn({ snapshot, progress, progressSeenCount = 0, viewMode = "t
 
   const subtaskMap = new Map((snapshot?.subtasks ?? []).map((s) => [s.id, s.title]));
   const subtaskOrder = new Map((snapshot?.subtasks ?? []).map((s, i) => [s.id, i + 1]));
+  const workerTimelineEntries = useMemo(() => buildProgressTimelineEntries(snapshot, "worker"), [snapshot]);
   return (
     <div style={{
       borderRight: "1px solid #e5e7eb",
@@ -4060,7 +4192,10 @@ function WorkerColumn({ snapshot, progress, progressSeenCount = 0, viewMode = "t
       {activeViewMode === "timeline" ? (
         <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: "12px" }}>
           <ProgressStrip items={progress} label="Worker" sourceCount={progressSeenCount} />
-          {progress.length === 0 && (
+          {workerTimelineEntries.length > 0 && (
+            <ProgressEventTimeline entries={workerTimelineEntries} label="Worker" />
+          )}
+          {workerTimelineEntries.length === 0 && progress.length === 0 && (
             <div style={{
               color: "#4b5563",
               fontSize: "14px",
@@ -4171,6 +4306,7 @@ function CoordinatorColumn({ snapshot, width, progress = [], progressSeenCount =
   const novelSummary = (snapshot as any)?.state?.extra?.novel_summary_t1_t4 || (snapshot as any)?.orchestrator_state?.extra?.novel_summary_t1_t4;
   const t4Details = (snapshot as any)?.state?.extra?.t4_detailed_chapter_allocations || (snapshot as any)?.orchestrator_state?.extra?.t4_detailed_chapter_allocations;
   const reviewerRevisions = (snapshot as any)?.state?.extra?.reviewer_revisions || (snapshot as any)?.orchestrator_state?.extra?.reviewer_revisions || {};
+  const reviewerTimelineEntries = useMemo(() => buildProgressTimelineEntries(snapshot, "reviewer"), [snapshot]);
 
   // Derive reviewer-like statuses from subtasks when no explicit decision exists.
   const existingIds = new Set(
@@ -4351,7 +4487,10 @@ function CoordinatorColumn({ snapshot, width, progress = [], progressSeenCount =
           }}
         >
           <ProgressStrip items={progress} label="Reviewer" sourceCount={progressSeenCount} />
-          {progress.length === 0 && (
+          {reviewerTimelineEntries.length > 0 && (
+            <ProgressEventTimeline entries={reviewerTimelineEntries} label="Reviewer" />
+          )}
+          {reviewerTimelineEntries.length === 0 && progress.length === 0 && (
             <div style={{
               color: "#4b5563",
               fontSize: "14px",

@@ -1,0 +1,6 @@
+
+# 运转过程可视化计划
+
+1. 通过现有的 `progress_events` 汇总出各 agent（worker/reviewer）每次 start/finish 的条目，生成带时间戳、阶段、状态和 metadata 的时间线数据结构，并添加专门的 `ProgressEventTimeline` 组件用于展示。
+2. 在 Worker Column 里，基于 snapshot 生成的时间线数据在 Timeline 视图下渲染出来，同时将原来的“暂无进度”提示改为仅在既没有聚合进度也没有时间线条目的时候显示。
+3. 同样在 Reviewer Column 里展示时间线条目，并把时间线条目和 `ProgressStrip` 组合成 Timeline 视图的第一屏，确保后端实际记录的 Task1/redo/decision 都能直观呈现。
