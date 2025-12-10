@@ -57,7 +57,7 @@ export type OrchestratorEvent = {
 };
 
 export type SubtaskProgressEvent = {
-  agent: "worker" | "reviewer";
+  agent: "worker" | "reviewer" | "planner";
   subtask_id: string;
   stage: "start" | "finish";
   status: "in_progress" | "completed";
