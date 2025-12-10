@@ -430,6 +430,9 @@ def build_session_snapshot(
         )
 
     log_path = message_bus.store.logs_dir(session_id) / "envelopes.jsonl"
+    print(f"[Snapshot] Envelope log path: {log_path}")
+    print(f"[Snapshot] Log file exists: {log_path.exists()}")
+
     envelopes = _read_log_entries(log_path)
     envelopes.sort(key=lambda env: env.get("timestamp", ""))
 
@@ -440,6 +443,9 @@ def build_session_snapshot(
     chat_history: List[Dict[str, Any]] = []
 
     print(f"[Snapshot] Processing {len(envelopes)} envelopes for session {session_id}")
+    if log_path.exists():
+        subtask_result_count = sum(1 for e in envelopes if _normalize_payload_type(e.get("payload_type")) == PayloadType.SUBTASK_RESULT.value)
+        print(f"[Snapshot] Found {subtask_result_count} SUBTASK_RESULT envelopes")
     for envelope in envelopes:
         payload_type = _normalize_payload_type(envelope.get("payload_type"))
         payload = envelope.get("payload", {})

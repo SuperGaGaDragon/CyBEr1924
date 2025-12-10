@@ -1694,18 +1694,37 @@ class Orchestrator:
             print(f"  Worker result saved: {ref_work.path}")
             print(f"  Worker output length: {len(worker_output)} chars")
             print(f"  Sending SUBTASK_RESULT for {subtask.id}")
-            self.bus.send(
-                session_id=session_id,
-                sender="worker",
-                recipient="coordinator",
-                payload_type="subtask_result",
-                payload={
-                    "subtask_id": subtask.id,
-                    "subtask_title": subtask.title,
-                    "result_artifact": ref_work.to_payload(),
-                },
-            )
-            print(f"  SUBTASK_RESULT sent successfully for {subtask.id}")
+
+            # Send envelope and verify it was written
+            try:
+                envelope = self.bus.send(
+                    session_id=session_id,
+                    sender="worker",
+                    recipient="coordinator",
+                    payload_type="subtask_result",
+                    payload={
+                        "subtask_id": subtask.id,
+                        "subtask_title": subtask.title,
+                        "result_artifact": ref_work.to_payload(),
+                    },
+                )
+                print(f"  ✓ SUBTASK_RESULT envelope sent for {subtask.id}")
+
+                # Verify the envelope was written to the log file
+                log_path = self.bus.store.logs_dir(session_id) / "envelopes.jsonl"
+                if not log_path.exists():
+                    print(f"  ❌ ERROR: Envelope log not found at {log_path}")
+                    log_path.parent.mkdir(parents=True, exist_ok=True)
+                else:
+                    # Count SUBTASK_RESULT envelopes in the file
+                    import json
+                    with open(log_path) as f:
+                        lines = f.readlines()
+                        subtask_results = [l for l in lines if '"payload_type": "subtask_result"' in l or '"payload_type": "SUBTASK_RESULT"' in l]
+                        print(f"  ✓ Envelope log exists with {len(subtask_results)} SUBTASK_RESULT entries")
+            except Exception as e:
+                print(f"  ❌ ERROR: Failed to send/verify envelope for {subtask.id}: {e}")
+                raise
             if state is not None:
                 try:
                     state.worker_outputs.append(
