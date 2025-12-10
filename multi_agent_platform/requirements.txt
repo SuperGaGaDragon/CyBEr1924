@@ -4,6 +4,7 @@ pydantic
 python-dotenv
 httpx
 openai
+anthropic
 jsonschema
 SQLAlchemy>=2.0
 psycopg2-binary>=2.9
