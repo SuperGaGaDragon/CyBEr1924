@@ -17,8 +17,6 @@ import resend
 from fastapi import Depends, FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
-from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse
 
 from multi_agent_platform.api_models import (
     CommandRequest,
@@ -528,34 +526,6 @@ def login(payload: LoginRequest):
         access_token=token,
         token_type="bearer",
     )
-
-
-# ===== Static Files (for Railway deployment) =====
-
-# Serve frontend static files if they exist
-ui_dist_path = os.path.join(os.path.dirname(__file__), "multi_agent_platform", "ui", "dist")
-if os.path.exists(ui_dist_path):
-    # Mount assets directory for CSS, JS, etc.
-    assets_path = os.path.join(ui_dist_path, "assets")
-    if os.path.exists(assets_path):
-        app.mount("/assets", StaticFiles(directory=assets_path), name="assets")
-
-    # Serve SPA - catch-all route for React Router
-    @app.get("/{full_path:path}")
-    async def serve_spa(full_path: str):
-        """Serve the React SPA for all non-API routes."""
-        # Check if it's a specific file request
-        file_path = os.path.join(ui_dist_path, full_path)
-        if os.path.exists(file_path) and os.path.isfile(file_path):
-            return FileResponse(file_path)
-
-        # Otherwise serve index.html for SPA routing
-        index_path = os.path.join(ui_dist_path, "index.html")
-        if os.path.exists(index_path):
-            return FileResponse(index_path)
-
-        raise HTTPException(status_code=404, detail="Not found")
-
 
 # ===== Run Server =====
 
