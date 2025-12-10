@@ -2516,7 +2516,7 @@ function App() {
         />
       </aside>
 
-      <main style={{ flex: 1, display: "flex", flexDirection: "column", background: "#ffffff", minHeight: 0, overflow: "hidden" }}>
+      <main style={{ flex: 1, display: "flex", flexDirection: "column", background: "#ffffff", minHeight: 0 }}>
         <header
           style={{
             padding: "16px 24px",
@@ -2624,7 +2624,7 @@ function App() {
         {snapshot && snapshot.session_mode === "planning" ? (
           <section
             id="main-content"
-            style={{ flex: 1, display: "flex", overflow: "hidden", position: "relative", minHeight: 0 }}
+            style={{ flex: 1, display: "flex", position: "relative", minHeight: 0 }}
           >
             <div style={{ flex: 2, minWidth: 0, borderRight: "1px solid #e5e7eb", minHeight: 0, overflow: "hidden" }}>
               <PlanningView
