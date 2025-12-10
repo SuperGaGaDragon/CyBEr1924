@@ -2645,7 +2645,7 @@ function App() {
         ) : (
           <section
             id="main-content"
-            style={{ flex: 1, display: "flex", overflow: "hidden", position: "relative", minHeight: 0 }}
+            style={{ flex: 1, display: "flex", position: "relative", minHeight: 0 }}
           >
             <div
               ref={layoutRef}
