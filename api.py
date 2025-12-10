@@ -88,12 +88,14 @@ init_db()
 # Initialize Resend
 RESEND_API_KEY = os.getenv("RESEND_API_KEY")
 EMAIL_FROM = os.getenv("EMAIL_FROM")
+ENV = os.getenv("ENV", "development")  # default to development for safety
 
 if not RESEND_API_KEY or not EMAIL_FROM:
     # 这里不要直接 raise，让本地/测试还能跑；真正发邮件失败再报错
-    print("[WARN] RESEND_API_KEY or EMAIL_FROM not set; email sending will be disabled.")
+    print(f"[WARN] RESEND_API_KEY or EMAIL_FROM not set (ENV={ENV}); email sending will be disabled.")
 else:
     resend.api_key = RESEND_API_KEY
+    print(f"[INFO] Resend initialized successfully (ENV={ENV}, EMAIL_FROM={EMAIL_FROM})")
 
 # Initialize orchestrator (singleton)
 artifact_store = ArtifactStore()
@@ -481,18 +483,54 @@ def register(payload: RegisterRequest):
     """
     注册用户：创建用户 + 生成验证码并发邮件。
     """
+    print(f"[REGISTER] Starting registration for {payload.email} (ENV={ENV})")
+
     try:
         verification_code = create_user(payload.email, payload.password)
+        print(f"[REGISTER] User created: {payload.email}, verification_code: {verification_code}")
     except ValueError as e:
         # 比如 Email already registered
+        print(f"[REGISTER] Failed to create user: {e}")
         raise HTTPException(status_code=400, detail=str(e))
 
-    # 发送邮件 - 让 send_verification_email 自己抛 500 或成功
-    send_verification_email(payload.email, verification_code)
+    # Development mode: auto-verify for testing
+    if ENV == "development":
+        print(f"[REGISTER] Development mode detected - auto-verifying user {payload.email}")
+        try:
+            from multi_agent_platform.db import get_user_by_email, get_db
+            db = next(get_db())
+            user = get_user_by_email(db, payload.email)
+            if user:
+                user.is_verified = True
+                db.commit()
+                print(f"[REGISTER] User {payload.email} auto-verified successfully")
+            db.close()
+        except Exception as e:
+            print(f"[REGISTER] WARNING: Failed to auto-verify user: {e}")
 
-    return AuthResponse(
-        message="Registered successfully. Please check your email for the verification code."
-    )
+    # Production mode: send verification email
+    if RESEND_API_KEY and EMAIL_FROM:
+        try:
+            send_verification_email(payload.email, verification_code)
+            print(f"[REGISTER] Verification email sent to {payload.email}")
+        except Exception as e:
+            print(f"[REGISTER] ERROR: Failed to send verification email: {e}")
+            # In production, this should fail. In development, we already auto-verified.
+            if ENV == "production":
+                raise
+    else:
+        print(f"[REGISTER] WARNING: Email sending disabled (RESEND_API_KEY or EMAIL_FROM not set)")
+        if ENV == "production":
+            raise HTTPException(
+                status_code=500,
+                detail="Email service not configured. Please contact administrator."
+            )
+
+    message = "Registered successfully. Please check your email for the verification code."
+    if ENV == "development":
+        message = f"Registered successfully (development mode - auto-verified). Verification code: {verification_code}"
+
+    return AuthResponse(message=message)
 
 
 @app.post("/auth/verify-email", response_model=AuthResponse)
