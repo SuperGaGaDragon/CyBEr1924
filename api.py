@@ -71,7 +71,7 @@ origins = [
 
 # Regex pattern to match all Cloudflare Pages URLs (production and previews)
 # Matches: cyber1924.pages.dev, *.cyber1924.pages.dev, cyber1924-production.up.railway.app
-origin_regex = r"https://([a-zA-Z0-9-]+\.)?cyber1924\.pages\.dev|https://cyber1924-production\.up\.railway\.app"
+origin_regex = r"https://([a-z0-9-]+\.)?cyber1924\.pages\.dev|https://cyber1924-production\.up\.railway\.app"
 
 app.add_middleware(
     CORSMiddleware,

@@ -1617,6 +1617,7 @@ class Orchestrator:
             plan_id=plan.plan_id,
             status="idle",
             current_subtask_id=None,
+            plan_locked=True if novel_mode else False,
             extra={
                 "novel_mode": bool(novel_mode),
                 "novel_profile": safe_profile or {},
