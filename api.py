@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import os
 import json
+import re
 from datetime import datetime, timezone
 from typing import Dict, Any, Optional, List
 import resend
@@ -61,17 +62,21 @@ app = FastAPI(
 )
 
 # CORS middleware - configure allowed origins
+# Using allow_origin_regex to support all Cloudflare Pages preview/production URLs
 origins = [
     "http://localhost:5173",                # Local frontend development
     "http://localhost:5174",                # Local frontend development (alternate port)
     "https://cyber1924.com",                # Production domain
-    "https://cyber1924-production.up.railway.app",  # Railway-hosted API domain
-    "https://cyber1924.pages.dev",          # Cloudflare Pages production
 ]
+
+# Regex pattern to match all Cloudflare Pages URLs (production and previews)
+# Matches: cyber1924.pages.dev, *.cyber1924.pages.dev, cyber1924-production.up.railway.app
+origin_regex = r"https://([a-zA-Z0-9-]+\.)?cyber1924\.pages\.dev|https://cyber1924-production\.up\.railway\.app"
 
 app.add_middleware(
     CORSMiddleware,
     allow_origins=origins,
+    allow_origin_regex=origin_regex,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
