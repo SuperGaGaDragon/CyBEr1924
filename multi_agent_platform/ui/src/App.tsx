@@ -1370,26 +1370,38 @@ function App() {
         novel_mode: createSessionForm.novelMode,
         novel_profile: novelProfile,
       });
-      const sessions = await listSessions();
       const id = snapshot.session_id;
 
+      // Immediately navigate and set activeSessionId so user sees chat interface
       localStorage.setItem(SESSION_TOKEN_KEY, id);
       navigateToSession(id);
 
       setState((prev) => ({
         ...prev,
-        loading: false,
-        sessions,
+        loading: true,  // Keep loading=true to show "Initializing..." message
         activeSessionId: id,
         snapshot,
       }));
+
+      // Complete profile sending and session list update in background
       const profileFromResponse =
         (snapshot as any)?.state?.extra?.novel_profile ||
         (snapshot as any)?.orchestrator_state?.extra?.novel_profile ||
         novelProfile;
+
       if (createSessionForm.novelMode) {
         await sendNovelProfileToPlanner(id, profileFromResponse as Record<string, any>);
       }
+
+      const sessions = await listSessions();
+
+      // Only now set loading=false
+      setState((prev) => ({
+        ...prev,
+        loading: false,
+        sessions,
+      }));
+
       setCreateSessionForm({
         show: false,
         topic: "",
@@ -4157,6 +4169,7 @@ function CoordinatorColumn({ snapshot, width, progress = [], progressSeenCount =
   const activeViewMode: ViewMode = viewMode ?? "timeline";
   const [descending, setDescending] = useState(true);
   const novelSummary = (snapshot as any)?.state?.extra?.novel_summary_t1_t4 || (snapshot as any)?.orchestrator_state?.extra?.novel_summary_t1_t4;
+  const t4Details = (snapshot as any)?.state?.extra?.t4_detailed_chapter_allocations || (snapshot as any)?.orchestrator_state?.extra?.t4_detailed_chapter_allocations;
   const reviewerRevisions = (snapshot as any)?.state?.extra?.reviewer_revisions || (snapshot as any)?.orchestrator_state?.extra?.reviewer_revisions || {};
 
   // Derive reviewer-like statuses from subtasks when no explicit decision exists.
@@ -4299,6 +4312,34 @@ function CoordinatorColumn({ snapshot, width, progress = [], progressSeenCount =
           <div style={{ whiteSpace: "pre-wrap" }}>{novelSummary}</div>
         </div>
       )}
+      {t4Details && (
+        <div style={{
+          padding: "12px",
+          borderRadius: "10px",
+          border: "1px solid #d1d5db",
+          background: "#f9fafb",
+          marginBottom: "12px",
+        }}>
+          <div style={{
+            fontWeight: 800,
+            fontSize: "11px",
+            letterSpacing: "0.08em",
+            textTransform: "uppercase",
+            color: "#6366f1",
+            marginBottom: "8px"
+          }}>
+            Chapter Allocations (Task 4)
+          </div>
+          <div style={{
+            whiteSpace: "pre-wrap",
+            fontSize: "13px",
+            lineHeight: 1.6,
+            color: "#111827"
+          }}>
+            {t4Details}
+          </div>
+        </div>
+      )}
       {activeViewMode === "timeline" ? (
         <div
           style={{
@@ -4333,7 +4374,6 @@ function CoordinatorColumn({ snapshot, width, progress = [], progressSeenCount =
             padding: "16px",
             borderRadius: "10px",
             border: "1px solid #e0e0e0",
-            marginBottom: "16px",
             minHeight: 0,
           }}
         >

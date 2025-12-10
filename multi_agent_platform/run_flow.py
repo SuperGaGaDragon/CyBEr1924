@@ -319,10 +319,17 @@ def _update_novel_summary(
         return None
 
     summary_lines: List[str] = []
+    t4_chapter_allocations = None
+
     for sub in plan.subtasks[:4]:
         content = getattr(sub, "output", "") or getattr(sub, "notes", "") or ""
         if content:
             summary_lines.append(f"{sub.id} {sub.title}: {content}")
+
+            # Extract t4 detailed chapter allocations
+            if sub.id == "t4":
+                t4_chapter_allocations = content
+
     profile_ctx = _format_novel_profile_context(getattr(state, "extra", {}).get("novel_profile"))
     if profile_ctx:
         summary_lines.insert(0, f"Profile:\n{profile_ctx}")
@@ -332,6 +339,10 @@ def _update_novel_summary(
         if state.extra is None:
             state.extra = {}
         state.extra["novel_summary_t1_t4"] = summary
+
+        # Save t4 detailed output separately for display and chapter generation
+        if t4_chapter_allocations:
+            state.extra["t4_detailed_chapter_allocations"] = t4_chapter_allocations
     except Exception:
         pass
 
@@ -1247,34 +1258,76 @@ class Orchestrator:
         except Exception:
             return
 
+        # Save planner outline for debugging
+        try:
+            debug_ref = self.store.save_artifact(
+                session_id,
+                outline,
+                kind="markdown",
+                description="Planner chapter outline (after t4)",
+            )
+            print(f"DEBUG: Planner outline saved to {debug_ref.path}")
+        except Exception:
+            pass
+
         try:
             stub_plan = Plan.from_outline(topic, outline)
-        except Exception:
-            return
+            print(f"DEBUG: Planner returned {len(stub_plan.subtasks)} chapter candidates")
+        except Exception as e:
+            print(f"ERROR: Failed to parse planner outline: {e}")
+            stub_plan = None
 
         sanitized_subtasks: List[Dict[str, Any]] = []
         base_count = len(plan.subtasks)
-        for sub in stub_plan.subtasks:
-            title = sub.title or ""
-            if "chapter" not in title.lower():
-                continue
-            desc = sub.description or _chapter_description(title)
-            next_id = f"t{base_count + len(sanitized_subtasks) + 1}"
-            sanitized_subtasks.append(
-                {
-                    "subtask_id": next_id,
-                    "title": title,
-                    "status": "pending",
-                    "description": desc,
-                    "notes": sub.notes,
-                }
-            )
+
+        if stub_plan:
+            for sub in stub_plan.subtasks:
+                title = sub.title or ""
+                # Relaxed validation: accept "chapter", "第X章", or "章节"
+                has_chapter = (
+                    "chapter" in title.lower() or
+                    "章" in title or
+                    "Chapter" in title
+                )
+                if not has_chapter:
+                    continue
+                desc = sub.description or _chapter_description(title)
+                next_id = f"t{base_count + len(sanitized_subtasks) + 1}"
+                sanitized_subtasks.append(
+                    {
+                        "subtask_id": next_id,
+                        "title": title,
+                        "status": "pending",
+                        "description": desc,
+                        "notes": sub.notes,
+                    }
+                )
+
+        print(f"DEBUG: After sanitization: {len(sanitized_subtasks)} valid chapters")
+
+        # Fallback: if no valid chapters, generate default 5 chapters
+        if not sanitized_subtasks:
+            print("WARNING: Planner returned no valid chapters, generating default 5 chapters")
+            chapter_count = profile.get("chapter_count", 5) if profile else 5
+            for i in range(chapter_count):
+                next_id = f"t{base_count + i + 1}"
+                sanitized_subtasks.append(
+                    {
+                        "subtask_id": next_id,
+                        "title": f"Chapter {i+1}",
+                        "status": "pending",
+                        "description": _chapter_description(f"Chapter {i+1}"),
+                        "notes": "Auto-generated chapter task (planner fallback)",
+                    }
+                )
+            print(f"Generated {len(sanitized_subtasks)} default chapters")
+
         planner_result = PlannerResult(
             plan={
-                "plan_id": stub_plan.plan_id,
-                "title": stub_plan.title,
-                "description": stub_plan.description,
-                "notes": stub_plan.notes,
+                "plan_id": stub_plan.plan_id if stub_plan else plan.plan_id,
+                "title": stub_plan.title if stub_plan else plan.title,
+                "description": stub_plan.description if stub_plan else "",
+                "notes": stub_plan.notes if stub_plan else "",
             },
             subtasks=sanitized_subtasks,
         )
@@ -1507,14 +1560,33 @@ class Orchestrator:
         )
         print("Outline saved:", ref_outline.path)
         plan = Plan.from_outline(topic, outline)
-        try:
-            if safe_profile:
+
+        # Novel mode: force use of t1-t4 structure
+        if safe_profile:
+            try:
                 plan.subtasks = [
                     Subtask(**raw)
                     for raw in _build_novel_t1_t4(safe_profile, plan.title or topic)
                 ]
-        except Exception:
-            pass
+            except Exception as e:
+                print(f"WARNING: Failed to build t1-t4 with profile: {e}")
+                # Fallback: use empty profile to ensure we still get t1-t4
+                plan.subtasks = [
+                    Subtask(**raw)
+                    for raw in _build_novel_t1_t4({}, plan.title or topic)
+                ]
+
+            # Validation: ensure we have exactly 4 tasks in novel mode
+            if len(plan.subtasks) != 4:
+                print(f"ERROR: Novel mode requires 4 base tasks, got {len(plan.subtasks)}")
+                print(f"Task IDs: {[s.id for s in plan.subtasks]}")
+                # Force rebuild with minimal profile
+                plan.subtasks = [
+                    Subtask(**raw)
+                    for raw in _build_novel_t1_t4({}, plan.title or topic)
+                ]
+                print(f"Rebuilt with {len(plan.subtasks)} tasks: {[s.id for s in plan.subtasks]}")
+
         ref_plan = self.store.save_artifact(
             session_id,
             plan.to_dict(),
