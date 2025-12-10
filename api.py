@@ -14,7 +14,7 @@ from datetime import datetime, timezone
 from typing import Dict, Any, Optional, List
 import resend
 
-from fastapi import Depends, FastAPI, HTTPException
+from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
@@ -108,23 +108,33 @@ security = HTTPBearer(auto_error=False)
 
 def get_current_user(
     credentials: HTTPAuthorizationCredentials = Depends(security),
+    request: Request,
 ):
     """
     从 Authorization: Bearer <token> 中解析当前用户。
     如果没有 token 或无效，返回 401。
     """
+    request_info = f"{request.method} {request.url.path}"
+
     if credentials is None:
+        print(f"[AUTH] {request_info} - No Authorization header received")
         raise HTTPException(status_code=401, detail="Not authenticated")
 
     token = credentials.credentials
+    print(
+        f"[AUTH] {request_info} - Received token prefix: {token[:20]}{'...' if len(token) > 20 else ''}"
+    )
     user_id = decode_access_token(token)
     if not user_id:
+        print(f"[AUTH] {request_info} - Token decode failed or expired")
         raise HTTPException(status_code=401, detail="Invalid or expired token")
 
     user = get_user_by_id(user_id)
     if not user:
+        print(f"[AUTH] {request_info} - User {user_id} not found")
         raise HTTPException(status_code=401, detail="User not found")
 
+    print(f"[AUTH] {request_info} - Authenticated user {user.id}")
     return user
 
 
