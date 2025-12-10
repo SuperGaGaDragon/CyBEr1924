@@ -1,5 +1,5 @@
 [phases.setup]
-nixPkgs = ["python312", "postgresql"]
+nixPkgs = ["python312", "postgresql", "nodejs", "npm"]
 
 [phases.install]
 cmds = [
@@ -8,8 +8,9 @@ cmds = [
 
 [phases.build]
 cmds = [
-  "cd multi_agent_platform/ui && npm install && npm run build"
+  "npm install --prefix multi_agent_platform/ui",
+  "npm run build --prefix multi_agent_platform/ui"
 ]
 
 [start]
-cmd = "cd multi_agent_platform && uvicorn api:app --host 0.0.0.0 --port $PORT"
+cmd = "uvicorn api:app --host 0.0.0.0 --port $PORT"
