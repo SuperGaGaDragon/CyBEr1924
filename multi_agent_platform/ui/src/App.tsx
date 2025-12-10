@@ -327,7 +327,7 @@ type PlanPanelProps = {
   setCreateSessionForm: Dispatch<SetStateAction<CreateSessionFormState>>;
 };
 
-function PlanAdvancedPanel({ snapshot, onPlanCommand, createSessionForm, setCreateSessionForm }: PlanPanelProps) {
+function PlanAdvancedPanel({ snapshot, onPlanCommand }: PlanPanelProps) {
   const planLocked = snapshot.plan_locked;
 
   const promptForSubtask = (
@@ -2928,7 +2928,6 @@ function App() {
                   onChange={(e) => setCreateSessionForm((prev) => ({
                     ...prev,
                     novelMode: e.target.checked,
-                    wizardOpen: e.target.checked || prev.wizardOpen,
                     step: 1,
                     length: e.target.checked ? prev.length : "",
                     year: e.target.checked ? prev.year : "",
@@ -2952,7 +2951,9 @@ function App() {
                 <div style={{ display: "flex", justifyContent: "flex-end" }}>
                   <button
                     type="button"
-                    onClick={() => setCreateSessionForm((prev) => ({ ...prev, wizardOpen: true, step: 1 }))}
+                    onClick={() => {
+                      setCreateSessionForm((prev) => ({ ...prev, show: false, wizardOpen: true, step: 1 }));
+                    }}
                     style={{
                       padding: "10px 14px",
                       borderRadius: "10px",

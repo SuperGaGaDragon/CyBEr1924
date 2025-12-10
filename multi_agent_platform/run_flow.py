@@ -1207,6 +1207,19 @@ class Orchestrator:
         except Exception:
             return
 
+        # Record that planner is starting to generate chapter tasks
+        try:
+            self._record_progress_event(
+                session_id,
+                state,
+                agent="planner",
+                subtask_id="chapter_expansion",
+                stage="start",
+                payload={"note": "Generating chapter tasks after t4 completion"},
+            )
+        except Exception:
+            pass
+
         summary = state.extra.get("novel_summary_t1_t4")
         artifact_payload = state.extra.get("novel_summary_artifact")
         reviewer_annotations = state.extra.get("reviewer_revisions_batch")
@@ -1283,12 +1296,13 @@ class Orchestrator:
                 self._record_progress_event(
                     session_id,
                     state,
-                    agent="worker",
-                    subtask_id="t4",
+                    agent="planner",
+                    subtask_id="chapter_expansion",
                     stage="finish",
                     payload={
                         "plan_snapshot": plan.to_dict(),
-                        "note": f"Appended {added} chapter subtasks",
+                        "note": f"Appended {added} chapter subtasks after t4 completion",
+                        "added_count": added,
                     },
                 )
             except Exception:
