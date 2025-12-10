@@ -1,0 +1,19 @@
+{
+  "session_id": "sess-20251210-024119-9a2e804b",
+  "plan_id": "plan-4659a688",
+  "status": "idle",
+  "current_subtask_id": null,
+  "extra": {
+    "novel_mode": true,
+    "novel_profile": {
+      "length": "novel",
+      "genre": "Historical"
+    }
+  },
+  "plan_locked": false,
+  "orchestrator_messages": [],
+  "orch_events": [],
+  "progress_events": [],
+  "planner_chat": [],
+  "worker_outputs": []
+}

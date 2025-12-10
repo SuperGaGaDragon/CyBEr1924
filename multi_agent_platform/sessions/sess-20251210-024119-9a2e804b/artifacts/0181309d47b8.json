@@ -1,0 +1,48 @@
+{
+  "plan_id": "plan-4659a688",
+  "title": "Test Session",
+  "description": "",
+  "notes": "",
+  "subtasks": [
+    {
+      "id": "t1",
+      "title": "Research",
+      "description": "Research the genre, time setting, and target style.（cover full content for this task）\n- Length: novel\n- Year: \n- Genre: Historical\n- Style: \n- Title: \n- Characters: \n- Extra:",
+      "status": "pending",
+      "notes": "Research for genre/time/style context",
+      "output": "",
+      "needs_redo": false,
+      "metadata": {}
+    },
+    {
+      "id": "t2",
+      "title": "人物设定",
+      "description": "List and refine character names and roles.（cover full content for this task）\n- Length: novel\n- Year: \n- Genre: Historical\n- Style: \n- Title: \n- Characters: \n- Extra:",
+      "status": "pending",
+      "notes": "Character roster",
+      "output": "",
+      "needs_redo": false,
+      "metadata": {}
+    },
+    {
+      "id": "t3",
+      "title": "情节设计",
+      "description": "Design main plot arcs consistent with the brief.（cover full content for this task）\n- Length: novel\n- Year: \n- Genre: Historical\n- Style: \n- Title: \n- Characters: \n- Extra:",
+      "status": "pending",
+      "notes": "Plot arcs",
+      "output": "",
+      "needs_redo": false,
+      "metadata": {}
+    },
+    {
+      "id": "t4",
+      "title": "章节分配 & 小说概要撰写",
+      "description": "作为一位资深作家指导新人，请为每个章节制定详细的写作指南。\n\n对于每个章节，请用以下格式描述：\n【章节X】标题\n- 详细情节内容：（具体描述本章要发生什么，人物如何互动，情节如何推进）\n- 文笔风格：（本章应该采用什么样的叙述方式，如：紧张悬疑/温馨抒情/快节奏动作等）\n- 侧重点：（本章的核心目标是什么，如：人物性格塑造/情节转折/氛围营造/冲突升级等）\n- 写作建议：（给新人作家的具体建议，如需要注意的细节、避免的陷阱、推荐的写作技巧等）\n\n最后生成一份简明的小说整体概要（synopsis）。（cover full content for this task）\n- Length: novel\n- Year: \n- Genre: Historical\n- Style: \n- Title: \n- Characters: \n- Extra:",
+      "status": "pending",
+      "notes": "Chapter plan and synopsis",
+      "output": "",
+      "needs_redo": false,
+      "metadata": {}
+    }
+  ]
+}
