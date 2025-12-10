@@ -151,13 +151,21 @@ async function request<T>(
   });
 
   if (!resp.ok) {
-    let text: string;
+    let errorMessage: string;
     try {
-      text = await resp.text();
+      const text = await resp.text();
+      // Try to parse as JSON to extract the detail field
+      try {
+        const errorData = JSON.parse(text);
+        errorMessage = errorData.detail || errorData.message || text;
+      } catch {
+        // If not JSON, use the text as-is
+        errorMessage = text;
+      }
     } catch {
-      text = resp.statusText;
+      errorMessage = resp.statusText;
     }
-    throw new ApiError(resp.status, text || resp.statusText);
+    throw new ApiError(resp.status, errorMessage || resp.statusText);
   }
 
   if (resp.status === 204) {
