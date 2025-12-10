@@ -107,8 +107,8 @@ security = HTTPBearer(auto_error=False)
 
 
 def get_current_user(
-    credentials: HTTPAuthorizationCredentials = Depends(security),
     request: Request,
+    credentials: HTTPAuthorizationCredentials = Depends(security),
 ):
     """
     从 Authorization: Bearer <token> 中解析当前用户。
