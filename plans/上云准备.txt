@@ -1,0 +1,17 @@
+
+cyber1924-production.up.railway.app
+
+***目标***
+
+***要求***
+
+***注意事项***
+
+***具体实现步骤***
+（先determine是先debug 400还是先上云）
+
+Phase 1
+
+Phase 2
+
+需要自己加，格式、要求同12.9_debug_implementation.md
