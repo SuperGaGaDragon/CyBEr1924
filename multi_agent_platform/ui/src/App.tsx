@@ -3380,7 +3380,7 @@ function App() {
                   type="button"
                   onClick={() => {
                     if (createSessionForm.step === 7) {
-                      setCreateSessionForm((prev) => ({ ...prev, wizardOpen: false }));
+                      setCreateSessionForm((prev) => ({ ...prev, wizardOpen: false, show: true }));
                       return;
                     }
                     const nextStep = createSessionForm.step + 1;

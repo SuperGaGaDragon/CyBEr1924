@@ -259,7 +259,16 @@ def _build_novel_t1_t4(profile: Dict[str, Any] | None, base_topic: str) -> List[
             "title": "章节分配 & 小说概要撰写",
             "status": "pending",
             "notes": "Chapter plan and synopsis",
-            "description": _desc("Produce chapter allocation and concise novel synopsis; include chapter-wise responsibilities."),
+            "description": _desc(
+                "作为一位资深作家指导新人，请为每个章节制定详细的写作指南。\n\n"
+                "对于每个章节，请用以下格式描述：\n"
+                "【章节X】标题\n"
+                "- 详细情节内容：（具体描述本章要发生什么，人物如何互动，情节如何推进）\n"
+                "- 文笔风格：（本章应该采用什么样的叙述方式，如：紧张悬疑/温馨抒情/快节奏动作等）\n"
+                "- 侧重点：（本章的核心目标是什么，如：人物性格塑造/情节转折/氛围营造/冲突升级等）\n"
+                "- 写作建议：（给新人作家的具体建议，如需要注意的细节、避免的陷阱、推荐的写作技巧等）\n\n"
+                "最后生成一份简明的小说整体概要（synopsis）。"
+            ),
         },
     ]
 
