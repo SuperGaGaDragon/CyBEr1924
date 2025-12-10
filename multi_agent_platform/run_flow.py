@@ -321,14 +321,18 @@ def _update_novel_summary(
     summary_lines: List[str] = []
     t4_chapter_allocations = None
 
+    print(f"  [Novel Summary] Processing {len(plan.subtasks[:4])} tasks (t1-t4)")
     for sub in plan.subtasks[:4]:
         content = getattr(sub, "output", "") or getattr(sub, "notes", "") or ""
         if content:
+            preview = content[:100] + "..." if len(content) > 100 else content
+            print(f"  [Novel Summary] {sub.id} has output ({len(content)} chars): {preview}")
             summary_lines.append(f"{sub.id} {sub.title}: {content}")
 
             # Extract t4 detailed chapter allocations
             if sub.id == "t4":
                 t4_chapter_allocations = content
+                print(f"  [Novel Summary] Extracted t4 chapter allocations ({len(content)} chars)")
 
     profile_ctx = _format_novel_profile_context(getattr(state, "extra", {}).get("novel_profile"))
     if profile_ctx:
@@ -1675,7 +1679,9 @@ class Orchestrator:
                 kind="markdown",
                 description=f"子任务 {subtask.id} 的执行结果",
             )
-            print("  Worker result saved:", ref_work.path)
+            print(f"  Worker result saved: {ref_work.path}")
+            print(f"  Worker output length: {len(worker_output)} chars")
+            print(f"  Sending SUBTASK_RESULT for {subtask.id}")
             self.bus.send(
                 session_id=session_id,
                 sender="worker",
@@ -1687,6 +1693,7 @@ class Orchestrator:
                     "result_artifact": ref_work.to_payload(),
                 },
             )
+            print(f"  SUBTASK_RESULT sent successfully for {subtask.id}")
             if state is not None:
                 try:
                     state.worker_outputs.append(
@@ -1711,8 +1718,14 @@ class Orchestrator:
             # Cache output on subtask and refresh novel summary if applicable
             try:
                 subtask.output = worker_output
-            except Exception:
+                print(f"  Cached output on subtask {subtask.id}")
+            except Exception as e:
+                print(f"  WARNING: Failed to cache output on subtask: {e}")
                 pass
+
+            # Update novel summary for t1-t4
+            if state and state.extra.get("novel_mode"):
+                print(f"  Updating novel summary (novel mode active)")
             _update_novel_summary(state, plan, self.store)
 
             self._record_progress_event(

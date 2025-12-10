@@ -4218,7 +4218,6 @@ function CoordinatorColumn({ snapshot, width, progress = [], progressSeenCount =
         display: "flex",
         flexDirection: "column",
         background: "#ffffff",
-        overflow: "hidden",
         minHeight: 0,
         height: "100%",
         flex: "1 1 0",

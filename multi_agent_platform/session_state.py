@@ -439,6 +439,7 @@ def build_session_snapshot(
     coord_decisions: Dict[str, Dict[str, Any]] = {}
     chat_history: List[Dict[str, Any]] = []
 
+    print(f"[Snapshot] Processing {len(envelopes)} envelopes for session {session_id}")
     for envelope in envelopes:
         payload_type = _normalize_payload_type(envelope.get("payload_type"))
         payload = envelope.get("payload", {})
@@ -456,6 +457,8 @@ def build_session_snapshot(
             artifact_path = artifact_info.get("path")
             full_text = _read_artifact_content(session_store, artifact_path, max_length=None)
             preview = _read_artifact_preview(session_store, artifact_path)
+
+            print(f"[Snapshot] Found SUBTASK_RESULT for {sub_id}: artifact_path={artifact_path}, content_length={len(full_text) if full_text else 0}")
 
             worker_outputs[sub_id] = {
                 "subtask_id": sub_id,
@@ -562,6 +565,10 @@ def build_session_snapshot(
         for sub_id in subtask_map.keys()
         if sub_id in coord_decisions
     ]
+
+    print(f"[Snapshot] Final worker_outputs count: {len(worker_list)} (expected: {len(subtask_map)})")
+    for wo in worker_list:
+        print(f"[Snapshot]   - {wo['subtask_id']}: {wo['subtask_title']} (source: {wo.get('source', 'unknown')})")
 
     state_dict = orchestrator_state.to_dict()
     state_dict["session_mode"] = orchestrator_state.session_mode
