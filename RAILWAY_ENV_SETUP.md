@@ -7,7 +7,7 @@
 ### 1. 邮件服务 (Email Verification)
 ```
 RESEND_API_KEY=re_xxxxxxxxxxxxxxxxxxxxx
-EMAIL_FROM=noreply@cyber1924.com
+EMAIL_FROM=no-reply@cyber1924.com
 ```
 
 **说明**：
@@ -60,7 +60,7 @@ LOG_LEVEL=INFO
 配置完成后，重启 Railway 服务，检查日志中是否出现：
 
 ```
-[INFO] Resend initialized successfully (ENV=production, EMAIL_FROM=noreply@cyber1924.com)
+[INFO] Resend initialized successfully (ENV=production, EMAIL_FROM=no-reply@cyber1924.com)
 ```
 
 如果看到警告：
