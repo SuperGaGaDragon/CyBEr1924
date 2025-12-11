@@ -51,7 +51,7 @@ class OrchestratorEventModel(BaseModel):
 
 
 class SubtaskProgressEventModel(BaseModel):
-    agent: Literal["worker", "reviewer", "planner"]
+    agent: str  # Relaxed from Literal to allow any agent type (coordinator, etc.)
     subtask_id: str
     stage: Literal["start", "finish"] = "start"
     status: Literal["in_progress", "completed"] = "in_progress"
