@@ -620,14 +620,16 @@ def register(payload: RegisterRequest):
     if ENV == "development":
         print(f"[REGISTER] Development mode detected - auto-verifying user {payload.email}")
         try:
-            from multi_agent_platform.db import get_user_by_email, get_db
-            db = next(get_db())
-            user = get_user_by_email(db, payload.email)
-            if user:
-                user.is_verified = True
-                db.commit()
-                print(f"[REGISTER] User {payload.email} auto-verified successfully")
-            db.close()
+            from multi_agent_platform.db.db import SessionLocal, DbUser
+
+            with SessionLocal() as db:
+                user = db.query(DbUser).filter(DbUser.email == payload.email).first()
+                if user:
+                    user.is_verified = True
+                    db.commit()
+                    print(f"[REGISTER] ✓ User {payload.email} auto-verified successfully")
+                else:
+                    print(f"[REGISTER] WARNING: User {payload.email} not found in database")
         except Exception as e:
             print(f"[REGISTER] WARNING: Failed to auto-verify user: {e}")
 
