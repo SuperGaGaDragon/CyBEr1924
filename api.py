@@ -262,6 +262,51 @@ def _load_progress_events(session_id: str, since: Optional[datetime]) -> list[di
         except Exception:
             pass
 
+    # If both sources are empty, try to extract from envelopes.jsonl as last resort
+    if not events:
+        envelope_log_path = artifact_store.logs_dir(session_id) / "envelopes.jsonl"
+        if envelope_log_path.exists():
+            try:
+                with envelope_log_path.open("r", encoding="utf-8") as f:
+                    for line in f:
+                        if not line.strip():
+                            continue
+                        try:
+                            envelope = json.loads(line)
+                            # Extract progress-related envelopes
+                            # Look for any envelope that indicates progress (worker start/finish, etc.)
+                            payload = envelope.get("payload", {})
+                            source = envelope.get("source", "")
+                            timestamp = envelope.get("timestamp")
+
+                            # Filter by since timestamp
+                            ts_dt = None
+                            if isinstance(timestamp, str):
+                                try:
+                                    ts_dt = datetime.fromisoformat(timestamp)
+                                except Exception:
+                                    pass
+                            if since and ts_dt and ts_dt <= since:
+                                continue
+
+                            # Try to construct a progress event from the envelope
+                            # This is a best-effort reconstruction
+                            if source in ["worker", "reviewer", "planner"]:
+                                subtask_id = payload.get("subtask_id")
+                                if subtask_id:
+                                    events.append({
+                                        "agent": source,
+                                        "subtask_id": subtask_id,
+                                        "stage": "finish",  # Assume finish if we see output
+                                        "status": "completed",
+                                        "ts": timestamp,
+                                        "payload": {},
+                                    })
+                        except Exception:
+                            continue
+            except Exception:
+                pass
+
     # Deduplicate by (agent, subtask_id, stage, ts)
     seen = set()
     deduped = []
