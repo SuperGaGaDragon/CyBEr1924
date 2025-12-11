@@ -631,6 +631,7 @@ type ProgressTimelineEntry = {
   ts?: string;
   payload?: Record<string, any>;
   _originalIndex?: number;  // Used for stable sorting when ts is missing
+  taskOrder?: number;  // Display order of the task (e.g., Task 1, Task 2)
 };
 
 type ViewMode = "timeline" | "output";
@@ -721,6 +722,7 @@ function buildProgressTimelineEntries(
 ): ProgressTimelineEntry[] {
   if (!snapshot?.progress_events) return [];
   const titleMap = new Map((snapshot.subtasks ?? []).map((s) => [String(s.id), s.title]));
+  const orderMap = new Map((snapshot.subtasks ?? []).map((s, idx) => [String(s.id), idx + 1]));
   const entries = snapshot.progress_events
     .map((ev, idx) => ({ ev, idx }))
     .filter(({ ev }) => ev?.agent === agent && ev?.subtask_id)
@@ -737,6 +739,7 @@ function buildProgressTimelineEntries(
         ts,
         payload: ev.payload ?? {},
         _originalIndex: idx,  // Preserve original index for stable sorting
+        taskOrder: orderMap.get(subtaskId),  // Get task order from subtasks array
       };
     })
     .sort((a, b) => {
@@ -3802,6 +3805,41 @@ function ProgressEventTimeline({ entries, label }: { entries: ProgressTimelineEn
   if (!entries || entries.length === 0) {
     return null;
   }
+
+  // Helper function to render decision badge with color coding
+  const renderDecisionBadge = (decision: string | undefined) => {
+    if (!decision) return null;
+
+    let bgColor = "#e5e7eb";
+    let textColor = "#374151";
+
+    if (decision === "REDO" || decision === "redo") {
+      bgColor = "#fef2f2";
+      textColor = "#dc2626";
+    } else if (decision === "ACCEPT" || decision === "accept") {
+      bgColor = "#f0fdf4";
+      textColor = "#16a34a";
+    } else if (decision === "PENDING" || decision === "pending") {
+      bgColor = "#fef3c7";
+      textColor = "#d97706";
+    }
+
+    return (
+      <span style={{
+        padding: "2px 8px",
+        borderRadius: "6px",
+        fontSize: "10px",
+        fontWeight: 700,
+        textTransform: "uppercase",
+        letterSpacing: "0.05em",
+        background: bgColor,
+        color: textColor,
+      }}>
+        {decision}
+      </span>
+    );
+  };
+
   return (
     <div style={{
       padding: "10px 14px",
@@ -3830,17 +3868,11 @@ function ProgressEventTimeline({ entries, label }: { entries: ProgressTimelineEn
               : entry.stage === "start"
                 ? "Started"
                 : entry.stage;
-          const payloadNotes: string[] = [];
-          if (entry.payload?.decision) {
-            payloadNotes.push(`Decision: ${entry.payload.decision}`);
-          }
-          if (entry.payload?.kind) {
-            payloadNotes.push(entry.payload.kind);
-          }
-          if (entry.payload?.source) {
-            payloadNotes.push(`Source: ${entry.payload.source}`);
-          }
-          const metaText = payloadNotes.length > 0 ? payloadNotes.join(" · ") : null;
+
+          // Build task identifier with order
+          const taskId = entry.taskOrder ? `Task ${entry.taskOrder}` : entry.title;
+          const decision = entry.payload?.decision;
+
           return (
             <div key={entry.id} style={{
               padding: "8px 10px",
@@ -3851,16 +3883,20 @@ function ProgressEventTimeline({ entries, label }: { entries: ProgressTimelineEn
               flexDirection: "column",
               gap: "4px",
             }}>
-              <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
                 <span style={{
                   fontSize: "12px",
                   fontWeight: 700,
                   color: "#111827",
-                  overflow: "hidden",
-                  textOverflow: "ellipsis",
-                  whiteSpace: "nowrap",
                 }}>
-                  {entry.title}
+                  {taskId}
+                </span>
+                {decision && renderDecisionBadge(decision)}
+                <span style={{
+                  fontSize: "11px",
+                  color: "#6b7280",
+                }}>
+                  by {entry.agent}
                 </span>
                 <span style={{
                   fontSize: "11px",
@@ -3870,12 +3906,8 @@ function ProgressEventTimeline({ entries, label }: { entries: ProgressTimelineEn
                 }}>
                   {stageLabel}
                 </span>
-                <span style={{ fontSize: "11px", color: "#6b7280" }}>
-                  {entry.status}
-                </span>
               </div>
               <div style={{ fontSize: "11px", color: "#6b7280" }}>{tsLabel}</div>
-              {metaText && <div style={{ fontSize: "12px", color: "#374151" }}>{metaText}</div>}
             </div>
           );
         })}
