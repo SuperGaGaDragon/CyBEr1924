@@ -2743,15 +2743,12 @@ class Orchestrator:
                         target.status = "done"
                         note_prefix = "[adopted reviewer revision]"
                         target.notes = f"{note_prefix} {target.notes or ''}".strip()
+                        # ✅ Phase 5 Fix: Do NOT add reviewer revision to worker_outputs
+                        # Reviewer revisions are already stored in:
+                        # 1. target.notes (for display in subtask notes)
+                        # 2. state.extra.reviewer_revisions (for structured access)
+                        # Adding to worker_outputs causes "reviewer comments appearing in worker output"
                         if state is not None:
-                            state.worker_outputs.append(
-                                WorkerOutputState(
-                                    subtask_id=target.id,
-                                    title=target.title,
-                                    artifact=ref_revision,
-                                    timestamp=datetime.utcnow(),
-                                )
-                            )
                             if state.extra is None:
                                 state.extra = {}
                             inflight = state.extra.get("novel_inflight_batch")

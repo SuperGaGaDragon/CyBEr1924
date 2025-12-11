@@ -725,7 +725,20 @@ function buildProgressTimelineEntries(
   const orderMap = new Map((snapshot.subtasks ?? []).map((s, idx) => [String(s.id), idx + 1]));
   const entries = snapshot.progress_events
     .map((ev, idx) => ({ ev, idx }))
-    .filter(({ ev }) => ev?.agent === agent && ev?.subtask_id)
+    .filter(({ ev }) => {
+      const isCorrectAgent = ev?.agent === agent;
+      const hasSubtaskId = !!ev?.subtask_id;
+      // Phase 5 diagnostic: log mismatched agents to help identify backend data issues
+      if (!isCorrectAgent && ev?.agent && hasSubtaskId) {
+        console.error(`[Timeline] WRONG AGENT: expected "${agent}", got "${ev.agent}"`, {
+          subtask_id: ev.subtask_id,
+          stage: ev.stage,
+          ts: ev.ts,
+          payload: ev.payload
+        });
+      }
+      return isCorrectAgent && hasSubtaskId;
+    })
     .map(({ ev, idx }) => {
       const subtaskId = String(ev.subtask_id);
       const ts = ev.ts ? String(ev.ts) : undefined;
@@ -2754,10 +2767,23 @@ function App() {
               />
 
               <div
-                onMouseDown={() => {
+                onMouseDown={(e) => {
+                  console.log("[Drag] Left divider clicked", {
+                    x: e.clientX,
+                    y: e.clientY,
+                    target: e.target,
+                    currentTarget: e.currentTarget
+                  });
                   layoutDrag.current = "left";
                   document.body.style.cursor = 'col-resize';
                   document.body.style.userSelect = 'none';
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = "rgba(59, 130, 246, 0.5)";
+                  console.log("[Drag] Hover detected on left divider");
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = "transparent";
                 }}
                 style={{
                   position: "absolute",
@@ -2768,13 +2794,27 @@ function App() {
                   cursor: "col-resize",
                   background: "transparent",
                   zIndex: 10,
+                  transition: "background 0.2s",
                 }}
               />
               <div
-                onMouseDown={() => {
+                onMouseDown={(e) => {
+                  console.log("[Drag] Right divider clicked", {
+                    x: e.clientX,
+                    y: e.clientY,
+                    target: e.target,
+                    currentTarget: e.currentTarget
+                  });
                   layoutDrag.current = "right";
                   document.body.style.cursor = 'col-resize';
                   document.body.style.userSelect = 'none';
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = "rgba(59, 130, 246, 0.5)";
+                  console.log("[Drag] Hover detected on right divider");
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = "transparent";
                 }}
                 style={{
                   position: "absolute",
@@ -2785,6 +2825,7 @@ function App() {
                   cursor: "col-resize",
                   background: "transparent",
                   zIndex: 10,
+                  transition: "background 0.2s",
                 }}
               />
             </div>
@@ -4281,7 +4322,7 @@ function WorkerColumn({ snapshot, progress, progressSeenCount = 0, viewMode = "t
               background: "#ffffff",
               border: "1px dashed #d1d5db",
             }}>
-              Reviewer comments will show up here once a batch is reviewed.
+              Worker outputs will appear here once tasks are completed.
             </div>
           )}
           {outputs.map((out, idx) => {
