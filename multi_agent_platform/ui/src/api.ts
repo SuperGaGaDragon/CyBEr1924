@@ -97,8 +97,14 @@ export type SessionSnapshot = {
   state: Record<string, any>;
 };
 
-// Use environment variable for API base URL, fallback to localhost for local development
-const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:8000";
+// Use environment variable for API base URL, fallback to intelligent detection
+// If running on localhost/127.0.0.1 -> use local backend
+// Otherwise (production) -> use Railway backend
+const API_BASE = import.meta.env.VITE_API_BASE_URL ||
+  (typeof window !== 'undefined' &&
+   (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1")
+    ? "http://localhost:8000"
+    : "https://cyber1924-production.up.railway.app");
 
 let accessToken: string | null = null;
 
