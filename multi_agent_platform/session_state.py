@@ -272,9 +272,14 @@ class OrchestratorState:
         return cls.from_dict(data)
 
     def save(self, path: Path) -> None:
-        """Save state to a file."""
+        """Save state to a file with explicit flush to avoid race conditions."""
+        import os
         path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(self.to_json(), encoding="utf-8")
+        # Use explicit file operations with flush/fsync instead of write_text
+        with path.open("w", encoding="utf-8") as f:
+            f.write(self.to_json())
+            f.flush()
+            os.fsync(f.fileno())
 
     @classmethod
     def load(cls, path: Path) -> "OrchestratorState":
