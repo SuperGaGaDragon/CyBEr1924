@@ -10,6 +10,7 @@ from __future__ import annotations
 import os
 import json
 import re
+import time
 from datetime import datetime, timezone
 from typing import Dict, Any, Optional, List
 import resend
@@ -184,6 +185,23 @@ def _parse_since(ts_val: Optional[str | float | int]) -> Optional[datetime]:
     except Exception:
         return None
 
+def _passes_since(ts_val: Any, since: Optional[datetime]) -> bool:
+    if since is None:
+        return True
+    ts_dt: Optional[datetime] = None
+    if isinstance(ts_val, datetime):
+        ts_dt = ts_val
+    elif isinstance(ts_val, str):
+        try:
+            ts_dt = datetime.fromisoformat(ts_val)
+        except Exception:
+            return True
+    else:
+        return True
+    if ts_dt is None:
+        return True
+    return ts_dt > since
+
 
 def _load_plan_title(session_id: str) -> Optional[str]:
     state_path = artifact_store.session_dir(session_id) / "state.json"
@@ -214,6 +232,39 @@ def _session_timestamps(session_id: str) -> tuple[Optional[float], Optional[floa
         except FileNotFoundError:
             pass
     return created, updated
+
+
+def _refresh_snapshot_if_needed(
+    session_id: str,
+    snapshot_dict: dict,
+    *,
+    timeout: float = 0.4,
+    interval: float = 0.05,
+) -> dict:
+    if snapshot_dict.get("worker_outputs"):
+        return snapshot_dict
+
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        time.sleep(interval)
+        try:
+            state = orch.load_orchestrator_state(session_id)
+            refreshed = build_session_snapshot(artifact_store, state, message_bus)
+            refreshed.command = snapshot_dict.get("command")
+            refreshed.message = snapshot_dict.get("message") or refreshed.message
+            refreshed.ok = snapshot_dict.get("ok", refreshed.ok)
+            refreshed.mode = snapshot_dict.get("mode")
+            refreshed.context = snapshot_dict.get("context")
+            refreshed_dict = refreshed.to_dict()
+            if refreshed_dict.get("worker_outputs"):
+                print(
+                    f"[Snapshot] Refreshed snapshot captured {len(refreshed_dict['worker_outputs'])} worker outputs"
+                )
+                return refreshed_dict
+        except Exception:
+            continue
+
+    return snapshot_dict
 
 
 def _load_progress_events(session_id: str, since: Optional[datetime]) -> list[dict]:
@@ -307,6 +358,9 @@ def _load_progress_events(session_id: str, since: Optional[datetime]) -> list[di
             except Exception:
                 pass
 
+    if not events:
+        events.extend(_collect_progress_events_from_snapshot(session_id, since))
+
     # Deduplicate by (agent, subtask_id, stage, ts)
     seen = set()
     deduped = []
@@ -318,6 +372,46 @@ def _load_progress_events(session_id: str, since: Optional[datetime]) -> list[di
         deduped.append(ev)
     deduped.sort(key=lambda e: str(e.get("ts") or ""))
     return deduped
+
+
+def _collect_progress_events_from_snapshot(session_id: str, since: Optional[datetime]) -> list[dict]:
+    try:
+        state = orch.load_orchestrator_state(session_id)
+    except Exception:
+        return []
+
+    try:
+        snapshot = build_session_snapshot(artifact_store, state, message_bus)
+    except Exception:
+        return []
+
+    filtered: list[dict] = []
+    for ev in snapshot.progress_events or []:
+        if not isinstance(ev, dict):
+            continue
+        if not _passes_since(ev.get("ts"), since):
+            continue
+        filtered.append(ev)
+    return filtered
+
+
+def _collect_worker_outputs_from_snapshot(session_id: str, since: Optional[datetime]) -> list[dict]:
+    try:
+        state = orch.load_orchestrator_state(session_id)
+    except Exception:
+        return []
+
+    try:
+        snapshot = build_session_snapshot(artifact_store, state, message_bus)
+    except Exception:
+        return []
+
+    filtered: list[dict] = []
+    for wo in snapshot.worker_outputs or []:
+        if not _passes_since(wo.get("timestamp"), since):
+            continue
+        filtered.append(wo)
+    return filtered
 
 
 def _load_worker_outputs_since(session_id: str, since: Optional[datetime]) -> list[dict]:
@@ -332,16 +426,7 @@ def _load_worker_outputs_since(session_id: str, since: Optional[datetime]) -> li
         state = orch.load_orchestrator_state(session_id)
         for wo in state.worker_outputs or []:
             data = wo.to_dict() if hasattr(wo, "to_dict") else dict(wo)
-            ts_val = data.get("timestamp")
-            ts_dt = None
-            if isinstance(ts_val, str):
-                try:
-                    ts_dt = datetime.fromisoformat(ts_val)
-                except Exception:
-                    ts_dt = None
-            elif isinstance(ts_val, datetime):
-                ts_dt = ts_val
-            if since and ts_dt and ts_dt <= since:
+            if not _passes_since(data.get("timestamp"), since):
                 continue
             outputs.append(data)
 
@@ -369,15 +454,7 @@ def _load_worker_outputs_since(session_id: str, since: Optional[datetime]) -> li
                     if payload_type == "SUBTASK_RESULT" or payload_type == PayloadType.SUBTASK_RESULT.value:
                         payload = envelope.get("payload", {})
                         timestamp = envelope.get("timestamp")
-
-                        # Filter by since timestamp
-                        ts_dt = None
-                        if isinstance(timestamp, str):
-                            try:
-                                ts_dt = datetime.fromisoformat(timestamp)
-                            except Exception:
-                                pass
-                        if since and ts_dt and ts_dt <= since:
+                        if not _passes_since(timestamp, since):
                             continue
 
                         # Extract worker output data
@@ -408,6 +485,8 @@ def _load_worker_outputs_since(session_id: str, since: Optional[datetime]) -> li
     except Exception:
         pass  # Return whatever we've collected
 
+    if not outputs:
+        outputs.extend(_collect_worker_outputs_from_snapshot(session_id, since))
     return outputs
 
 
@@ -516,6 +595,7 @@ def post_command(
     if not user_owns_session(current_user.id, session_id):
         raise HTTPException(status_code=404, detail="Session not found")
 
+    start_time = time.perf_counter()
     try:
         message_bus.log_user_command(
             session_id,
@@ -528,6 +608,7 @@ def post_command(
             request.command,
             payload=request.payload,
         )
+        snapshot = _refresh_snapshot_if_needed(session_id, snapshot)
         snapshot_model = SessionSnapshotModel(**snapshot)
         save_snapshot(session_id, snapshot_model)
         return snapshot_model
@@ -563,6 +644,7 @@ def post_command(
                 request.command,
                 payload=request.payload,
             )
+            snapshot = _refresh_snapshot_if_needed(session_id, snapshot)
             snapshot_model = SessionSnapshotModel(**snapshot)
             save_snapshot(session_id, snapshot_model)
             return snapshot_model
@@ -570,6 +652,9 @@ def post_command(
             raise HTTPException(status_code=500, detail=str(exc))
     except Exception as exc:
         raise HTTPException(status_code=500, detail=str(exc))
+    finally:
+        duration = time.perf_counter() - start_time
+        print(f"[Snapshot] command_response_delay={duration:.3f}s")
 
 
 @app.delete("/sessions/{session_id}")
