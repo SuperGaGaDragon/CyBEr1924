@@ -75,9 +75,23 @@ def _chapter_description(base_desc: str | None) -> str:
 
 
 def _chapter_title_has_index(title: str | None) -> bool:
+    """
+    Validate chapter title format (English and Chinese):
+    - English: "chapter 1", "Chapter2", "CHAPTER 10"
+    - Chinese: "第1章", "第一章", "第10章"
+    """
     if not title:
         return False
-    return bool(re.search(r"chapter\s*\d+", title, re.IGNORECASE))
+
+    # English format: "chapter" + number
+    if re.search(r"chapter\s*\d+", title, re.IGNORECASE):
+        return True
+
+    # Chinese format: "第N章" or "第一章"
+    if re.search(r"第\s*(\d+|[一二三四五六七八九十百千]+)\s*章", title):
+        return True
+
+    return False
 
 
 def _chapter_description_has_full_content(desc: str | None) -> bool:
@@ -915,12 +929,20 @@ def _apply_planner_result_to_state(
         notes = raw.get("notes") or ""
         desc = raw.get("description", "")
         if novel_mode and idx > 4:
-            # Phase 7 Checkpoint 2: Diagnose chapter validation
+            # Phase 8 Checkpoint: Enhanced chapter validation with detailed diagnostics
+            title_raw = raw.get('title', '')
             is_valid = _is_valid_chapter_candidate(raw)
-            print(f"[Planner] Validating chapter {sub_id}: is_valid={is_valid}, title={raw.get('title', 'N/A')[:50]}, has_CHAPTER_FULL_CONTENT={CHAPTER_FULL_CONTENT in desc}")
+            has_index = _chapter_title_has_index(title_raw)
+            has_marker = CHAPTER_FULL_CONTENT in desc
+            print(f"[Planner] Validating {sub_id}: is_valid={is_valid}, has_index={has_index}, has_marker={has_marker}, title={title_raw[:60]}")
+
             if not is_valid:
+                if not has_index:
+                    print(f"[Planner] ❌ Rejected {sub_id}: title does not match chapter pattern (English 'chapter N' or Chinese '第N章')")
+                if not has_marker:
+                    print(f"[Planner] ❌ Rejected {sub_id}: description missing CHAPTER_FULL_CONTENT marker")
                 warning_lines.append(
-                    f"Skipped planner chapter {sub_id} because title must include 'Chapter {{n}}' and description must contain '{CHAPTER_FULL_CONTENT}'."
+                    f"Skipped planner chapter {sub_id} because title must include 'Chapter {{n}}' or '第N章' and description must contain '{CHAPTER_FULL_CONTENT}'."
                 )
                 continue
             normalized = _normalize_chapter_subtask(raw, idx)
