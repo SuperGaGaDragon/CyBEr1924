@@ -1224,12 +1224,17 @@ class Orchestrator:
     ) -> None:
         """Invoke planner again after t4 to append t5+ chapter subtasks."""
         if state is None:
+            print("[Planner] Skipping chapter expansion: state is None")
             return
         try:
             if not state.extra or not state.extra.get("novel_mode"):
+                print("[Planner] Skipping chapter expansion: not in novel_mode")
                 return
         except Exception:
+            print("[Planner] Skipping chapter expansion: exception checking novel_mode")
             return
+
+        print(f"[Planner] Starting chapter expansion after t4 completion (current subtasks: {len(plan.subtasks)})")
 
         # Record that planner is starting to generate chapter tasks
         try:
@@ -1251,6 +1256,7 @@ class Orchestrator:
 
         topic = plan.title or "Novel Story"
         outline = ""
+        print(f"[Planner] Calling planner to generate chapter outline for: {topic}")
         try:
             outline = self._call_planner(
                 topic,
@@ -1259,7 +1265,9 @@ class Orchestrator:
                 summary_artifact=artifact_payload,
                 reviewer_batch_annotations=reviewer_annotations,
             )
-        except Exception:
+            print(f"[Planner] ✓ Planner returned outline ({len(outline)} chars)")
+        except Exception as e:
+            print(f"[Planner] ❌ Failed to call planner: {e}")
             return
 
         # Save planner outline for debugging
@@ -1270,15 +1278,15 @@ class Orchestrator:
                 kind="markdown",
                 description="Planner chapter outline (after t4)",
             )
-            print(f"DEBUG: Planner outline saved to {debug_ref.path}")
+            print(f"[Planner] Outline saved to {debug_ref.path}")
         except Exception:
             pass
 
         try:
             stub_plan = Plan.from_outline(topic, outline)
-            print(f"DEBUG: Planner returned {len(stub_plan.subtasks)} chapter candidates")
+            print(f"[Planner] Parsed {len(stub_plan.subtasks)} chapter candidates from outline")
         except Exception as e:
-            print(f"ERROR: Failed to parse planner outline: {e}")
+            print(f"[Planner] ❌ Failed to parse planner outline: {e}")
             stub_plan = None
 
         sanitized_subtasks: List[Dict[str, Any]] = []
@@ -1294,6 +1302,7 @@ class Orchestrator:
                     "Chapter" in title
                 )
                 if not has_chapter:
+                    print(f"[Planner] Skipping non-chapter subtask: {title}")
                     continue
                 desc = sub.description or _chapter_description(title)
                 next_id = f"t{base_count + len(sanitized_subtasks) + 1}"
@@ -1307,11 +1316,11 @@ class Orchestrator:
                     }
                 )
 
-        print(f"DEBUG: After sanitization: {len(sanitized_subtasks)} valid chapters")
+        print(f"[Planner] After sanitization: {len(sanitized_subtasks)} valid chapters")
 
         # Fallback: if no valid chapters, generate default 5 chapters
         if not sanitized_subtasks:
-            print("WARNING: Planner returned no valid chapters, generating default 5 chapters")
+            print("[Planner] ⚠️ No valid chapters found, generating default 5 chapters")
             chapter_count = profile.get("chapter_count", 5) if profile else 5
             for i in range(chapter_count):
                 next_id = f"t{base_count + i + 1}"
@@ -1324,7 +1333,7 @@ class Orchestrator:
                         "notes": "Auto-generated chapter task (planner fallback)",
                     }
                 )
-            print(f"Generated {len(sanitized_subtasks)} default chapters")
+            print(f"[Planner] Generated {len(sanitized_subtasks)} default chapters")
 
         planner_result = PlannerResult(
             plan={
@@ -1373,8 +1382,17 @@ class Orchestrator:
                 )
             except Exception:
                 pass
+            # Persist plan and state immediately so new chapters are visible to next iteration
+            print(f"[Planner] Persisting plan with {added} new chapter tasks (total: {len(plan.subtasks)})")
+            try:
+                self.save_state(session_id, plan)
+                self.save_orchestrator_state(state)
+                print(f"[Planner] ✓ Plan and state persisted successfully")
+            except Exception as e:
+                print(f"[Planner] ❌ Failed to persist plan/state: {e}")
         else:
             self._update_novel_phase_step(state, increment=0)
+            print("[Planner] No chapter tasks were added (skipping plan persistence)")
 
     def _update_novel_phase_step(self, state: OrchestratorState | None, *, increment: int = 0) -> None:
         if state is None:
