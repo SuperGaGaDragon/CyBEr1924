@@ -1,6 +1,466 @@
+** to do list **
+- debug
+- 后端 ui同步。（生成什么ui显示什么）
+- ui内容无法显示到前端问题
 
-# 运转过程可视化计划
+═══════════════════════════════════════════════════════════════════
+📋 问题诊断与分析
+═══════════════════════════════════════════════════════════════════
 
-1. 通过现有的 `progress_events` 汇总出各 agent（worker/reviewer）每次 start/finish 的条目，生成带时间戳、阶段、状态和 metadata 的时间线数据结构，并添加专门的 `ProgressEventTimeline` 组件用于展示。
-2. 在 Worker Column 里，基于 snapshot 生成的时间线数据在 Timeline 视图下渲染出来，同时将原来的“暂无进度”提示改为仅在既没有聚合进度也没有时间线条目的时候显示。
-3. 同样在 Reviewer Column 里展示时间线条目，并把时间线条目和 `ProgressStrip` 组合成 Timeline 视图的第一屏，确保后端实际记录的 Task1/redo/decision 都能直观呈现。
+** 具体问题定位 **
+
+=== 问题 1: Log 混乱输出 Bug ===
+根据log，可以看到以下混乱：
+- 第105行：`小说标题：3030` 和 `体裁：科幻短篇` 混在了章节分配的日志中
+- 第107行：`章节安排：` 后紧跟着 `- 类型：服务型智能机器人`（这应该是t2的内容）
+- 第109-113行：t4的内容和t2的内容混在一起
+
+问题原因：
+1. **并发输出导致交错**：多个agent并发运行时，print() 语句会交错输出
+2. **Novel Summary 日志穿插**：`_update_novel_summary` 在每个subtask完成后都会执行
+3. **数据本身混乱**：worker 输出的内容可能本身就包含了其他task的信息
+
+**优先级：低** - 只是日志可读性问题，不影响功能
+
+=== 问题 2: UI 不同步显示（只显示task1加载中）===
+表现：UI只显示task1处于"加载中"状态，没有同步更新后续task的状态
+
+**这是问题3的症状表现**
+
+=== 问题 3: UI内容完全无法显示到前端 ⚠️ ===
+
+**根本原因**：orchestrator_state.worker_outputs 缓存未正确更新
+
+从log分析：
+- 第38行：`[Snapshot] Found 0 SUBTASK_RESULT envelopes`
+- 第39行：`[Snapshot] Final worker_outputs count: 0 (expected: 4)`
+- 但第46-48行：`✓ SUBTASK_RESULT envelope sent for t1`、`✓ Envelope log exists with 1 SUBTASK_RESULT entries`
+
+说明：
+- SUBTASK_RESULT 确实写入了 envelopes.jsonl
+- 但在生成snapshot时，读取到的是 0 个 SUBTASK_RESULT
+- **时序竞争**：snapshot 在 17:30:49 生成，envelope 也在 17:30:49 写入（同一秒）
+
+═══════════════════════════════════════════════════════════════════
+🔍 深层技术分析
+═══════════════════════════════════════════════════════════════════
+
+=== 无法解决根本问题的方案 ===
+
+❌ **仅在UI层添加timeline显示是不够的**
+
+即使添加了 ProgressEventTimeline 组件（App.tsx:3789-3834），如果后端根本不返回 progress_events，UI层依旧是空白。
+
+关键问题链条：
+1. api.py:219-252 的 _load_progress_events 在以下情况返回空数组：
+   - 状态文件丢失（FileNotFoundError）
+   - progress_events.jsonl 文件不存在
+   - since 时间戳过滤导致所有事件被排除
+   - orchestrator_state.progress_events 为空
+
+2. 如果 GET /sessions/{id} 因为 SessionSnapshotModel 校验失败（如旧版拒绝 agent="planner"），
+   根本拿不到 snapshot，timeline 也永无机会显示
+
+**结论**：UI层的改动不能替代 API 请求链路中断的问题
+
+=== 关键代码位置与问题 ===
+
+1. **Envelope 写入缺少 flush()**
+   位置：multi_agent_platform/message_bus.py:64-67
+   ```python
+   with log_path.open("a", encoding="utf-8") as f:
+       f.write(json.dumps(envelope_dict, ensure_ascii=False))
+       f.write("\n")
+   # 缺少 f.flush() 或 os.fsync(f.fileno())
+   ```
+
+2. **Events 接口完全依赖缓存**
+   位置：api.py:278-298 _load_worker_outputs_since
+   ```python
+   def _load_worker_outputs_since(session_id: str, since: Optional[datetime]) -> list[dict]:
+       outputs: list[dict] = []
+       try:
+           state = orch.load_orchestrator_state(session_id)
+       except FileNotFoundError:
+           return outputs  # 文件丢失直接返回空！
+       for wo in state.worker_outputs or []:
+           # ... 只处理缓存数据
+   ```
+
+   **关键发现**：这个函数完全依赖 orchestrator_state.worker_outputs 缓存！
+   如果缓存为空或文件丢失，即使 envelope 写入成功，events接口也返回空数组。
+
+3. **Progress Events 读取逻辑**
+   位置：api.py:219-252 _load_progress_events
+   问题：
+   - 在状态丢失时返回空数组
+   - since 时间戳过滤可能过滤掉所有事件
+   - 没有从 envelope.jsonl 中补充缺失的 progress_events
+
+4. **SessionSnapshotModel 验证问题**
+   位置：multi_agent_platform/api_models.py:53-60
+   如果模型验证失败（如 agent 字段值不在枚举范围内），整个请求都会失败
+
+═══════════════════════════════════════════════════════════════════
+✅ 必须修复的根本问题（按优先级排序）每次完成请commit 到github
+═══════════════════════════════════════════════════════════════════
+
+Phase 1: 数据持久化与读取（最高优先级）✅ 已完成
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+- [x] 1.1 确保 envelope 写入时 flush 到磁盘
+      位置：multi_agent_platform/message_bus.py:64-67
+      方案：在 f.write("\n") 后添加 f.flush() 和 os.fsync(f.fileno())
+
+- [x] 1.2 确保 orchestrator_state 保存时 flush
+      位置：run_flow.py save_orchestrator_state() 调用处
+      方案：保存后确保文件完全写入磁盘
+      ✅ 已完成 - commit 0a273dc
+
+- [x] 1.3 修复 _load_worker_outputs_since 的容错机制
+      位置：api.py:278-298
+      方案：当缓存为空时，尝试从 envelopes.jsonl 读取 SUBTASK_RESULT
+      实现：复用 build_session_snapshot 中的 envelope 解析逻辑
+      ✅ 已完成 - commit 2f5c23b (最关键的修复)
+
+- [x] 1.4 修复 _load_progress_events 的数据源
+      位置：api.py:219-252
+      当前问题：只读取内存状态 + progress_events.jsonl
+      方案：如果这两个都为空，尝试从 envelopes.jsonl 中提取进度事件
+      ✅ 已完成 - commit 80f286e
+
+- [x] 1.5 修复 SessionSnapshotModel 验证规则
+      位置：multi_agent_platform/api_models.py:53-60
+      方案：允许 agent 字段有更宽松的值（如 "planner"）
+      或者：在保存前规范化数据，确保符合模型约束
+      ✅ 已完成 - commit 0a273dc
+
+Phase 2: UI 层优化（依赖 Phase 1 完成）
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+- [ ] 2.1 buildProgressTimelineEntries 时间戳排序修复 ⚠️ 高优先级
+      位置：App.tsx:717-749
+
+      **当前问题**：
+      - 仅基于 ts 排序，缺失时间戳的事件默认为 0，跳到时间线最前面
+      - 无法保留后端日志的实际写入顺序
+      - redo/decision 事件可能被任意重排，破坏因果关系
+
+      **修复方案**：
+      在比较时间戳前，先使用原始插入索引（或 payload.sequence）作为 fallback
+
+      ```tsx
+      // buildProgressTimelineEntries 修改
+      const rawEvents = snapshot?.progress_events || [];
+
+      // 为每个事件添加原始索引
+      const eventsWithIndex = rawEvents.map((ev, idx) => ({
+          ...ev,
+          _originalIndex: idx
+      }));
+
+      // 过滤特定 agent 的事件...
+
+      // 排序：优先使用时间戳，缺失时用原始索引
+      entries.sort((a, b) => {
+          const tsA = a.ts ? new Date(a.ts).getTime() : null;
+          const tsB = b.ts ? new Date(b.ts).getTime() : null;
+
+          // 两者都有时间戳：按时间戳排序
+          if (tsA !== null && tsB !== null) {
+              if (tsA !== tsB) return tsA - tsB;
+              // 时间戳相同：用原始索引打破平局
+              return (a._originalIndex || 0) - (b._originalIndex || 0);
+          }
+
+          // 只有一个有时间戳：有时间戳的排后面（保持无时间戳的原始顺序）
+          if (tsA === null && tsB !== null) return -1;
+          if (tsA !== null && tsB === null) return 1;
+
+          // 都没有时间戳：保持原始索引顺序
+          return (a._originalIndex || 0) - (b._originalIndex || 0);
+      });
+      ```
+
+- [ ] 2.2 ProgressEventTimeline 视觉优化与信息完整性 ⚠️ 高优先级
+      位置：App.tsx:3789-3844
+
+      **当前问题**：
+      - stage/status/metadata 挤在一列，难以扫描关键信息
+      - 缺少 REDO/ACCEPT 决策的视觉区分
+      - 未显示 subtaskId 或 task order，用户看到 "Novel Summary timeline" 无法定位具体任务
+
+      **改进方案**：
+
+      1. 添加决策类型徽章（badge）：
+      ```tsx
+      const decisionBadge = (decision: string) => {
+          const styles = {
+              REDO: { bg: "#fee2e2", fg: "#991b1b", label: "REDO" },
+              ACCEPT: { bg: "#d1fae5", fg: "#065f46", label: "ACCEPT" },
+              PENDING: { bg: "#f3f4f6", fg: "#4b5563", label: "PENDING" }
+          };
+          const style = styles[decision] || styles.PENDING;
+          return (
+              <span style={{
+                  background: style.bg,
+                  color: style.fg,
+                  padding: "2px 8px",
+                  borderRadius: "4px",
+                  fontSize: "11px",
+                  fontWeight: "700"
+              }}>
+                  {style.label}
+              </span>
+          );
+      };
+      ```
+
+      2. 显示任务信息（Task ID + Order）：
+      ```tsx
+      // 在 ProgressEventTimeline 组件中
+      {entries.map((entry, idx) => {
+          const subtaskId = entry.subtask_id || entry.payload?.subtask_id;
+          const taskOrder = subtaskMap.get(subtaskId);  // 从 snapshot.subtasks 获取 order
+
+          return (
+              <div key={idx} style={{ ... }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                      {taskOrder && (
+                          <span style={{
+                              fontWeight: "700",
+                              color: "#6b7280",
+                              fontSize: "12px"
+                          }}>
+                              Task {taskOrder}
+                          </span>
+                      )}
+                      <span>·</span>
+                      {entry.payload?.decision && decisionBadge(entry.payload.decision)}
+                      <span style={{ fontSize: "13px" }}>by {entry.agent}</span>
+                  </div>
+                  <div>{entry.title || subtaskId}</div>
+              </div>
+          );
+      })}
+      ```
+
+      **期望效果**：
+      显示 "Task 1 · REDO by reviewer" 而不是 "Novel Summary timeline"
+
+- [ ] 2.3 优化 timeline entries 的依赖与性能 ⚠️ 中优先级
+      位置：App.tsx:4071, 4309
+
+      **当前问题**：
+      - workerTimelineEntries 和 reviewerTimelineEntries 依赖整个 snapshot 对象
+      - 每次 snapshot 任何部分更新（如 is_running 变化）都会重建数组
+      - 在长时间运行的 session 中造成不必要的渲染开销
+
+      **优化方案**：
+      精确指定依赖项，只在相关数据变化时重建
+
+      ```tsx
+      // WorkerColumn 组件中
+      const workerTimelineEntries = useMemo(
+          () => buildProgressTimelineEntries(snapshot, "worker"),
+          [
+              snapshot?.progress_events,      // 事件列表变化
+              snapshot?.subtasks              // 任务标题变化时也需要重建（显示名称）
+          ]
+      );
+
+      // CoordinatorColumn 组件中
+      const reviewerTimelineEntries = useMemo(
+          () => buildProgressTimelineEntries(snapshot, "reviewer"),
+          [
+              snapshot?.progress_events,
+              snapshot?.subtasks
+          ]
+      );
+      ```
+
+      **性能提升**：
+      避免在 is_running、current_subtask_id 等无关字段变化时重建时间线数组
+
+- [ ] 2.4 修复前端事件轮询停止过早的问题
+      位置：App.tsx:992-1003
+      方案：在所有 subtask 完成前保持轮询，不仅依赖 is_running
+
+- [ ] 2.5 修复 mergeSnapshotWithEvents 合并逻辑
+      位置：App.tsx:764-817
+      方案：确保新的 worker_outputs 正确合并，不被去重逻辑错误过滤
+
+Phase 3: Redo 版本支持（可选功能增强）
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+- [ ] 3.1 在 worker_outputs 中添加 revision 字段
+      后端：run_flow.py 发送 SUBTASK_RESULT 时添加 revision 字段
+
+- [ ] 3.2 UI 渲染同一 subtask_id 的多个版本
+      位置：App.tsx WorkerColumn
+      方案：按 subtask_id 分组，同一个task的多个版本堆叠显示
+      第一个版本：正常显示
+      后续版本：显示 "[Redone Version]" 标签
+
+- [ ] 3.3 Reviewer timeline 记录 REDO 事件
+      方案：在发送 REQUEST_REDO 时记录为 progress_event
+      后端：run_flow.py 发送 orch_events 时同时记录到 progress_events
+
+═══════════════════════════════════════════════════════════════════
+📊 完整的问题链条
+═══════════════════════════════════════════════════════════════════
+
+1. 用户执行 "all" 命令 → execute_command() 启动后台任务
+2. 后台任务执行 worker → 写入 envelope → 更新 state.worker_outputs → save_orchestrator_state()
+   ⚠️ 问题点：save 可能未 flush，envelope 可能未 flush
+3. 前端轮询 /events 接口 → _load_worker_outputs_since() 读取 orchestrator_state
+   ⚠️ 问题点：只读缓存，如果 FileNotFoundError 直接返回空数组
+4. 前端收到空数组 → UI 无法显示任何内容
+
+**为什么会发生**：
+- 后台任务是异步的，state.worker_outputs 的更新有延迟
+- save_orchestrator_state() 和 envelope 写入都没有 flush
+- load_orchestrator_state() 读取时可能读到旧数据或找不到文件
+- events 接口没有容错机制（缓存失败时不尝试从 envelope 读取）
+
+═══════════════════════════════════════════════════════════════════
+🎯 实施建议
+═══════════════════════════════════════════════════════════════════
+
+**立即执行（关键路径）**：
+1. Phase 1.1 - 1.2：修复文件 flush 问题（最简单，影响最大）
+2. Phase 1.3 - 1.4：修复 events 接口容错（确保即使缓存失败也能从 envelope 读取）
+3. Phase 1.5：修复模型验证（清理 API 验证格局）
+
+**验证测试**：
+1. 启动后台任务后，立即调用 /events 接口，检查是否能获取 worker_outputs
+2. 删除 orchestrator_state 文件，检查 events 接口是否能从 envelope 读取数据
+3. 检查 progress_events 是否正确写入并透出
+
+**后续优化（Phase 2-3）**：
+在 Phase 1 全部完成并验证通过后，再进行 UI 层优化和功能增强。
+
+═══════════════════════════════════════════════════════════════════
+📝 Redo版本显示示例（Phase 3 参考）
+═══════════════════════════════════════════════════════════════════
+
+后端数据结构（worker_outputs）：
+```json
+[
+  {
+    "subtask_id": "t1",
+    "subtask_title": "Research",
+    "content": "第一版内容...",
+    "timestamp": "2025-12-10T17:30:49",
+    "revision": 0
+  },
+  {
+    "subtask_id": "t1",
+    "subtask_title": "Research",
+    "content": "修改后的内容...",
+    "timestamp": "2025-12-10T17:35:20",
+    "revision": 1
+  }
+]
+```
+
+前端渲染逻辑（WorkerColumn）：
+```tsx
+// 按 subtask_id 分组
+const groupedOutputs = outputs.reduce((acc, out) => {
+  if (!acc[out.subtask_id]) acc[out.subtask_id] = [];
+  acc[out.subtask_id].push(out);
+  return acc;
+}, {});
+
+// 渲染时
+Object.entries(groupedOutputs).map(([subtaskId, versions]) => (
+  <div key={subtaskId}>
+    <h3>{versions[0].subtask_title}</h3>
+    {versions.map((version, idx) => (
+      <div key={idx}>
+        {idx > 0 && <span className="redo-badge">[Redone Version {idx}]</span>}
+        <p>{version.content}</p>
+      </div>
+    ))}
+  </div>
+))
+```
+
+═══════════════════════════════════════════════════════════════════
+🔧 最新 Review Findings（2025-12-10）
+═══════════════════════════════════════════════════════════════════
+
+**状态**：✅ 无阻塞问题，但建议进行以下优化以保持 timeline UI 可靠和可读
+
+### 优化 1：时间戳排序逻辑修复（高优先级）
+**位置**：buildProgressTimelineEntries (App.tsx:717-749)
+
+**现状**：
+- 仅基于 ts 排序，缺失时间戳的事件默认为 0
+- 这些事件会跳到时间线最前面
+- 无法保留后端日志的实际写入顺序（chronological order）
+- redo/decision 事件可能被任意重排
+
+**影响**：
+破坏事件的因果关系，用户无法理解正确的执行流程
+
+**解决方案**：
+参见 Phase 2.1 的详细实现代码
+
+---
+
+### 优化 2：Timeline 卡片信息完整性（高优先级）
+**位置**：ProgressEventTimeline (App.tsx:3789-3844)
+
+**现状**：
+- stage/status/metadata 挤在单列
+- reviewer 反馈关键信息（task id + decision）难以扫描
+- 缺少 REDO/ACCEPT 的视觉区分
+- 没有显示 subtaskId 或任务顺序
+
+**影响**：
+用户看到 "Novel Summary timeline" 无法定位具体是哪个任务
+
+**期望效果**：
+显示 "Task 1 · REDO by reviewer" 代替模糊描述
+
+**解决方案**：
+参见 Phase 2.2 的 badge 设计和任务信息显示代码
+
+---
+
+### 优化 3：性能优化（中优先级）
+**位置**：workerTimelineEntries / reviewerTimelineEntries (App.tsx:4071, 4309)
+
+**现状**：
+- 依赖整个 snapshot 对象
+- snapshot 任何部分更新都会重建数组
+- 长时间运行的 session 中造成不必要的渲染
+
+**解决方案**：
+精确依赖 `snapshot.progress_events` 和 `snapshot.subtasks`
+
+---
+
+**总结**：
+这三项优化不会阻塞功能，但能显著提升 timeline UI 的可靠性和可读性。
+建议在 Phase 1 完成后，优先实施 Phase 2.1 和 2.2。
+
+═══════════════════════════════════════════════════════════════════
+
+当前log参考：
+\n=== Subtask t1: Research ===
+INFO:     100.64.0.2:16526 - "POST /sessions/sess-20251210-222943-cffaf1a8/command HTTP/1.1" 200 OK
+[Snapshot] Envelope log path: /app/multi_agent_platform/sessions/sess-20251210-222943-cffaf1a8/logs/envelopes.jsonl
+[Snapshot] Log file exists: True
+[Snapshot] Processing 5 envelopes for session sess-20251210-222943-cffaf1a8
+[Snapshot] Found 0 SUBTASK_RESULT envelopes
+[Snapshot] Final worker_outputs count: 0 (expected: 4)
+...
+  Worker result saved: sessions/sess-20251210-222943-cffaf1a8/artifacts/9ec0289e1d11.md
+  Worker output length: 276 chars
+  Sending SUBTASK_RESULT for t1
+  ✓ SUBTASK_RESULT envelope sent for t1
+  ✓ Envelope log exists with 1 SUBTASK_RESULT entries
+  Cached output on subtask t1
