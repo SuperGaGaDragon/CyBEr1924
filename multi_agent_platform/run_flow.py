@@ -915,7 +915,10 @@ def _apply_planner_result_to_state(
         notes = raw.get("notes") or ""
         desc = raw.get("description", "")
         if novel_mode and idx > 4:
-            if not _is_valid_chapter_candidate(raw):
+            # Phase 7 Checkpoint 2: Diagnose chapter validation
+            is_valid = _is_valid_chapter_candidate(raw)
+            print(f"[Planner] Validating chapter {sub_id}: is_valid={is_valid}, title={raw.get('title', 'N/A')[:50]}, has_CHAPTER_FULL_CONTENT={CHAPTER_FULL_CONTENT in desc}")
+            if not is_valid:
                 warning_lines.append(
                     f"Skipped planner chapter {sub_id} because title must include 'Chapter {{n}}' and description must contain '{CHAPTER_FULL_CONTENT}'."
                 )
@@ -1314,7 +1317,9 @@ class Orchestrator:
                 if not has_chapter:
                     print(f"[Planner] Skipping non-chapter subtask: {title}")
                     continue
-                desc = sub.description or _chapter_description(title)
+                # Phase 7 Fix: Always call _chapter_description to ensure CHAPTER_FULL_CONTENT marker
+                # This ensures chapters pass _is_valid_chapter_candidate validation in _apply_planner_result_to_state
+                desc = _chapter_description(sub.description or title)
                 next_id = f"t{base_count + len(sanitized_subtasks) + 1}"
                 sanitized_subtasks.append(
                     {
@@ -1327,6 +1332,12 @@ class Orchestrator:
                 )
 
         print(f"[Planner] After sanitization: {len(sanitized_subtasks)} valid chapters")
+
+        # Phase 7 Checkpoint 1: Verify all chapters have CHAPTER_FULL_CONTENT marker
+        if sanitized_subtasks:
+            for task in sanitized_subtasks:
+                has_marker = CHAPTER_FULL_CONTENT in task.get("description", "")
+                print(f"[Planner] Chapter {task['subtask_id']}: has_marker={has_marker}, title={task.get('title', 'N/A')}")
 
         # Fallback: if no valid chapters, generate default 5 chapters
         if not sanitized_subtasks:
