@@ -1515,6 +1515,9 @@ class Orchestrator:
             with log_path.open("a", encoding="utf-8") as f:
                 f.write(json.dumps(record, ensure_ascii=False))
                 f.write("\n")
+                # Ensure data is flushed to disk to avoid race conditions
+                f.flush()
+                os.fsync(f.fileno())
             # Also mirror into envelopes.jsonl for downstream diagnostics/analytics.
             try:
                 self.bus.log_progress_event(session_id, record)

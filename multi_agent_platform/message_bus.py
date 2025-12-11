@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
@@ -65,6 +66,9 @@ class MessageBus:
         with log_path.open("a", encoding="utf-8") as f:
             f.write(json.dumps(envelope_dict, ensure_ascii=False))
             f.write("\n")
+            # Ensure data is flushed to disk to avoid race conditions
+            f.flush()
+            os.fsync(f.fileno())
 
         return envelope_dict
 
