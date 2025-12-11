@@ -795,9 +795,12 @@ function mergeSnapshotWithEvents(
   });
 
   const mergedOutputs = [...(snapshot.worker_outputs ?? [])];
-  const existingOutputs = new Set(mergedOutputs.map((o) => `${o.subtask_id}-${o.timestamp}`));
+  // Use JSON.stringify for more robust deduplication, handling undefined timestamps
+  const existingOutputs = new Set(
+    mergedOutputs.map((o) => JSON.stringify({ subtask_id: o.subtask_id, timestamp: o.timestamp, content: o.content?.substring(0, 100) }))
+  );
   for (const wo of events.worker_outputs ?? []) {
-    const key = `${wo.subtask_id}-${wo.timestamp}`;
+    const key = JSON.stringify({ subtask_id: wo.subtask_id, timestamp: wo.timestamp, content: wo.content?.substring(0, 100) });
     if (existingOutputs.has(key)) continue;
     existingOutputs.add(key);
     mergedOutputs.push(wo);
