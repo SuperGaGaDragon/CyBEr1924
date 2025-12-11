@@ -451,6 +451,12 @@ def build_session_snapshot(
     if log_path.exists():
         subtask_result_count = sum(1 for e in envelopes if _normalize_payload_type(e.get("payload_type")) == PayloadType.SUBTASK_RESULT.value)
         print(f"[Snapshot] Found {subtask_result_count} SUBTASK_RESULT envelopes")
+        # DEBUG: Print payload_type of each envelope to diagnose mismatch
+        if len(envelopes) > 0 and subtask_result_count == 0:
+            print(f"[Snapshot DEBUG] First 5 envelope payload_types:")
+            for i, env in enumerate(envelopes[:5]):
+                pt = env.get("payload_type")
+                print(f"  [{i}] payload_type='{pt}' (type: {type(pt).__name__})")
     for envelope in envelopes:
         payload_type = _normalize_payload_type(envelope.get("payload_type"))
         payload = envelope.get("payload", {})
