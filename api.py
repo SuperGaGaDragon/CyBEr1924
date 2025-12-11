@@ -276,25 +276,93 @@ def _load_progress_events(session_id: str, since: Optional[datetime]) -> list[di
 
 
 def _load_worker_outputs_since(session_id: str, since: Optional[datetime]) -> list[dict]:
+    """
+    Load worker outputs from orchestrator_state cache.
+    Fallback to envelopes.jsonl if cache is empty or file is missing.
+    """
     outputs: list[dict] = []
+
+    # Try to load from orchestrator_state cache first
     try:
         state = orch.load_orchestrator_state(session_id)
+        for wo in state.worker_outputs or []:
+            data = wo.to_dict() if hasattr(wo, "to_dict") else dict(wo)
+            ts_val = data.get("timestamp")
+            ts_dt = None
+            if isinstance(ts_val, str):
+                try:
+                    ts_dt = datetime.fromisoformat(ts_val)
+                except Exception:
+                    ts_dt = None
+            elif isinstance(ts_val, datetime):
+                ts_dt = ts_val
+            if since and ts_dt and ts_dt <= since:
+                continue
+            outputs.append(data)
+
+        # If we found outputs in cache, return them
+        if outputs:
+            return outputs
     except FileNotFoundError:
-        return outputs
-    for wo in state.worker_outputs or []:
-        data = wo.to_dict() if hasattr(wo, "to_dict") else dict(wo)
-        ts_val = data.get("timestamp")
-        ts_dt = None
-        if isinstance(ts_val, str):
-            try:
-                ts_dt = datetime.fromisoformat(ts_val)
-            except Exception:
-                ts_dt = None
-        elif isinstance(ts_val, datetime):
-            ts_dt = ts_val
-        if since and ts_dt and ts_dt <= since:
-            continue
-        outputs.append(data)
+        pass  # Fall through to envelope reading
+
+    # Fallback: Read from envelopes.jsonl if cache is empty or missing
+    from src.protocol import PayloadType
+    try:
+        log_path = artifact_store.logs_dir(session_id) / "envelopes.jsonl"
+        if not log_path.exists():
+            return outputs
+
+        with log_path.open("r", encoding="utf-8") as f:
+            for line in f:
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    envelope = json.loads(line)
+                    payload_type = envelope.get("payload_type", "").upper()
+                    if payload_type == "SUBTASK_RESULT" or payload_type == PayloadType.SUBTASK_RESULT.value:
+                        payload = envelope.get("payload", {})
+                        timestamp = envelope.get("timestamp")
+
+                        # Filter by since timestamp
+                        ts_dt = None
+                        if isinstance(timestamp, str):
+                            try:
+                                ts_dt = datetime.fromisoformat(timestamp)
+                            except Exception:
+                                pass
+                        if since and ts_dt and ts_dt <= since:
+                            continue
+
+                        # Extract worker output data
+                        artifact_info = payload.get("result_artifact", {})
+                        artifact_path = artifact_info.get("path")
+
+                        # Read artifact content
+                        content = ""
+                        if artifact_path:
+                            try:
+                                full_path = artifact_store.base_dir / artifact_path
+                                if full_path.exists():
+                                    content = full_path.read_text(encoding="utf-8")
+                            except Exception:
+                                pass
+
+                        outputs.append({
+                            "subtask_id": payload.get("subtask_id"),
+                            "subtask_title": payload.get("subtask_title", ""),
+                            "artifact_path": artifact_path,
+                            "content": content,
+                            "preview": content[:400] if content else "",
+                            "timestamp": timestamp,
+                            "source": "envelopes_fallback",
+                        })
+                except Exception:
+                    continue  # Skip malformed lines
+    except Exception:
+        pass  # Return whatever we've collected
+
     return outputs
 
 
