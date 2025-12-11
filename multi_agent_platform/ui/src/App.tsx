@@ -630,6 +630,7 @@ type ProgressTimelineEntry = {
   status: string;
   ts?: string;
   payload?: Record<string, any>;
+  _originalIndex?: number;  // Used for stable sorting when ts is missing
 };
 
 type ViewMode = "timeline" | "output";
@@ -735,15 +736,26 @@ function buildProgressTimelineEntries(
         status: ev.status ?? (ev.stage === "finish" ? "completed" : "in_progress"),
         ts,
         payload: ev.payload ?? {},
+        _originalIndex: idx,  // Preserve original index for stable sorting
       };
     })
     .sort((a, b) => {
-      const ta = a.ts ? new Date(a.ts).getTime() : 0;
-      const tb = b.ts ? new Date(b.ts).getTime() : 0;
-      if (ta !== tb) {
-        return ta - tb;
+      const tsA = a.ts ? new Date(a.ts).getTime() : null;
+      const tsB = b.ts ? new Date(b.ts).getTime() : null;
+
+      // Both have timestamps: sort by timestamp
+      if (tsA !== null && tsB !== null) {
+        if (tsA !== tsB) return tsA - tsB;
+        // Same timestamp: use original index as tiebreaker
+        return (a._originalIndex || 0) - (b._originalIndex || 0);
       }
-      return a.id.localeCompare(b.id);
+
+      // Only one has timestamp: put events without timestamp first (preserve original order)
+      if (tsA === null && tsB !== null) return -1;
+      if (tsA !== null && tsB === null) return 1;
+
+      // Both missing timestamps: preserve original index order
+      return (a._originalIndex || 0) - (b._originalIndex || 0);
     });
   return entries;
 }
