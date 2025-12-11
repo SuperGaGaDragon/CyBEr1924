@@ -967,6 +967,13 @@ function App() {
     }
   };
 
+  // Helper function to check if there are incomplete subtasks
+  const hasIncompleteSubtasks = (snapshot: SessionSnapshot | null): boolean => {
+    if (!snapshot?.subtasks || snapshot.subtasks.length === 0) return false;
+    // A subtask is incomplete if it's not "done" or "skipped"
+    return snapshot.subtasks.some((st) => st.status !== "done" && st.status !== "skipped");
+  };
+
   const pollEventsOnce = async () => {
     if (!state.activeSessionId || !state.snapshot) return;
     const since = state.lastEventTs || state.snapshot.last_progress_event_ts || null;
@@ -981,12 +988,13 @@ function App() {
           events.length > 0
             ? events[events.length - 1]?.ts ?? merged.last_progress_event_ts
             : merged.last_progress_event_ts ?? prev.lastEventTs;
-        stillRunning = merged.is_running ?? false;
+        // Continue polling if is_running OR if there are incomplete subtasks
+        stillRunning = merged.is_running ?? hasIncompleteSubtasks(merged);
         return {
           ...prev,
           snapshot: merged,
           lastEventTs: latestTs ?? null,
-          pollingEvents: merged.is_running ?? false,
+          pollingEvents: stillRunning,
         };
       });
     } catch (err: any) {
@@ -1005,7 +1013,11 @@ function App() {
   };
 
   useEffect(() => {
-    const shouldPoll = !!state.activeSessionId && (state.snapshot?.is_running || state.snapshot?.current_subtask_id);
+    const shouldPoll = !!state.activeSessionId && (
+      state.snapshot?.is_running ||
+      state.snapshot?.current_subtask_id ||
+      hasIncompleteSubtasks(state.snapshot)
+    );
     if (shouldPoll) {
       setState((prev) => ({ ...prev, pollingEvents: true }));
       if (!eventsPollTimer.current) {
@@ -1015,7 +1027,7 @@ function App() {
       stopEventPolling();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [state.activeSessionId, state.snapshot?.is_running, state.snapshot?.current_subtask_id]);
+  }, [state.activeSessionId, state.snapshot?.is_running, state.snapshot?.current_subtask_id, state.snapshot?.subtasks]);
 
   const isDraggingSidebar = useRef(false);
   const clearActiveSession = async (message: string) => {
