@@ -166,13 +166,23 @@ Phase 2: UI 层优化（依赖 Phase 1 完成）
       - 修改 reviewerTimelineEntries useMemo 依赖为 [snapshot?.progress_events, snapshot?.subtasks]
       - 性能提升：避免在无关字段变化时重建时间线
 
-- [ ] 2.4 修复前端事件轮询停止过早的问题
-      位置：App.tsx:992-1003
-      方案：在所有 subtask 完成前保持轮询，不仅依赖 is_running
+- [x] 2.4 修复前端事件轮询停止过早的问题
+      位置：App.tsx:970-1029
+      ✅ 已完成 - commit 9bd88c0
 
-- [ ] 2.5 修复 mergeSnapshotWithEvents 合并逻辑
-      位置：App.tsx:764-817
-      方案：确保新的 worker_outputs 正确合并，不被去重逻辑错误过滤
+      实现：
+      - 添加 hasIncompleteSubtasks 辅助函数
+      - 修改轮询条件：is_running OR hasIncompleteSubtasks
+      - 更新 useEffect 依赖包含 snapshot.subtasks
+
+- [x] 2.5 修复 mergeSnapshotWithEvents 合并逻辑
+      位置：App.tsx:797-807
+      ✅ 已完成 - commit ee2f2e8
+
+      实现：
+      - 使用 JSON.stringify 替代简单字符串拼接进行去重
+      - 去重键包含 subtask_id, timestamp, content preview
+      - 正确处理 undefined timestamp 的情况
 
 Phase 3: Redo 版本支持（可选功能增强）
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
