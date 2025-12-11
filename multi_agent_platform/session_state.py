@@ -12,6 +12,7 @@ from pathlib import Path
 from typing import Optional, Dict, Any, List, Literal
 from datetime import datetime
 import json
+import os
 from pydantic import BaseModel, Field, root_validator
 
 from .message_bus import MessageBus
@@ -273,7 +274,6 @@ class OrchestratorState:
 
     def save(self, path: Path) -> None:
         """Save state to a file with explicit flush to avoid race conditions."""
-        import os
         path.parent.mkdir(parents=True, exist_ok=True)
         # Use explicit file operations with flush/fsync instead of write_text
         with path.open("w", encoding="utf-8") as f:
@@ -291,8 +291,15 @@ def _read_log_entries(log_path: Path) -> List[Dict[str, Any]]:
     if not log_path.exists():
         return []
 
+    try:
+        os.sync()
+    except AttributeError:
+        pass
+    except OSError:
+        pass
+
     entries: List[Dict[str, Any]] = []
-    with log_path.open("r", encoding="utf-8") as reader:
+    with log_path.open("r", encoding="utf-8", buffering=1) as reader:
         for line in reader:
             line = line.strip()
             if not line:
@@ -301,6 +308,15 @@ def _read_log_entries(log_path: Path) -> List[Dict[str, Any]]:
                 entries.append(json.loads(line))
             except Exception:
                 continue
+
+    if entries:
+        tail_entries = entries[-5:]
+        print(f"[Snapshot] Tail {len(tail_entries)} envelopes:")
+        for idx, envelope in enumerate(tail_entries, start=1):
+            pt = envelope.get("payload_type")
+            ts = envelope.get("timestamp")
+            print(f"[Snapshot]   tail[{idx}] payload_type='{pt}' ts='{ts}'")
+
     return entries
 
 
@@ -440,6 +456,9 @@ def build_session_snapshot(
 
     envelopes = _read_log_entries(log_path)
     envelopes.sort(key=lambda env: env.get("timestamp", ""))
+    if envelopes:
+        last_payload = _normalize_payload_type(envelopes[-1].get("payload_type"))
+        print(f"[Snapshot] Last envelope payload_type: {last_payload}")
 
     subtask_map = {sub["id"]: sub["title"] for sub in subtasks}
 
@@ -526,6 +545,7 @@ def build_session_snapshot(
         cached_outputs = orchestrator_state.worker_outputs or []
     except Exception:
         cached_outputs = []
+    print(f"[Snapshot] Cached worker_outputs length: {len(cached_outputs)}")
 
     for cached in cached_outputs:
         sub_id = getattr(cached, "subtask_id", None) or (cached.get("subtask_id") if isinstance(cached, dict) else None)

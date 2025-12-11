@@ -117,6 +117,8 @@ class MessageBus:
             with log_path.open("a", encoding="utf-8") as f:
                 f.write(json.dumps(payload, ensure_ascii=False))
                 f.write("\n")
+                f.flush()
+                os.fsync(f.fileno())
         except Exception:
             # Logging is best-effort; ignore failures.
             return
