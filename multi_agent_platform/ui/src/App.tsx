@@ -4112,7 +4112,10 @@ function WorkerColumn({ snapshot, progress, progressSeenCount = 0, viewMode = "t
 
   const subtaskMap = new Map((snapshot?.subtasks ?? []).map((s) => [s.id, s.title]));
   const subtaskOrder = new Map((snapshot?.subtasks ?? []).map((s, i) => [s.id, i + 1]));
-  const workerTimelineEntries = useMemo(() => buildProgressTimelineEntries(snapshot, "worker"), [snapshot]);
+  const workerTimelineEntries = useMemo(
+    () => buildProgressTimelineEntries(snapshot, "worker"),
+    [snapshot?.progress_events, snapshot?.subtasks]
+  );
   return (
     <div style={{
       borderRight: "1px solid #e5e7eb",
@@ -4350,7 +4353,10 @@ function CoordinatorColumn({ snapshot, width, progress = [], progressSeenCount =
   const novelSummary = (snapshot as any)?.state?.extra?.novel_summary_t1_t4 || (snapshot as any)?.orchestrator_state?.extra?.novel_summary_t1_t4;
   const t4Details = (snapshot as any)?.state?.extra?.t4_detailed_chapter_allocations || (snapshot as any)?.orchestrator_state?.extra?.t4_detailed_chapter_allocations;
   const reviewerRevisions = (snapshot as any)?.state?.extra?.reviewer_revisions || (snapshot as any)?.orchestrator_state?.extra?.reviewer_revisions || {};
-  const reviewerTimelineEntries = useMemo(() => buildProgressTimelineEntries(snapshot, "reviewer"), [snapshot]);
+  const reviewerTimelineEntries = useMemo(
+    () => buildProgressTimelineEntries(snapshot, "reviewer"),
+    [snapshot?.progress_events, snapshot?.subtasks]
+  );
 
   // Derive reviewer-like statuses from subtasks when no explicit decision exists.
   const existingIds = new Set(
