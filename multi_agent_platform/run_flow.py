@@ -1249,21 +1249,31 @@ class Orchestrator:
         except Exception:
             pass
 
-        summary = state.extra.get("novel_summary_t1_t4")
-        artifact_payload = state.extra.get("novel_summary_artifact")
-        reviewer_annotations = state.extra.get("reviewer_revisions_batch")
-        profile = state.extra.get("novel_profile")
+        # Phase 6 Fix: Only use t4 content instead of full novel_summary
+        # This prevents Planner from generating project management tasks (t10, t11, t12)
+        # instead of actual chapter tasks (t5, t6, t7...)
+        t4_output = None
+        for sub in plan.subtasks:
+            if sub.id == "t4":
+                t4_output = sub.output
+                break
 
+        if not t4_output:
+            print("[Planner] ❌ Cannot find t4 output, skipping chapter expansion")
+            return
+
+        profile = state.extra.get("novel_profile")
         topic = plan.title or "Novel Story"
         outline = ""
         print(f"[Planner] Calling planner to generate chapter outline for: {topic}")
+        print(f"[Planner] Using t4 output ({len(t4_output)} chars) as chapter allocation guide")
         try:
             outline = self._call_planner(
                 topic,
                 novel_profile=profile,
-                novel_summary=summary,
-                summary_artifact=artifact_payload,
-                reviewer_batch_annotations=reviewer_annotations,
+                novel_summary=t4_output,  # ← Only pass t4 content
+                summary_artifact=None,  # ← Remove summary artifact
+                reviewer_batch_annotations=None,  # ← Remove reviewer annotations
             )
             print(f"[Planner] ✓ Planner returned outline ({len(outline)} chars)")
         except Exception as e:
@@ -1349,7 +1359,7 @@ class Orchestrator:
             updated_plan = _apply_planner_result_to_state(
                 state,
                 planner_result,
-                fallback_user_text=summary or "",
+                fallback_user_text=t4_output or "",
                 existing_plan=plan,
                 novel_profile=profile,
             )
